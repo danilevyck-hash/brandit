@@ -18,7 +18,7 @@ export default function Navbar() {
             <Link
               href="/"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                pathname === "/"
+                pathname === "/" || pathname.startsWith("/cotizacion")
                   ? "bg-navy text-white"
                   : "text-gray-500 hover:text-navy hover:bg-gray-50"
               }`}
@@ -26,14 +26,34 @@ export default function Navbar() {
               Cotizaciones
             </Link>
             <Link
-              href="/cotizacion/nueva"
+              href="/caja"
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                pathname === "/cotizacion/nueva"
+                pathname.startsWith("/caja")
                   ? "bg-navy text-white"
                   : "text-gray-500 hover:text-navy hover:bg-gray-50"
               }`}
             >
-              + Nueva
+              Caja
+            </Link>
+            <Link
+              href="/guias"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                pathname.startsWith("/guias")
+                  ? "bg-navy text-white"
+                  : "text-gray-500 hover:text-navy hover:bg-gray-50"
+              }`}
+            >
+              Guías
+            </Link>
+            <Link
+              href="/leads"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                pathname.startsWith("/leads")
+                  ? "bg-navy text-white"
+                  : "text-gray-500 hover:text-navy hover:bg-gray-50"
+              }`}
+            >
+              Leads
             </Link>
           </div>
         </div>
