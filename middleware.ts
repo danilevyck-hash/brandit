@@ -1,19 +1,26 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/_next", "/api", "/favicon.ico"];
-
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (PUBLIC.some((p) => pathname.startsWith(p))) {
+  // Public routes — always pass through
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname === "/favicon.ico"
+  ) {
     return NextResponse.next();
   }
 
-  const hasSession = req.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+  // Check for any Supabase session cookie (sb-*)
+  const allCookies = req.cookies.getAll();
+  const hasSession = allCookies.some((c) => c.name.startsWith("sb-"));
 
   if (!hasSession) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
