@@ -1,47 +1,24 @@
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+const PUBLIC = ["/login", "/_next", "/api", "/favicon.ico"];
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_APPS_FAMILIA_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_APPS_FAMILIA_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll().map(({ name, value }) => ({ name, value }));
-        },
-        setAll(cookies) {
-          cookies.forEach(({ name, value, options }) => {
-            req.cookies.set({ name, value, ...options });
-            res.cookies.set({ name, value, ...options });
-          });
-        },
-      },
-    }
-  );
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session && req.nextUrl.pathname !== "/login") {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
+  if (PUBLIC.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
   }
 
-  if (session && req.nextUrl.pathname === "/login") {
-    const homeUrl = new URL("/", req.url);
-    return NextResponse.redirect(homeUrl);
+  const hasSession = req.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+
+  if (!hasSession) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
