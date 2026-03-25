@@ -68,7 +68,7 @@ export default function GuiaDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl p-8 print:shadow-none print:rounded-none">
           <div className="text-center mb-6 border-b pb-4">
-            <h1 className="text-2xl font-extrabold text-navy">Confecciones Boston</h1>
+            <h1 className="text-2xl font-extrabold text-brandit-black">Confecciones Boston</h1>
             <p className="text-lg font-semibold text-gray-700">Guía de Transporte #{guia.numero}</p>
           </div>
           <div className="flex justify-between text-sm mb-6">
@@ -85,14 +85,14 @@ export default function GuiaDetailPage() {
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-2 border-navy text-left">
-                <th className="py-2 text-navy">#</th>
-                <th className="py-2 text-navy">Cliente</th>
-                <th className="py-2 text-navy">Dirección</th>
-                <th className="py-2 text-navy">Empresa</th>
-                <th className="py-2 text-navy">Facturas</th>
-                <th className="py-2 text-center text-navy">Bultos</th>
-                <th className="py-2 text-navy"># Guía</th>
+              <tr className="border-b-2 border-brandit-orange text-left">
+                <th className="py-2 text-brandit-black">#</th>
+                <th className="py-2 text-brandit-black">Cliente</th>
+                <th className="py-2 text-brandit-black">Dirección</th>
+                <th className="py-2 text-brandit-black">Empresa</th>
+                <th className="py-2 text-brandit-black">Facturas</th>
+                <th className="py-2 text-center text-brandit-black">Bultos</th>
+                <th className="py-2 text-brandit-black"># Guía</th>
               </tr>
             </thead>
             <tbody>
@@ -109,7 +109,7 @@ export default function GuiaDetailPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-navy font-bold">
+              <tr className="border-t-2 border-brandit-orange font-bold">
                 <td colSpan={5} className="py-2 text-right">Total Bultos:</td>
                 <td className="py-2 text-center">{totalBultos}</td>
                 <td></td>
@@ -128,10 +128,10 @@ export default function GuiaDetailPage() {
           </div>
         </div>
         <div className="flex gap-2 mt-4 print:hidden">
-          <button onClick={() => setPrintMode(false)} className="text-sm text-gray-500 hover:text-navy">
+          <button onClick={() => setPrintMode(false)} className="text-sm text-gray-500 hover:text-brandit-black">
             ← Volver
           </button>
-          <button onClick={() => window.print()} className="bg-navy text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-navy/90 transition-colors">
+          <button onClick={() => window.print()} className="bg-brandit-orange text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors">
             Imprimir
           </button>
         </div>
@@ -142,18 +142,18 @@ export default function GuiaDetailPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center gap-2 mb-6">
-        <Link href="/guias" className="text-sm text-gray-400 hover:text-navy">← Guías</Link>
+        <Link href="/guias" className="text-sm text-gray-400 hover:text-brandit-black">← Guías</Link>
       </div>
 
       <div className="flex items-end justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Guía #{guia.numero}</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Guía #{guia.numero}</h1>
           <p className="text-sm text-gray-400 mt-1">
             {guia.fecha} · {guia.transportista} · Placa: {guia.placa}
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setPrintMode(true)} className="text-sm text-gray-500 hover:text-navy border border-gray-200 rounded-xl px-4 py-2">
+          <button onClick={() => setPrintMode(true)} className="text-sm text-gray-500 hover:text-brandit-black border border-gray-200 rounded-xl px-4 py-2">
             Imprimir
           </button>
           {isAdmin && (
@@ -175,13 +175,13 @@ export default function GuiaDetailPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-left">
-              <th className="px-5 py-3 text-xs font-semibold text-navy">#</th>
-              <th className="px-5 py-3 text-xs font-semibold text-navy">Cliente</th>
-              <th className="px-5 py-3 text-xs font-semibold text-navy">Dirección</th>
-              <th className="px-5 py-3 text-xs font-semibold text-navy">Empresa</th>
-              <th className="px-5 py-3 text-xs font-semibold text-navy">Facturas</th>
-              <th className="px-5 py-3 text-xs font-semibold text-navy text-center">Bultos</th>
-              <th className="px-5 py-3 text-xs font-semibold text-navy"># Guía</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black">#</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Cliente</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Dirección</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Empresa</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Facturas</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black text-center">Bultos</th>
+              <th className="px-5 py-3 text-xs font-semibold text-brandit-black"># Guía</th>
             </tr>
           </thead>
           <tbody>
@@ -200,7 +200,7 @@ export default function GuiaDetailPage() {
           <tfoot>
             <tr className="border-t border-gray-100 font-semibold">
               <td colSpan={5} className="px-5 py-3 text-right text-gray-500 text-xs">Total Bultos:</td>
-              <td className="px-5 py-3 text-center text-navy">{totalBultos}</td>
+              <td className="px-5 py-3 text-center text-brandit-black">{totalBultos}</td>
               <td></td>
             </tr>
           </tfoot>

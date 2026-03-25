@@ -52,7 +52,7 @@ export default function ClientSelector({ selectedClientId, onSelect }: Props) {
             const c = clients.find(c => c.id === Number(e.target.value));
             if (c) onSelect(c);
           }}
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none bg-white"
+          className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none bg-white"
         >
           <option value="">Seleccionar cliente...</option>
           {clients.map(c => (
@@ -62,7 +62,7 @@ export default function ClientSelector({ selectedClientId, onSelect }: Props) {
         <button
           type="button"
           onClick={() => setShowNew(!showNew)}
-          className="px-4 py-2.5 bg-navy text-white rounded-xl text-sm font-medium hover:bg-navy/90 transition-colors"
+          className="px-4 py-2.5 bg-brandit-orange text-white rounded-xl text-sm font-medium hover:bg-brandit-orange/90 transition-colors"
         >
           + Nuevo
         </button>
@@ -74,27 +74,27 @@ export default function ClientSelector({ selectedClientId, onSelect }: Props) {
             placeholder="Nombre del cliente *"
             value={newName}
             onChange={e => setNewName(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
           />
           <div className="grid grid-cols-2 gap-3">
             <input
               placeholder="Teléfono"
               value={newPhone}
               onChange={e => setNewPhone(e.target.value)}
-              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none"
+              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
             />
             <input
               placeholder="Email"
               value={newEmail}
               onChange={e => setNewEmail(e.target.value)}
-              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none"
+              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
             />
           </div>
           <button
             type="button"
             onClick={createClient}
             disabled={saving || !newName.trim()}
-            className="w-full bg-navy text-white font-medium py-2.5 rounded-xl text-sm hover:bg-navy/90 transition-colors disabled:opacity-50"
+            className="w-full bg-brandit-orange text-white font-medium py-2.5 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50"
           >
             {saving ? "Guardando..." : "Crear Cliente"}
           </button>

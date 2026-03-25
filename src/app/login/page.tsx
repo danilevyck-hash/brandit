@@ -53,11 +53,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-cream flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-gray-50 shadow-sm p-8 w-full max-w-sm">
+    <div className="min-h-screen bg-brandit-black flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-navy font-extrabold text-3xl tracking-tight">Brand It</h1>
-          <p className="text-[11px] text-gray-400 font-medium mt-1">by Confecciones Boston</p>
+          <h1 className="text-3xl font-bold tracking-tight uppercase">
+            <span className="text-brandit-black">BRAND</span>
+            <span className="text-brandit-blue">/</span>
+            <span className="text-brandit-black">IT</span>
+            <span className="text-brandit-orange">.</span>
+          </h1>
+          <p className="text-[11px] text-brandit-gray font-medium mt-1">by Confecciones Boston</p>
         </div>
 
         <form onSubmit={handleLogin}>
@@ -68,7 +73,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none"
+              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none"
             />
             <input
               type="password"
@@ -76,7 +81,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none"
+              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none"
             />
           </div>
 
@@ -87,7 +92,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-navy text-white font-semibold py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors disabled:opacity-50"
+            className="w-full bg-brandit-orange text-white font-semibold py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50"
           >
             {loading ? "Ingresando..." : "Ingresar"}
           </button>

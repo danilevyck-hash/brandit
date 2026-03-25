@@ -142,11 +142,11 @@ export default function LeadsPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Leads</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Leads</h1>
           <p className="text-sm text-gray-400 mt-1">Seguimiento de clientes potenciales</p>
         </div>
         <button onClick={openNew}
-          className="bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm">
+          className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm">
           + Nuevo Lead
         </button>
       </div>
@@ -155,14 +155,14 @@ export default function LeadsPage() {
       <div className="flex gap-2 mb-8">
         <button onClick={() => setFiltro("")}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            filtro === "" ? "bg-navy text-white" : "text-gray-500 hover:text-navy hover:bg-gray-50"
+            filtro === "" ? "bg-brandit-orange text-white" : "text-gray-500 hover:text-brandit-black hover:bg-gray-50"
           }`}>
           Todos
         </button>
         {ESTADOS.map((e) => (
           <button key={e.value} onClick={() => setFiltro(e.value)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              filtro === e.value ? "bg-navy text-white" : "text-gray-500 hover:text-navy hover:bg-gray-50"
+              filtro === e.value ? "bg-brandit-orange text-white" : "text-gray-500 hover:text-brandit-black hover:bg-gray-50"
             }`}>
             {e.label}
           </button>
@@ -172,18 +172,18 @@ export default function LeadsPage() {
       {/* Form panel */}
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-50 p-6 mb-6">
-          <h3 className="font-semibold text-navy mb-4">{editingId ? "Editar Lead" : "Nuevo Lead"}</h3>
+          <h3 className="font-semibold text-brandit-black mb-4">{editingId ? "Editar Lead" : "Nuevo Lead"}</h3>
           <div className="grid grid-cols-2 gap-3 mb-3">
             <input placeholder="Nombre *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input placeholder="Empresa" value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input placeholder="Teléfono" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as Lead["estado"] })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none">
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none">
               {ESTADOS.map((e) => (
                 <option key={e.value} value={e.value}>{e.label}</option>
               ))}
@@ -193,14 +193,14 @@ export default function LeadsPage() {
               value={form.vendedora}
               onChange={(e) => setForm({ ...form, vendedora: e.target.value })}
               readOnly={isVendedora}
-              className={`bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none ${isVendedora ? "bg-gray-50 text-gray-500" : ""}`}
+              className={`bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none ${isVendedora ? "bg-gray-50 text-gray-500" : ""}`}
             />
           </div>
           <textarea placeholder="Notas" value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={2}
-            className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none mb-4" />
+            className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none mb-4" />
           <div className="flex gap-2">
             <button type="submit" disabled={saving}
-              className="bg-navy text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-navy/90 transition-colors disabled:opacity-50">
+              className="bg-brandit-orange text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50">
               {saving ? "Guardando..." : editingId ? "Actualizar" : "Guardar"}
             </button>
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
@@ -218,7 +218,7 @@ export default function LeadsPage() {
         <div className="text-center py-24">
           <div className="text-6xl mb-4 opacity-20">👥</div>
           <p className="text-gray-400 text-lg mb-3">No hay leads</p>
-          <button onClick={openNew} className="text-navy font-medium hover:underline text-sm">Agregar el primer lead</button>
+          <button onClick={openNew} className="text-brandit-black font-medium hover:underline text-sm">Agregar el primer lead</button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -228,16 +228,16 @@ export default function LeadsPage() {
               <div
                 key={lead.id}
                 onClick={() => canEdit(lead) && openEdit(lead)}
-                className={`flex items-center justify-between bg-white rounded-2xl border px-5 py-4 hover:border-navy/10 hover:shadow-md transition-all group ${
+                className={`flex items-center justify-between bg-white rounded-2xl border px-5 py-4 hover:border-brandit-orange/10 hover:shadow-md transition-all group ${
                   canEdit(lead) ? "cursor-pointer" : ""
-                } ${editingId === lead.id ? "border-navy/20 shadow-md" : "border-gray-50"}`}
+                } ${editingId === lead.id ? "border-brandit-orange/20 shadow-md" : "border-gray-50"}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-navy/5 group-hover:text-navy transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
                     {lead.nombre.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm group-hover:text-navy transition-colors">
+                    <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
                       {lead.nombre}
                       {lead.empresa && <span className="text-gray-400 font-normal"> · {lead.empresa}</span>}
                     </h3>

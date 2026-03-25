@@ -59,7 +59,7 @@ function NumInput({ value, onChange }: { value: number; onChange: (v: number) =>
       step="any"
       value={value || ""}
       onChange={e => onChange(parseFloat(e.target.value) || 0)}
-      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:ring-1 focus:ring-navy/20 focus:border-navy outline-none"
+      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:ring-1 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
     />
   );
 }
@@ -83,7 +83,7 @@ export default function ConfectionTable({ items, onChange }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900">Items de Confección</h3>
-        <button type="button" onClick={add} className="text-xs bg-navy text-white px-3 py-1.5 rounded-lg font-medium hover:bg-navy/90 transition-colors">
+        <button type="button" onClick={add} className="text-xs bg-brandit-orange text-white px-3 py-1.5 rounded-lg font-medium hover:bg-brandit-orange/90 transition-colors">
           + Agregar Item
         </button>
       </div>
@@ -97,7 +97,7 @@ export default function ConfectionTable({ items, onChange }: Props) {
       {items.map((item, idx) => (
         <div key={item._key} className="bg-white border border-gray-100 rounded-2xl p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-navy bg-navy/5 px-2.5 py-1 rounded-lg">#{idx + 1}</span>
+            <span className="text-xs font-bold text-brandit-black bg-brandit-orange/5 px-2.5 py-1 rounded-lg">#{idx + 1}</span>
             <button type="button" onClick={() => remove(idx)} className="text-red-400 hover:text-red-600 text-xs font-medium">Eliminar</button>
           </div>
 
@@ -108,7 +108,7 @@ export default function ConfectionTable({ items, onChange }: Props) {
                 value={item.description}
                 onChange={e => update(idx, "description", e.target.value)}
                 placeholder="Ej: Pantalón Dama"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-navy/20 focus:border-navy outline-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
               />
             </div>
             <div>
@@ -117,7 +117,7 @@ export default function ConfectionTable({ items, onChange }: Props) {
                 value={item.size_color || ""}
                 onChange={e => update(idx, "size_color", e.target.value)}
                 placeholder="Ej: Gris 12"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-navy/20 focus:border-navy outline-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
               />
             </div>
             <div>
@@ -164,7 +164,7 @@ export default function ConfectionTable({ items, onChange }: Props) {
                 value={item.seamstress || ""}
                 onChange={e => update(idx, "seamstress", e.target.value)}
                 placeholder="Nombre"
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-navy/20 focus:border-navy outline-none"
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
               />
             </div>
             <div>

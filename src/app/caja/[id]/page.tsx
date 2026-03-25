@@ -109,7 +109,7 @@ export default function CajaDetailPage() {
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl p-8 print:shadow-none print:rounded-none">
           <div className="text-center mb-6 border-b pb-4">
-            <h1 className="text-2xl font-extrabold text-navy">Confecciones Boston</h1>
+            <h1 className="text-2xl font-extrabold text-brandit-black">Confecciones Boston</h1>
             <p className="text-xs text-gray-400">Reporte de Caja Menuda</p>
           </div>
           <div className="flex justify-between text-sm mb-6">
@@ -126,13 +126,13 @@ export default function CajaDetailPage() {
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-2 border-navy text-left">
-                <th className="py-2 text-navy">Fecha</th>
-                <th className="py-2 text-navy">Empresa</th>
-                <th className="py-2 text-navy">Descripción</th>
-                <th className="py-2 text-right text-navy">Subtotal</th>
-                <th className="py-2 text-right text-navy">ITBMS</th>
-                <th className="py-2 text-right text-navy">Total</th>
+              <tr className="border-b-2 border-brandit-orange text-left">
+                <th className="py-2 text-brandit-black">Fecha</th>
+                <th className="py-2 text-brandit-black">Empresa</th>
+                <th className="py-2 text-brandit-black">Descripción</th>
+                <th className="py-2 text-right text-brandit-black">Subtotal</th>
+                <th className="py-2 text-right text-brandit-black">ITBMS</th>
+                <th className="py-2 text-right text-brandit-black">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -148,7 +148,7 @@ export default function CajaDetailPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-navy font-bold">
+              <tr className="border-t-2 border-brandit-orange font-bold">
                 <td colSpan={5} className="py-2 text-right">Total Gastado:</td>
                 <td className="py-2 text-right">{fmt(periodo.total_gastado)}</td>
               </tr>
@@ -156,10 +156,10 @@ export default function CajaDetailPage() {
           </table>
         </div>
         <div className="flex gap-2 mt-4 print:hidden">
-          <button onClick={() => setPrintMode(false)} className="text-sm text-gray-500 hover:text-navy">
+          <button onClick={() => setPrintMode(false)} className="text-sm text-gray-500 hover:text-brandit-black">
             ← Volver
           </button>
-          <button onClick={() => window.print()} className="bg-navy text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-navy/90 transition-colors">
+          <button onClick={() => window.print()} className="bg-brandit-orange text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors">
             Imprimir
           </button>
         </div>
@@ -171,12 +171,12 @@ export default function CajaDetailPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
-        <Link href="/caja" className="text-sm text-gray-400 hover:text-navy">← Caja</Link>
+        <Link href="/caja" className="text-sm text-gray-400 hover:text-brandit-black">← Caja</Link>
       </div>
 
       <div className="flex items-end justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Período #{periodo.numero}</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Período #{periodo.numero}</h1>
           <p className="text-sm text-gray-400 mt-1">
             {periodo.fecha_apertura}{periodo.fecha_cierre ? ` → ${periodo.fecha_cierre}` : " → abierto"}
             <span className={`ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
@@ -187,7 +187,7 @@ export default function CajaDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setPrintMode(true)} className="text-sm text-gray-500 hover:text-navy border border-gray-200 rounded-xl px-4 py-2">
+          <button onClick={() => setPrintMode(true)} className="text-sm text-gray-500 hover:text-brandit-black border border-gray-200 rounded-xl px-4 py-2">
             Imprimir
           </button>
           {periodo.estado === "abierto" && (
@@ -209,7 +209,7 @@ export default function CajaDetailPage() {
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-2xl border border-gray-50 p-5">
           <p className="text-xs text-gray-400 mb-1">Fondo Inicial</p>
-          <p className="text-2xl font-bold text-navy">{fmt(periodo.fondo_inicial)}</p>
+          <p className="text-2xl font-bold text-brandit-black">{fmt(periodo.fondo_inicial)}</p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-50 p-5">
           <p className="text-xs text-gray-400 mb-1">Total Gastado</p>
@@ -227,20 +227,20 @@ export default function CajaDetailPage() {
       {periodo.estado === "abierto" && (
         showForm ? (
           <form onSubmit={addGasto} className="bg-white rounded-2xl border border-gray-50 p-5 mb-6">
-            <h3 className="font-semibold text-navy mb-4">Nuevo Gasto</h3>
+            <h3 className="font-semibold text-brandit-black mb-4">Nuevo Gasto</h3>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} required
-                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
               <input placeholder="Empresa" value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })} required
-                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             </div>
             <input placeholder="Descripción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required
-              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none mb-3" />
+              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none mb-3" />
             <div className="grid grid-cols-2 gap-3 mb-4">
               <input type="number" step="0.01" placeholder="Subtotal" value={form.subtotal} onChange={(e) => setForm({ ...form, subtotal: e.target.value })} required
-                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
               <select value={form.itbms} onChange={(e) => setForm({ ...form, itbms: e.target.value })}
-                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none">
+                className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none">
                 <option value="0">ITBMS 0%</option>
                 <option value="7">ITBMS 7%</option>
               </select>
@@ -252,7 +252,7 @@ export default function CajaDetailPage() {
             )}
             <div className="flex gap-2">
               <button type="submit" disabled={saving}
-                className="bg-navy text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-navy/90 transition-colors disabled:opacity-50">
+                className="bg-brandit-orange text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50">
                 Guardar
               </button>
               <button type="button" onClick={() => setShowForm(false)} className="text-sm text-gray-400 hover:text-gray-600 px-4 py-2">
@@ -262,7 +262,7 @@ export default function CajaDetailPage() {
           </form>
         ) : (
           <button onClick={() => setShowForm(true)}
-            className="bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm mb-6">
+            className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm mb-6">
             + Agregar Gasto
           </button>
         )
@@ -278,12 +278,12 @@ export default function CajaDetailPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
-                <th className="px-5 py-3 text-xs font-semibold text-navy">Fecha</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy">Empresa</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy">Descripción</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy text-right">Subtotal</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy text-right">ITBMS</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy text-right">Total</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Fecha</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Empresa</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Descripción</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black text-right">Subtotal</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black text-right">ITBMS</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black text-right">Total</th>
                 {periodo.estado === "abierto" && <th className="px-5 py-3"></th>}
               </tr>
             </thead>

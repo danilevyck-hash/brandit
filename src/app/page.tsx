@@ -31,12 +31,12 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Cotizaciones</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cotizaciones</h1>
           <p className="text-sm text-gray-400 mt-1">Gestión de costos de producción</p>
         </div>
         <Link
           href="/cotizacion/nueva"
-          className="bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm"
+          className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm"
         >
           + Nueva Cotización
         </Link>
@@ -48,12 +48,12 @@ export default function Dashboard() {
           placeholder="Buscar por cliente..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="flex-1 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none shadow-sm"
+          className="flex-1 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
         />
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none shadow-sm"
+          className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
         >
           <option value="">Todos los estados</option>
           {QUOTATION_STATUSES.map(s => (
@@ -69,7 +69,7 @@ export default function Dashboard() {
         <div className="text-center py-24">
           <div className="text-6xl mb-4 opacity-20">📋</div>
           <p className="text-gray-400 text-lg mb-3">No hay cotizaciones</p>
-          <Link href="/cotizacion/nueva" className="text-navy font-medium hover:underline text-sm">Crear la primera cotización</Link>
+          <Link href="/cotizacion/nueva" className="text-brandit-black font-medium hover:underline text-sm">Crear la primera cotización</Link>
         </div>
       ) : (
         <div className="space-y-2">
@@ -79,14 +79,14 @@ export default function Dashboard() {
               <Link
                 key={q.id}
                 href={`/cotizacion/${q.id}`}
-                className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-navy/10 hover:shadow-md transition-all group"
+                className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-brandit-orange/10 hover:shadow-md transition-all group"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-navy/5 group-hover:text-navy transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
                     #{q.id}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-sm group-hover:text-navy transition-colors">
+                    <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
                       {(q.client as { name?: string })?.name || "Sin cliente"}
                     </h3>
                     <p className="text-xs text-gray-400">{formatDate(q.date)}</p>
@@ -99,7 +99,7 @@ export default function Dashboard() {
                   >
                     {si?.label}
                   </span>
-                  <span className="text-gray-300 group-hover:text-navy transition-colors text-sm">→</span>
+                  <span className="text-gray-300 group-hover:text-brandit-black transition-colors text-sm">→</span>
                 </div>
               </Link>
             );

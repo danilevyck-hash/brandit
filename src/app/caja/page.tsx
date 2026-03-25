@@ -53,7 +53,7 @@ export default function CajaPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Caja Menuda</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Caja Menuda</h1>
           <p className="text-sm text-gray-400 mt-1">Control de gastos de caja chica</p>
         </div>
         <div className="flex items-center gap-2">
@@ -61,13 +61,13 @@ export default function CajaPage() {
             type="number"
             value={fondoInicial}
             onChange={(e) => setFondoInicial(e.target.value)}
-            className="w-24 bg-white border border-gray-100 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none shadow-sm"
+            className="w-24 bg-white border border-gray-100 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
             placeholder="Fondo"
           />
           <button
             onClick={crearPeriodo}
             disabled={creating}
-            className="bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm disabled:opacity-50"
+            className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm disabled:opacity-50"
           >
             + Nuevo Período
           </button>
@@ -88,14 +88,14 @@ export default function CajaPage() {
             <Link
               key={p.id}
               href={`/caja/${p.id}`}
-              className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-navy/10 hover:shadow-md transition-all group"
+              className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-brandit-orange/10 hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-navy/5 group-hover:text-navy transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
                   #{p.numero}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-navy transition-colors">
+                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
                     Período {p.numero}
                   </h3>
                   <p className="text-xs text-gray-400">
@@ -119,7 +119,7 @@ export default function CajaPage() {
                 >
                   {p.estado === "abierto" ? "Abierto" : "Cerrado"}
                 </span>
-                <span className="text-gray-300 group-hover:text-navy transition-colors text-sm">→</span>
+                <span className="text-gray-300 group-hover:text-brandit-black transition-colors text-sm">→</span>
               </div>
             </Link>
           ))}

@@ -31,10 +31,10 @@ export default function GuiasPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Guías de Transporte</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Guías de Transporte</h1>
           <p className="text-sm text-gray-400 mt-1">Control de envíos y entregas</p>
         </div>
-        <Link href="/guias/nueva" className="bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm">
+        <Link href="/guias/nueva" className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm">
           + Nueva Guía
         </Link>
       </div>
@@ -45,7 +45,7 @@ export default function GuiasPage() {
         <div className="text-center py-24">
           <div className="text-6xl mb-4 opacity-20">🚚</div>
           <p className="text-gray-400 text-lg mb-3">No hay guías de transporte</p>
-          <Link href="/guias/nueva" className="text-navy font-medium hover:underline text-sm">Crear la primera guía</Link>
+          <Link href="/guias/nueva" className="text-brandit-black font-medium hover:underline text-sm">Crear la primera guía</Link>
         </div>
       ) : (
         <div className="space-y-2">
@@ -53,14 +53,14 @@ export default function GuiasPage() {
             <Link
               key={g.id}
               href={`/guias/${g.id}`}
-              className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-navy/10 hover:shadow-md transition-all group"
+              className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-brandit-orange/10 hover:shadow-md transition-all group"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-navy/5 group-hover:text-navy transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
                   #{g.numero}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-navy transition-colors">
+                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
                     {g.transportista}
                   </h3>
                   <p className="text-xs text-gray-400">{g.fecha} · Placa: {g.placa}</p>
@@ -70,7 +70,7 @@ export default function GuiasPage() {
                 <div className="text-right">
                   <p className="text-xs text-gray-400">{g.total_items} items · {g.total_bultos} bultos</p>
                 </div>
-                <span className="text-gray-300 group-hover:text-navy transition-colors text-sm">→</span>
+                <span className="text-gray-300 group-hover:text-brandit-black transition-colors text-sm">→</span>
               </div>
             </Link>
           ))}

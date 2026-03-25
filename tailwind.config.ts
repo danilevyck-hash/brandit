@@ -9,9 +9,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: "#1A3A5C",
-        gold: "#C9A84C",
-        cream: "#F5F0E8",
+        "brandit-black": "#231F20",
+        "brandit-orange": "#F15A29",
+        "brandit-blue": "#B6C9D7",
+        "brandit-gray": "#58595B",
+        cream: "#FFFFFF",
       },
     },
   },

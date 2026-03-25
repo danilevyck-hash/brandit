@@ -195,7 +195,7 @@ export default function CxcPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Cuentas por Cobrar</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cuentas por Cobrar</h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-gray-400">Antigüedad de saldos</p>
             {freshness && (
@@ -209,16 +209,16 @@ export default function CxcPage() {
         <div className="flex items-center gap-2">
           <div className="flex bg-gray-100 rounded-lg p-0.5">
             <button onClick={() => setView("tabla")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "tabla" ? "bg-white text-navy shadow-sm" : "text-gray-500"}`}>
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "tabla" ? "bg-white text-brandit-black shadow-sm" : "text-gray-500"}`}>
               Tabla
             </button>
             <button onClick={() => setView("cards")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "cards" ? "bg-white text-navy shadow-sm" : "text-gray-500"}`}>
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${view === "cards" ? "bg-white text-brandit-black shadow-sm" : "text-gray-500"}`}>
               Cards
             </button>
           </div>
           {canUpload && (
-            <label className={`bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+            <label className={`bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
               {uploading ? "Cargando..." : "Cargar CSV"}
               <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
             </label>
@@ -232,7 +232,7 @@ export default function CxcPage() {
           placeholder="Buscar por nombre de cliente..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-md bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none shadow-sm"
+          className="w-full max-w-md bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
         />
       </div>
 
@@ -250,16 +250,16 @@ export default function CxcPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
-                <th className="px-4 py-3 text-xs font-semibold text-navy whitespace-nowrap">Cliente</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">0-30</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">31-60</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">61-90</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">91-120</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">121-180</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">181-270</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">271-365</th>
-                <th className="px-3 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">+365</th>
-                <th className="px-4 py-3 text-xs font-semibold text-navy text-right whitespace-nowrap">Total</th>
+                <th className="px-4 py-3 text-xs font-semibold text-brandit-black whitespace-nowrap">Cliente</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">0-30</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">31-60</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">61-90</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">91-120</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">121-180</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">181-270</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">271-365</th>
+                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">+365</th>
+                <th className="px-4 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -290,7 +290,7 @@ export default function CxcPage() {
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-navy font-bold text-navy">
+              <tr className="border-t-2 border-brandit-orange font-bold text-brandit-black">
                 <td className="px-4 py-3">Totales ({filtered.length})</td>
                 <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_0_30)}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_31_60)}</td>
@@ -319,7 +319,7 @@ export default function CxcPage() {
                     {sc.label}
                   </span>
                 </div>
-                <p className="text-2xl font-bold text-navy mb-3">${fmt(r.total)}</p>
+                <p className="text-2xl font-bold text-brandit-black mb-3">${fmt(r.total)}</p>
                 <div className="grid grid-cols-4 gap-1 text-[10px]">
                   {Number(r.d_0_30) > 0 && <div className="text-center"><p className="text-gray-400">0-30</p><p className="font-semibold text-gray-600">{fmt(r.d_0_30)}</p></div>}
                   {Number(r.d_31_60) > 0 && <div className="text-center"><p className="text-gray-400">31-60</p><p className="font-semibold text-gray-600">{fmt(r.d_31_60)}</p></div>}

@@ -74,7 +74,7 @@ export default function QuotationDetail() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Cotización #{q.id}</h1>
+            <h1 className="text-2xl font-extrabold text-brandit-black tracking-tight">Cotización #{q.id}</h1>
             <span
               className="text-[10px] font-semibold px-3 py-1 rounded-full"
               style={{ backgroundColor: si?.color + "15", color: si?.color }}
@@ -107,7 +107,7 @@ export default function QuotationDetail() {
         <div className="flex-1" />
         <button
           onClick={() => generatePDF(q)}
-          className="text-xs bg-navy text-white px-5 py-1.5 rounded-xl font-medium hover:bg-navy/90 transition-colors"
+          className="text-xs bg-brandit-orange text-white px-5 py-1.5 rounded-xl font-medium hover:bg-brandit-orange/90 transition-colors"
         >
           Descargar PDF
         </button>
@@ -232,7 +232,7 @@ export default function QuotationDetail() {
       )}
 
       {/* Totals */}
-      <div className="bg-navy rounded-2xl p-6">
+      <div className="bg-brandit-orange rounded-2xl p-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           <div>
             <p className="text-[10px] text-white/40 uppercase tracking-wider">Costo Confección</p>

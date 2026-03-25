@@ -61,30 +61,30 @@ export default function NuevaGuiaPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center gap-2 mb-6">
-        <Link href="/guias" className="text-sm text-gray-400 hover:text-navy">← Guías</Link>
+        <Link href="/guias" className="text-sm text-gray-400 hover:text-brandit-black">← Guías</Link>
       </div>
 
-      <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-8">Nueva Guía</h1>
+      <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight mb-8">Nueva Guía</h1>
 
       <form onSubmit={handleSubmit}>
         <div className="bg-white rounded-2xl border border-gray-50 p-6 mb-6">
-          <h3 className="font-semibold text-navy mb-4">Datos del Transporte</h3>
+          <h3 className="font-semibold text-brandit-black mb-4">Datos del Transporte</h3>
           <div className="grid grid-cols-2 gap-3">
             <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} required
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input placeholder="Transportista" value={form.transportista} onChange={(e) => setForm({ ...form, transportista: e.target.value })} required
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input placeholder="Placa" value={form.placa} onChange={(e) => setForm({ ...form, placa: e.target.value })} required
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input placeholder="Observaciones (opcional)" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
           </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-50 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-navy">Items</h3>
-            <button type="button" onClick={addItem} className="text-sm text-navy font-semibold hover:text-navy/70">
+            <h3 className="font-semibold text-brandit-black">Items</h3>
+            <button type="button" onClick={addItem} className="text-sm text-brandit-black font-semibold hover:text-brandit-black/70">
               + Agregar item
             </button>
           </div>
@@ -102,17 +102,17 @@ export default function NuevaGuiaPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <input placeholder="Cliente" value={item.cliente} onChange={(e) => updateItem(idx, "cliente", e.target.value)} required
-                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
                   <input placeholder="Dirección" value={item.direccion} onChange={(e) => updateItem(idx, "direccion", e.target.value)}
-                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
                   <input placeholder="Empresa" value={item.empresa} onChange={(e) => updateItem(idx, "empresa", e.target.value)}
-                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
                   <input placeholder="Facturas" value={item.facturas} onChange={(e) => updateItem(idx, "facturas", e.target.value)}
-                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
                   <input type="number" placeholder="Bultos" value={item.bultos} onChange={(e) => updateItem(idx, "bultos", e.target.value)} required
-                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
                   <input placeholder="# Guía Transporte" value={item.numero_guia_transp} onChange={(e) => updateItem(idx, "numero_guia_transp", e.target.value)}
-                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+                    className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
                 </div>
               </div>
             ))}
@@ -120,7 +120,7 @@ export default function NuevaGuiaPage() {
         </div>
 
         <button type="submit" disabled={saving}
-          className="bg-navy text-white font-semibold px-8 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm disabled:opacity-50">
+          className="bg-brandit-orange text-white font-semibold px-8 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm disabled:opacity-50">
           {saving ? "Guardando..." : "Crear Guía"}
         </button>
       </form>

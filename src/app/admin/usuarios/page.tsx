@@ -77,12 +77,12 @@ export default function UsuariosPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Usuarios</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Usuarios</h1>
           <p className="text-sm text-gray-400 mt-1">Administración de acceso</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-navy text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-navy/90 transition-colors shadow-sm"
+          className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm"
         >
           + Agregar Usuario
         </button>
@@ -90,16 +90,16 @@ export default function UsuariosPage() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-50 p-6 mb-6">
-          <h3 className="font-semibold text-navy mb-4">Nuevo Usuario</h3>
+          <h3 className="font-semibold text-brandit-black mb-4">Nuevo Usuario</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <input placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <input type="password" placeholder="Contraseña" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none" />
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none">
+              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none">
               {ROLES.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
@@ -108,7 +108,7 @@ export default function UsuariosPage() {
           {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
           <div className="flex gap-2">
             <button type="submit" disabled={saving}
-              className="bg-navy text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-navy/90 transition-colors disabled:opacity-50">
+              className="bg-brandit-orange text-white font-semibold px-6 py-2 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50">
               {saving ? "Creando..." : "Crear Usuario"}
             </button>
             <button type="button" onClick={() => setShowForm(false)}
@@ -130,9 +130,9 @@ export default function UsuariosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
-                <th className="px-5 py-3 text-xs font-semibold text-navy">Nombre</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy">Email</th>
-                <th className="px-5 py-3 text-xs font-semibold text-navy">Rol</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Nombre</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Email</th>
+                <th className="px-5 py-3 text-xs font-semibold text-brandit-black">Rol</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
@@ -143,7 +143,7 @@ export default function UsuariosPage() {
                   <td className="px-5 py-3 text-gray-600">{u.email}</td>
                   <td className="px-5 py-3">
                     <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
-                      u.role === "admin" ? "bg-navy/10 text-navy" :
+                      u.role === "admin" ? "bg-brandit-orange/10 text-brandit-black" :
                       u.role === "secretaria" ? "bg-blue-50 text-blue-600" :
                       "bg-gray-100 text-gray-500"
                     }`}>

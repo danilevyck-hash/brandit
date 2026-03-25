@@ -43,12 +43,17 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white border-b border-gray-100">
+    <nav className="bg-brandit-black">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
-          <Link href="/" className="flex items-baseline gap-1.5">
-            <span className="text-navy font-extrabold text-xl tracking-tight">Brand It</span>
-            <span className="text-[10px] text-gray-400 font-medium">by Confecciones Boston</span>
+          <Link href="/" className="flex flex-col">
+            <span className="text-xl font-bold tracking-tight uppercase leading-none">
+              <span className="text-white">BRAND</span>
+              <span className="text-brandit-blue">/</span>
+              <span className="text-white">IT</span>
+              <span className="text-brandit-orange">.</span>
+            </span>
+            <span className="text-[9px] text-gray-500 font-medium tracking-wide">by Confecciones Boston</span>
           </Link>
           <div className="flex items-center gap-1">
             {links.map((link) => (
@@ -57,8 +62,8 @@ export default function Navbar() {
                 href={link.href}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   link.match(pathname)
-                    ? "bg-navy text-white"
-                    : "text-gray-500 hover:text-navy hover:bg-gray-50"
+                    ? "bg-brandit-orange text-white"
+                    : "text-gray-300 hover:text-white hover:bg-white/10"
                 }`}
               >
                 {link.label}
@@ -66,7 +71,7 @@ export default function Navbar() {
             ))}
             <button
               onClick={handleLogout}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors ml-1"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-brandit-orange transition-colors ml-1"
             >
               Salir
             </button>

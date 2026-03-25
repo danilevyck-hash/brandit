@@ -76,7 +76,7 @@ export default function NuevaQuotation() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Nueva Cotización</h1>
+          <h1 className="text-2xl font-extrabold text-brandit-black tracking-tight">Nueva Cotización</h1>
           <p className="text-xs text-gray-400 mt-0.5">Completa los detalles de producción</p>
         </div>
         <button
@@ -98,7 +98,7 @@ export default function NuevaQuotation() {
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
               />
             </div>
             <div>
@@ -107,7 +107,7 @@ export default function NuevaQuotation() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Notas opcionales..."
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
               />
             </div>
           </div>
@@ -124,7 +124,7 @@ export default function NuevaQuotation() {
         </div>
 
         {/* Summary */}
-        <div className="bg-navy rounded-2xl p-6">
+        <div className="bg-brandit-orange rounded-2xl p-6">
           <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4">Resumen de Costos</h3>
           <div className="grid grid-cols-3 gap-6 text-center">
             <div>
@@ -146,7 +146,7 @@ export default function NuevaQuotation() {
         <button
           onClick={save}
           disabled={saving}
-          className="w-full bg-navy text-white font-bold py-4 rounded-2xl text-sm hover:bg-navy/90 transition-colors disabled:opacity-50 shadow-sm"
+          className="w-full bg-brandit-orange text-white font-bold py-4 rounded-2xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50 shadow-sm"
         >
           {saving ? "Guardando..." : "Guardar Cotización"}
         </button>
