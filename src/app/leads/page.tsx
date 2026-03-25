@@ -30,46 +30,55 @@ type LeadForm = {
   vendedora: string;
 };
 
-const emptyForm = (): LeadForm => ({
-  nombre: "",
-  empresa: "",
-  telefono: "",
-  email: "",
-  estado: "interesado",
-  notas: "",
-  vendedora: "",
-});
-
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("");
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<LeadForm>({
+    nombre: "", empresa: "", telefono: "", email: "", estado: "interesado", notas: "", vendedora: "",
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [role, setRole] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    const r = localStorage.getItem("brandit_role") || "";
+    const e = localStorage.getItem("brandit_email") || "";
+    setRole(r);
+    setUserEmail(e);
+  }, []);
+
+  const isVendedora = role === "vendedora";
 
   const load = useCallback(async () => {
+    if (!role) return;
     setLoading(true);
     const params = new URLSearchParams();
     if (filtro) params.set("estado", filtro);
+    if (isVendedora && userEmail) params.set("vendedora", userEmail);
     const res = await fetch(`/api/leads?${params}`);
     const data = await res.json();
     setLeads(Array.isArray(data) ? data : []);
     setLoading(false);
-  }, [filtro]);
+  }, [filtro, role, isVendedora, userEmail]);
 
   useEffect(() => { load(); }, [load]);
 
   const estadoInfo = (estado: string) => ESTADOS.find((e) => e.value === estado);
 
   const openNew = () => {
-    setForm(emptyForm());
+    setForm({
+      nombre: "", empresa: "", telefono: "", email: "", estado: "interesado", notas: "",
+      vendedora: userEmail,
+    });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (lead: Lead) => {
+    if (isVendedora && lead.vendedora !== userEmail) return;
     setForm({
       nombre: lead.nombre || "",
       empresa: lead.empresa || "",
@@ -103,7 +112,6 @@ export default function LeadsPage() {
 
     setShowForm(false);
     setEditingId(null);
-    setForm(emptyForm());
     setSaving(false);
     load();
   };
@@ -116,6 +124,18 @@ export default function LeadsPage() {
       setEditingId(null);
     }
     load();
+  };
+
+  const canDelete = (lead: Lead) => {
+    if (role === "admin" || role === "secretaria") return true;
+    if (isVendedora && lead.vendedora === userEmail) return true;
+    return false;
+  };
+
+  const canEdit = (lead: Lead) => {
+    if (role === "admin" || role === "secretaria") return true;
+    if (isVendedora && lead.vendedora === userEmail) return true;
+    return false;
   };
 
   return (
@@ -168,8 +188,13 @@ export default function LeadsPage() {
                 <option key={e.value} value={e.value}>{e.label}</option>
               ))}
             </select>
-            <input placeholder="Vendedora" value={form.vendedora} onChange={(e) => setForm({ ...form, vendedora: e.target.value })}
-              className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none" />
+            <input
+              placeholder="Vendedora"
+              value={form.vendedora}
+              onChange={(e) => setForm({ ...form, vendedora: e.target.value })}
+              readOnly={isVendedora}
+              className={`bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none ${isVendedora ? "bg-gray-50 text-gray-500" : ""}`}
+            />
           </div>
           <textarea placeholder="Notas" value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={2}
             className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-navy/10 focus:border-navy/30 outline-none mb-4" />
@@ -202,10 +227,10 @@ export default function LeadsPage() {
             return (
               <div
                 key={lead.id}
-                onClick={() => openEdit(lead)}
-                className={`flex items-center justify-between bg-white rounded-2xl border px-5 py-4 hover:border-navy/10 hover:shadow-md transition-all cursor-pointer group ${
-                  editingId === lead.id ? "border-navy/20 shadow-md" : "border-gray-50"
-                }`}
+                onClick={() => canEdit(lead) && openEdit(lead)}
+                className={`flex items-center justify-between bg-white rounded-2xl border px-5 py-4 hover:border-navy/10 hover:shadow-md transition-all group ${
+                  canEdit(lead) ? "cursor-pointer" : ""
+                } ${editingId === lead.id ? "border-navy/20 shadow-md" : "border-gray-50"}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-navy/5 group-hover:text-navy transition-colors">
@@ -226,12 +251,14 @@ export default function LeadsPage() {
                   <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ei?.bg} ${ei?.text}`}>
                     {ei?.label}
                   </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteLead(lead.id); }}
-                    className="text-xs text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    ✕
-                  </button>
+                  {canDelete(lead) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteLead(lead.id); }}
+                      className="text-xs text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -34,6 +34,11 @@ export default function CajaDetailPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [printMode, setPrintMode] = useState(false);
+  const [role, setRole] = useState("");
+
+  useEffect(() => { setRole(localStorage.getItem("brandit_role") || ""); }, []);
+
+  const isAdmin = role === "admin";
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
     empresa: "",
@@ -190,9 +195,11 @@ export default function CajaDetailPage() {
               <button onClick={cerrarPeriodo} className="text-sm text-gray-500 hover:text-orange-600 border border-gray-200 rounded-xl px-4 py-2">
                 Cerrar
               </button>
-              <button onClick={deletePeriodo} className="text-sm text-red-400 hover:text-red-600 border border-gray-200 rounded-xl px-4 py-2">
-                Eliminar
-              </button>
+              {isAdmin && (
+                <button onClick={deletePeriodo} className="text-sm text-red-400 hover:text-red-600 border border-gray-200 rounded-xl px-4 py-2">
+                  Eliminar
+                </button>
+              )}
             </>
           )}
         </div>

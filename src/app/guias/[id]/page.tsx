@@ -31,6 +31,11 @@ export default function GuiaDetailPage() {
   const [guia, setGuia] = useState<Guia | null>(null);
   const [loading, setLoading] = useState(true);
   const [printMode, setPrintMode] = useState(false);
+  const [role, setRole] = useState("");
+
+  useEffect(() => { setRole(localStorage.getItem("brandit_role") || ""); }, []);
+
+  const isAdmin = role === "admin";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,9 +156,11 @@ export default function GuiaDetailPage() {
           <button onClick={() => setPrintMode(true)} className="text-sm text-gray-500 hover:text-navy border border-gray-200 rounded-xl px-4 py-2">
             Imprimir
           </button>
-          <button onClick={deleteGuia} className="text-sm text-red-400 hover:text-red-600 border border-gray-200 rounded-xl px-4 py-2">
-            Eliminar
-          </button>
+          {isAdmin && (
+            <button onClick={deleteGuia} className="text-sm text-red-400 hover:text-red-600 border border-gray-200 rounded-xl px-4 py-2">
+              Eliminar
+            </button>
+          )}
         </div>
       </div>
 

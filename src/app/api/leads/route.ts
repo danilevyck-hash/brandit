@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const estado = request.nextUrl.searchParams.get("estado");
+  const vendedora = request.nextUrl.searchParams.get("vendedora");
 
   let query = getSupabaseAF()
     .from("leads")
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (estado) query = query.eq("estado", estado);
+  if (vendedora) query = query.eq("vendedora", vendedora);
 
   const { data, error } = await query;
 
