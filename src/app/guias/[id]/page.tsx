@@ -119,20 +119,69 @@ export default function GuiaDetailPage() {
             </tfoot>
           </table>
 
-          <div className="mt-16 grid grid-cols-3 gap-8 text-xs text-gray-500">
-            <div className="text-center">
-              <div className="border-t border-gray-400 w-full mb-1"></div>
-              Despachado por
+          {/* Signature blocks with space for physical signatures */}
+          <div className="mt-12 space-y-0">
+            {/* Signature 1: Dispatched by */}
+            <div className="mt-16 border-t border-gray-300 pt-3">
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <p className="font-semibold text-gray-700 mb-1">Despachado por:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <p className="text-gray-400">Firma</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Nombre:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Fecha:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                </div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="border-t border-gray-400 w-full mb-1"></div>
-              Recibido por
+
+            {/* Signature 2: Carrier */}
+            <div className="mt-16 border-t border-gray-300 pt-3">
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <p className="font-semibold text-gray-700 mb-1">Transportista:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <p className="text-gray-400">Firma</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Cédula/RUC:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Placa:</p>
+                  <p className="text-sm font-medium text-gray-700 mt-1">{guia.placa}</p>
+                </div>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="border-t border-gray-400 w-full mb-1"></div>
-              Transportista
+
+            {/* Signature 3: Received by */}
+            <div className="mt-16 border-t border-gray-300 pt-3">
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <p className="font-semibold text-gray-700 mb-1">Recibido por:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <p className="text-gray-400">Firma</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Nombre:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Fecha:</p>
+                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                </div>
+              </div>
             </div>
           </div>
+
+          <p className="text-[9px] text-gray-400 text-center mt-8">
+            Documento generado por BRAND/IT. | Confecciones Boston
+          </p>
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">

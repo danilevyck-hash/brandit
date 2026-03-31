@@ -29,9 +29,6 @@ type Periodo = {
   saldo: number;
 };
 
-type Categoria = { id: string; nombre: string };
-type Responsable = { id: string; nombre: string };
-
 type PrintView = "none" | "reporte" | "recibo" | "vale";
 
 export default function CajaDetailPage() {
@@ -41,8 +38,6 @@ export default function CajaDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [role, setRole] = useState("");
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [responsables, setResponsables] = useState<Responsable[]>([]);
   const [printView, setPrintView] = useState<PrintView>("none");
   const [printGasto, setPrintGasto] = useState<Gasto | null>(null);
   const [showValeModal, setShowValeModal] = useState(false);
@@ -72,11 +67,6 @@ export default function CajaDetailPage() {
   }, [params.id, router]);
 
   useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    fetch("/api/caja/categorias").then((r) => r.json()).then((d) => setCategorias(Array.isArray(d) ? d : []));
-    fetch("/api/caja/responsables").then((r) => r.json()).then((d) => setResponsables(Array.isArray(d) ? d : []));
-  }, []);
 
   const addGasto = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -462,11 +452,9 @@ export default function CajaDetailPage() {
             </div>
             <div>
               <label className="text-xs text-gray-400 block mb-1">Categoría</label>
-              <select value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
-                <option value="">Seleccionar...</option>
-                {categorias.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-              </select>
+              <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                placeholder="Ej: Limpieza, Oficina..."
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
             </div>
             {/* Row 2 */}
             <div>
@@ -477,11 +465,9 @@ export default function CajaDetailPage() {
             </div>
             <div>
               <label className="text-xs text-gray-400 block mb-1">Responsable</label>
-              <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
-                <option value="">Seleccionar...</option>
-                {responsables.map((r) => <option key={r.id} value={r.nombre}>{r.nombre}</option>)}
-              </select>
+              <input value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })}
+                placeholder="Nombre del responsable"
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
             </div>
             <div>
               <label className="text-xs text-gray-400 block mb-1">Empresa</label>
@@ -615,11 +601,9 @@ export default function CajaDetailPage() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Beneficiario</label>
-                <select value={vale.beneficiario} onChange={(e) => setVale({ ...vale, beneficiario: e.target.value })}
-                  className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
-                  <option value="">Seleccionar...</option>
-                  {responsables.map((r) => <option key={r.id} value={r.nombre}>{r.nombre}</option>)}
-                </select>
+                <input value={vale.beneficiario} onChange={(e) => setVale({ ...vale, beneficiario: e.target.value })}
+                  placeholder="Nombre del beneficiario"
+                  className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
               </div>
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Concepto</label>

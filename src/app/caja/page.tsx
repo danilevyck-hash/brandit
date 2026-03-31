@@ -14,25 +14,11 @@ type Periodo = {
   saldo: number;
 };
 
-type Categoria = { id: string; nombre: string };
-type Responsable = { id: string; nombre: string };
-
 export default function CajaPage() {
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [fondoInicial, setFondoInicial] = useState("200");
   const [creating, setCreating] = useState(false);
-  const [role, setRole] = useState("");
-  const [showCatModal, setShowCatModal] = useState(false);
-  const [showRespModal, setShowRespModal] = useState(false);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [responsables, setResponsables] = useState<Responsable[]>([]);
-  const [newCat, setNewCat] = useState("");
-  const [newResp, setNewResp] = useState("");
-
-  useEffect(() => { setRole(localStorage.getItem("brandit_role") || ""); }, []);
-
-  const isAdmin = role === "admin";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,16 +29,6 @@ export default function CajaPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const loadCategorias = async () => {
-    const res = await fetch("/api/caja/categorias");
-    setCategorias(await res.json());
-  };
-
-  const loadResponsables = async () => {
-    const res = await fetch("/api/caja/responsables");
-    setResponsables(await res.json());
-  };
 
   const crearPeriodo = async () => {
     setCreating(true);
@@ -65,38 +41,6 @@ export default function CajaPage() {
     if (data.error) alert(data.error);
     else load();
     setCreating(false);
-  };
-
-  const addCategoria = async () => {
-    if (!newCat.trim()) return;
-    await fetch("/api/caja/categorias", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre: newCat.trim() }),
-    });
-    setNewCat("");
-    loadCategorias();
-  };
-
-  const deleteCategoria = async (id: string) => {
-    await fetch(`/api/caja/categorias/${id}`, { method: "PATCH" });
-    loadCategorias();
-  };
-
-  const addResponsable = async () => {
-    if (!newResp.trim()) return;
-    await fetch("/api/caja/responsables", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre: newResp.trim() }),
-    });
-    setNewResp("");
-    loadResponsables();
-  };
-
-  const deleteResponsable = async (id: string) => {
-    await fetch(`/api/caja/responsables/${id}`, { method: "PATCH" });
-    loadResponsables();
   };
 
   const fmt = (n: number) =>
@@ -114,22 +58,6 @@ export default function CajaPage() {
           <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Caja Menuda</h1>
           <p className="text-sm text-gray-400 mt-1">Control de gastos de caja chica</p>
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setShowCatModal(true); loadCategorias(); }}
-              className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2.5 text-sm hover:border-gray-300 transition-colors"
-            >
-              Categorías
-            </button>
-            <button
-              onClick={() => { setShowRespModal(true); loadResponsables(); }}
-              className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2.5 text-sm hover:border-gray-300 transition-colors"
-            >
-              Responsables
-            </button>
-          </div>
-        )}
       </div>
 
       {/* KPI Cards */}
@@ -242,67 +170,6 @@ export default function CajaPage() {
         </div>
       )}
 
-      {/* Categorías Modal */}
-      {showCatModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowCatModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-brandit-black mb-4">Categorías de Gasto</h3>
-            <div className="flex gap-2 mb-4">
-              <input
-                value={newCat}
-                onChange={(e) => setNewCat(e.target.value)}
-                placeholder="Nueva categoría"
-                className="flex-1 border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors"
-                onKeyDown={(e) => e.key === "Enter" && addCategoria()}
-              />
-              <button onClick={addCategoria} className="bg-brandit-orange text-white rounded-xl px-4 py-2 text-sm font-medium">
-                Agregar
-              </button>
-            </div>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {categorias.map((c) => (
-                <div key={c.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50">
-                  <span className="text-sm text-gray-700">{c.nombre}</span>
-                  <button onClick={() => deleteCategoria(c.id)} className="text-xs text-red-400 hover:text-red-600">Eliminar</button>
-                </div>
-              ))}
-              {categorias.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Sin categorías</p>}
-            </div>
-            <button onClick={() => setShowCatModal(false)} className="mt-4 w-full text-center text-sm text-gray-400 hover:text-gray-600">Cerrar</button>
-          </div>
-        </div>
-      )}
-
-      {/* Responsables Modal */}
-      {showRespModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowRespModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-brandit-black mb-4">Responsables</h3>
-            <div className="flex gap-2 mb-4">
-              <input
-                value={newResp}
-                onChange={(e) => setNewResp(e.target.value)}
-                placeholder="Nuevo responsable"
-                className="flex-1 border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors"
-                onKeyDown={(e) => e.key === "Enter" && addResponsable()}
-              />
-              <button onClick={addResponsable} className="bg-brandit-orange text-white rounded-xl px-4 py-2 text-sm font-medium">
-                Agregar
-              </button>
-            </div>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {responsables.map((r) => (
-                <div key={r.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50">
-                  <span className="text-sm text-gray-700">{r.nombre}</span>
-                  <button onClick={() => deleteResponsable(r.id)} className="text-xs text-red-400 hover:text-red-600">Eliminar</button>
-                </div>
-              ))}
-              {responsables.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Sin responsables</p>}
-            </div>
-            <button onClick={() => setShowRespModal(false)} className="mt-4 w-full text-center text-sm text-gray-400 hover:text-gray-600">Cerrar</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
