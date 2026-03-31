@@ -97,8 +97,9 @@ export default function CxcPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/cxc");
+    const res = await fetch("/api/cxc", { cache: "no-store" });
     const data = await res.json();
+    console.log("[FRONTEND] setRows llamado con", data.rows?.length, "items");
     setRows(data.rows || []);
     setUpload(data.upload || null);
     setLoading(false);
