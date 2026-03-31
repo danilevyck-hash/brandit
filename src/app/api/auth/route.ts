@@ -14,6 +14,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
   }
 
+  // DEBUG TEMPORAL — eliminar después de verificar
+  const preview = (s: string | undefined) => s ? s.substring(0, 3) + "..." : "UNDEFINED";
+  console.log("[AUTH DEBUG] password recibida:", preview(password));
+  for (const c of CREDENTIALS) {
+    console.log(`[AUTH DEBUG] ${c.env}:`, preview(process.env[c.env]));
+  }
+
   for (const cred of CREDENTIALS) {
     const envPassword = process.env[cred.env];
     if (envPassword && password === envPassword) {
