@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
         subtotal,
         itbms: subtotal * (itbms / 100),
         total,
+        responsable: body.responsable || null,
+        categoria: body.categoria || null,
+        proveedor: body.proveedor || null,
       },
     ])
     .select()

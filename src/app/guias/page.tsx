@@ -16,6 +16,7 @@ type Guia = {
 export default function GuiasPage() {
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,53 +28,120 @@ export default function GuiasPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const filtered = guias.filter((g) =>
+    !search ||
+    g.transportista.toLowerCase().includes(search.toLowerCase()) ||
+    String(g.numero).includes(search)
+  );
+
+  const totalBultosMonth = guias.reduce((s, g) => {
+    const d = new Date(g.fecha);
+    const now = new Date();
+    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) return s + g.total_bultos;
+    return s;
+  }, 0);
+
+  const guiasThisMonth = guias.filter((g) => {
+    const d = new Date(g.fecha);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex items-end justify-between mb-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      {/* Header */}
+      <div className="flex items-end justify-between mb-8">
         <div>
-          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Guías de Transporte</h1>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Logística</p>
+          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Guías de Transporte</h1>
           <p className="text-sm text-gray-400 mt-1">Control de envíos y entregas</p>
         </div>
-        <Link href="/guias/nueva" className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm">
+        <Link
+          href="/guias/nueva"
+          className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90 transition-colors"
+        >
           + Nueva Guía
         </Link>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="bg-white rounded-2xl p-6 border border-gray-100">
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total Guías</p>
+          <p className="text-3xl font-bold text-brandit-black">{guias.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-6 border border-gray-100">
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Guías Este Mes</p>
+          <p className="text-3xl font-bold text-brandit-black">{guiasThisMonth}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-6 border border-gray-100">
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Bultos Este Mes</p>
+          <p className="text-3xl font-bold text-brandit-black">{totalBultosMonth}</p>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Buscar por transportista o número..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent"
+        />
+      </div>
+
+      {/* List */}
       {loading ? (
-        <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
-      ) : guias.length === 0 ? (
+        <div className="text-center py-24 text-gray-300">Cargando...</div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-24">
-          <div className="text-6xl mb-4 opacity-20">🚚</div>
-          <p className="text-gray-400 text-lg mb-3">No hay guías de transporte</p>
-          <Link href="/guias/nueva" className="text-brandit-black font-medium hover:underline text-sm">Crear la primera guía</Link>
+          <p className="text-gray-300 text-lg mb-2">
+            {search ? "Sin resultados" : "No hay guías de transporte"}
+          </p>
+          {!search && (
+            <Link href="/guias/nueva" className="text-brandit-orange font-medium hover:underline text-sm">
+              Crear la primera guía
+            </Link>
+          )}
         </div>
       ) : (
-        <div className="space-y-2">
-          {guias.map((g) => (
-            <Link
-              key={g.id}
-              href={`/guias/${g.id}`}
-              className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-brandit-orange/10 hover:shadow-md transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
-                  #{g.numero}
+        <div>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">
+            {filtered.length} guía{filtered.length !== 1 ? "s" : ""}
+          </p>
+          <div className="space-y-3">
+            {filtered.map((g) => (
+              <Link
+                key={g.id}
+                href={`/guias/${g.id}`}
+                className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-6 py-5 hover:border-brandit-orange/20 hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-xs font-bold text-gray-400 bg-gray-50 rounded-lg px-2.5 py-1 group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
+                    #{g.numero}
+                  </span>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
+                      {g.transportista}
+                    </h3>
+                    <p className="text-xs text-gray-400">{g.fecha} · Placa: {g.placa}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
-                    {g.transportista}
-                  </h3>
-                  <p className="text-xs text-gray-400">{g.fecha} · Placa: {g.placa}</p>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-brandit-orange/10 text-brandit-black">
+                      {g.total_items} items
+                    </span>
+                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
+                      {g.total_bultos} bultos
+                    </span>
+                  </div>
+                  <span className="text-gray-300 group-hover:text-brandit-black transition-colors text-sm">→</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">{g.total_items} items · {g.total_bultos} bultos</p>
-                </div>
-                <span className="text-gray-300 group-hover:text-brandit-black transition-colors text-sm">→</span>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>
