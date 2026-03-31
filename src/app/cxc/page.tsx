@@ -176,14 +176,13 @@ export default function CxcPage() {
           body: JSON.stringify({ rows: parsed, filename: file.name }),
         });
         const data = await res.json();
-        console.log("[CXC UPLOAD] response:", JSON.stringify(data));
         if (!res.ok) {
           alert(data.error || `Error del servidor: ${res.status}`);
         } else if (data.error) {
           alert(data.error);
         } else if (data.success) {
           alert(`Cargado exitosamente: ${data.count} clientes`);
-          load();
+          window.location.reload();
         } else {
           load();
         }
