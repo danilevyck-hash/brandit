@@ -119,67 +119,72 @@ export default function GuiaDetailPage() {
             </tfoot>
           </table>
 
-          {/* Signature blocks with space for physical signatures */}
-          <div className="mt-12 space-y-0">
+          {/* Signature blocks with ample space for physical signatures */}
+          <div className="mt-10" style={{ pageBreakInside: "avoid" }}>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2 border-b border-gray-300 pb-1">Firmas</p>
+
             {/* Signature 1: Dispatched by */}
-            <div className="mt-16 border-t border-gray-300 pt-3">
-              <div className="grid grid-cols-3 gap-4 text-xs">
+            <div className="mt-8 px-2">
+              <p className="text-xs font-bold text-gray-800 mb-1">1. Despachado por</p>
+              <div style={{ minHeight: "3.5cm" }}></div>
+              <div className="grid grid-cols-3 gap-6 text-xs">
                 <div>
-                  <p className="font-semibold text-gray-700 mb-1">Despachado por:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
-                  <p className="text-gray-400">Firma</p>
+                  <div className="border-b-2 border-gray-400 mb-1"></div>
+                  <p className="text-gray-500 text-center">Firma</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Nombre:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <div className="border-b border-gray-300 mb-1"></div>
+                  <p className="text-gray-400 text-center">Nombre: _______________</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Fecha:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <div className="border-b border-gray-300 mb-1"></div>
+                  <p className="text-gray-400 text-center">Fecha: _______________</p>
                 </div>
               </div>
             </div>
 
             {/* Signature 2: Carrier */}
-            <div className="mt-16 border-t border-gray-300 pt-3">
-              <div className="grid grid-cols-3 gap-4 text-xs">
+            <div className="mt-12 px-2">
+              <p className="text-xs font-bold text-gray-800 mb-1">2. Transportista</p>
+              <div style={{ minHeight: "3.5cm" }}></div>
+              <div className="grid grid-cols-3 gap-6 text-xs">
                 <div>
-                  <p className="font-semibold text-gray-700 mb-1">Transportista:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
-                  <p className="text-gray-400">Firma</p>
+                  <div className="border-b-2 border-gray-400 mb-1"></div>
+                  <p className="text-gray-500 text-center">Firma</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Cédula/RUC:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <div className="border-b border-gray-300 mb-1"></div>
+                  <p className="text-gray-400 text-center">Cédula/RUC: _______________</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Placa:</p>
-                  <p className="text-sm font-medium text-gray-700 mt-1">{guia.placa}</p>
+                  <div className="border-b border-gray-300 mb-1"></div>
+                  <p className="text-gray-500 text-center">Placa: <span className="font-semibold text-gray-700">{guia.placa}</span></p>
                 </div>
               </div>
             </div>
 
             {/* Signature 3: Received by */}
-            <div className="mt-16 border-t border-gray-300 pt-3">
-              <div className="grid grid-cols-3 gap-4 text-xs">
+            <div className="mt-12 px-2">
+              <p className="text-xs font-bold text-gray-800 mb-1">3. Recibido por</p>
+              <div style={{ minHeight: "3.5cm" }}></div>
+              <div className="grid grid-cols-3 gap-6 text-xs">
                 <div>
-                  <p className="font-semibold text-gray-700 mb-1">Recibido por:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
-                  <p className="text-gray-400">Firma</p>
+                  <div className="border-b-2 border-gray-400 mb-1"></div>
+                  <p className="text-gray-500 text-center">Firma</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Nombre:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <div className="border-b border-gray-300 mb-1"></div>
+                  <p className="text-gray-400 text-center">Nombre: _______________</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Fecha:</p>
-                  <div className="border-b border-gray-300 pb-1 mt-6 mb-1"></div>
+                  <div className="border-b border-gray-300 mb-1"></div>
+                  <p className="text-gray-400 text-center">Fecha: _______________</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <p className="text-[9px] text-gray-400 text-center mt-8">
+          <p className="text-[9px] text-gray-400 text-center mt-10 border-t border-gray-200 pt-3">
             Documento generado por BRAND/IT. | Confecciones Boston
           </p>
         </div>
