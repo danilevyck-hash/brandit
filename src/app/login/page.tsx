@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { supabaseAuth } from "@/lib/supabase-auth";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,37 +12,25 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error: authError } = await supabaseAuth.auth.signInWithPassword({
-      email,
-      password,
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
     });
 
-    if (authError) {
-      setError("Credenciales incorrectas");
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Error al ingresar");
       setLoading(false);
       return;
     }
 
-    // Check user role
-    const { data: roleData, error: roleError } = await supabaseAuth
-      .from("user_roles")
-      .select("role, nombre")
-      .eq("email", email.toLowerCase())
-      .single();
+    localStorage.setItem("brandit_role", data.role);
+    localStorage.setItem("brandit_email", data.email);
+    localStorage.setItem("brandit_nombre", data.nombre);
 
-    if (roleError || !roleData) {
-      setError("Usuario no autorizado. Contacte al administrador.");
-      await supabaseAuth.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    localStorage.setItem("brandit_role", roleData.role);
-    localStorage.setItem("brandit_email", email.toLowerCase());
-    localStorage.setItem("brandit_nombre", roleData.nombre || "");
-
-    // Use window.location.href to force full reload so Navbar reads fresh localStorage
-    if (roleData.role === "vendedora") {
+    if (data.role === "vendedora") {
       window.location.href = "/leads";
     } else {
       window.location.href = "/";
@@ -65,21 +51,14 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin}>
-          <div className="space-y-3 mb-6">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none"
-            />
+          <div className="mb-6">
             <input
               type="password"
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoFocus
               className="w-full bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none"
             />
           </div>

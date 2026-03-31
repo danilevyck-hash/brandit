@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { supabaseAuth } from "@/lib/supabase-auth";
 
 type NavLink = { href: string; label: string; match: (p: string) => boolean };
 
@@ -13,18 +12,16 @@ const ALL_LINKS: NavLink[] = [
   { href: "/guias", label: "Guías", match: (p) => p.startsWith("/guias") },
   { href: "/cxc", label: "CxC", match: (p) => p.startsWith("/cxc") },
   { href: "/leads", label: "Leads", match: (p) => p.startsWith("/leads") },
-  { href: "/admin/usuarios", label: "Usuarios", match: (p) => p.startsWith("/admin") },
 ];
 
 const ROLE_LINKS: Record<string, string[]> = {
-  admin: ["/", "/caja", "/guias", "/cxc", "/leads", "/admin/usuarios"],
+  admin: ["/", "/caja", "/guias", "/cxc", "/leads"],
   secretaria: ["/", "/caja", "/guias", "/cxc", "/leads"],
   vendedora: ["/leads"],
 };
 
 export default function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [role, setRole] = useState<string>("");
 
   useEffect(() => {
@@ -42,12 +39,12 @@ export default function Navbar() {
   const allowed = ROLE_LINKS[role] || [];
   const links = ALL_LINKS.filter((l) => allowed.includes(l.href));
 
-  const handleLogout = async () => {
-    await supabaseAuth.auth.signOut();
+  const handleLogout = () => {
     localStorage.removeItem("brandit_role");
     localStorage.removeItem("brandit_email");
     localStorage.removeItem("brandit_nombre");
-    router.push("/login");
+    document.cookie = "brandit_session=; path=/; max-age=0";
+    window.location.href = "/login";
   };
 
   return (
