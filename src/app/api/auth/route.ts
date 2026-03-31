@@ -1,46 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const CREDENTIALS: { env: string; role: string; nombre: string; email: string }[] = [
-  { env: "ADMIN_PASSWORD", role: "admin", nombre: "David", email: "admin@brandit" },
-  { env: "SECRETARIA_PASSWORD", role: "secretaria", nombre: "Secretaria", email: "secretaria@brandit" },
-  { env: "VENDEDORA1_PASSWORD", role: "vendedora", nombre: "Vendedora 1", email: "vendedora1@brandit" },
-  { env: "VENDEDORA2_PASSWORD", role: "vendedora", nombre: "Vendedora 2", email: "vendedora2@brandit" },
-];
+export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
-  const { password } = await request.json();
+export async function POST(req: NextRequest) {
+  const { password } = await req.json();
 
-  if (!password) {
-    return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
+  console.log("[AUTH DEBUG] password recibida:", password?.slice(0, 3));
+  console.log("[AUTH DEBUG] ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD?.slice(0, 3));
+  console.log("[AUTH DEBUG] SECRETARIA_PASSWORD:", process.env.SECRETARIA_PASSWORD?.slice(0, 3));
+  console.log("[AUTH DEBUG] VENDEDORA1_PASSWORD:", process.env.VENDEDORA1_PASSWORD?.slice(0, 3));
+  console.log("[AUTH DEBUG] VENDEDORA2_PASSWORD:", process.env.VENDEDORA2_PASSWORD?.slice(0, 3));
+
+  const roles: Record<string, { role: string; nombre: string; email: string }> = {
+    [process.env.ADMIN_PASSWORD!]: { role: "admin", nombre: "David", email: "admin@brandit" },
+    [process.env.SECRETARIA_PASSWORD!]: { role: "secretaria", nombre: "Secretaria", email: "secretaria@brandit" },
+    [process.env.VENDEDORA1_PASSWORD!]: { role: "vendedora", nombre: "Vendedora 1", email: "vendedora1@brandit" },
+    [process.env.VENDEDORA2_PASSWORD!]: { role: "vendedora", nombre: "Vendedora 2", email: "vendedora2@brandit" },
+  };
+
+  const match = roles[password];
+  if (!match) {
+    return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }
 
-  // DEBUG TEMPORAL — eliminar después de verificar
-  const preview = (s: string | undefined) => s ? s.substring(0, 3) + "..." : "UNDEFINED";
-  console.log("[AUTH DEBUG] password recibida:", preview(password));
-  for (const c of CREDENTIALS) {
-    console.log(`[AUTH DEBUG] ${c.env}:`, preview(process.env[c.env]));
-  }
-
-  for (const cred of CREDENTIALS) {
-    const envPassword = process.env[cred.env];
-    if (envPassword && password === envPassword) {
-      const response = NextResponse.json({
-        role: cred.role,
-        nombre: cred.nombre,
-        email: cred.email,
-      });
-
-      response.cookies.set("brandit_session", cred.role, {
-        path: "/",
-        httpOnly: false,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-      });
-
-      return response;
-    }
-  }
-
-  return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
+  const response = NextResponse.json(match);
+  response.cookies.set("brandit_session", match.role, {
+    httpOnly: false,
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+  return response;
 }
