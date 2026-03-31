@@ -29,6 +29,8 @@ export async function GET() {
     .eq("upload_id", latestUpload.id)
     .order("nombre", { ascending: true });
 
+  console.log("[CXC GET] upload:", latestUpload.id, "rows:", rows?.length, "error:", error?.message);
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Get client overrides
