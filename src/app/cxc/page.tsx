@@ -288,8 +288,8 @@ export default function CxcPage() {
         </div>
       ) : view === "tabla" ? (
         /* Table view */
-        <div className="bg-white rounded-2xl border border-gray-50 overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border-2 border-red-500 overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-gray-100 text-left">
                 <th className="px-4 py-3 text-xs font-semibold text-brandit-black whitespace-nowrap">Cliente</th>
