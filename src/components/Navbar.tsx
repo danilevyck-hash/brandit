@@ -29,6 +29,14 @@ export default function Navbar() {
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setRole(localStorage.getItem("brandit_role") || "");
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   const allowed = ROLE_LINKS[role] || [];

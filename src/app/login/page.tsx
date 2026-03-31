@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabaseAuth } from "@/lib/supabase-auth";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -45,10 +43,11 @@ export default function LoginPage() {
     localStorage.setItem("brandit_email", email.toLowerCase());
     localStorage.setItem("brandit_nombre", roleData.nombre || "");
 
+    // Use window.location.href to force full reload so Navbar reads fresh localStorage
     if (roleData.role === "vendedora") {
-      router.push("/leads");
+      window.location.href = "/leads";
     } else {
-      router.push("/");
+      window.location.href = "/";
     }
   };
 
