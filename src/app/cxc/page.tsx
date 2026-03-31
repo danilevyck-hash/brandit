@@ -100,11 +100,10 @@ export default function CxcPage() {
     try {
       const res = await fetch("/api/cxc", { cache: "no-store" });
       const data = await res.json();
-      console.log("[FRONTEND] setRows llamado con", data.rows?.length, "items");
       setRows(data.rows || []);
       setUpload(data.upload || null);
-    } catch (err) {
-      console.error("[FRONTEND] Error en load:", err);
+    } catch {
+      // silently fail
     } finally {
       setLoading(false);
     }
@@ -277,8 +276,6 @@ export default function CxcPage() {
         />
       </div>
 
-      <p className="text-xs text-red-500 mb-2">DEBUG: rows={rows.length} filtered={filtered.length} search=&quot;{search}&quot; loading={String(loading)}</p>
-
       {loading ? (
         <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
       ) : rows.length === 0 ? (
@@ -288,8 +285,8 @@ export default function CxcPage() {
         </div>
       ) : view === "tabla" ? (
         /* Table view */
-        <div className="bg-white rounded-2xl border-2 border-red-500 overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+        <div className="bg-white rounded-2xl border border-gray-50 overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
                 <th className="px-4 py-3 text-xs font-semibold text-brandit-black whitespace-nowrap">Cliente</th>
