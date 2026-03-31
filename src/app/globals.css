@@ -2,8 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  overflow-x: hidden;
+}
+
 @media print {
   nav, .print\:hidden { display: none !important; }
-  body { background: white !important; }
+  body { background: white !important; overflow: visible; }
   main { padding: 0 !important; }
 }

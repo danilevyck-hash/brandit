@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const estado = request.nextUrl.searchParams.get("estado");
   const vendedora = request.nextUrl.searchParams.get("vendedora");
+  const empresa = request.nextUrl.searchParams.get("empresa");
 
   let query = getSupabaseAF()
     .from("leads")
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
 
   if (estado) query = query.eq("estado", estado);
   if (vendedora) query = query.eq("vendedora", vendedora);
+  if (empresa) query = query.eq("empresa", empresa);
 
   const { data, error } = await query;
 
@@ -26,17 +28,18 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await getSupabaseAF()
     .from("leads")
-    .insert([
-      {
-        nombre: body.nombre,
-        empresa: body.empresa || null,
-        telefono: body.telefono || null,
-        email: body.email || null,
-        estado: body.estado || "interesado",
-        notas: body.notas || null,
-        vendedora: body.vendedora || null,
-      },
-    ])
+    .insert([{
+      nombre: body.nombre,
+      empresa: body.empresa || null,
+      telefono: body.telefono || null,
+      email: body.email || null,
+      estado: body.estado || "interesado",
+      estado_venta: body.estado_venta || "activo",
+      notas: body.notas || null,
+      vendedora: body.vendedora || null,
+      fecha_seguimiento: body.fecha_seguimiento || null,
+      asignado_a: body.asignado_a || null,
+    }])
     .select()
     .single();
 

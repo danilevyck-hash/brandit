@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="32" fill="#231F20"/>
+  <text x="100" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="56" fill="white">BRAND</text>
+  <text x="100" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="56">
+    <tspan fill="#0071CE">/</tspan><tspan fill="white">IT</tspan><tspan fill="#F15A29">.</tspan>
+  </text>
+</svg>

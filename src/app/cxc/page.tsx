@@ -37,7 +37,11 @@ function parseNum(val: string | undefined | null): number {
 }
 
 function normalizeHeader(h: string): string {
-  return h.trim().replace(/\s+/g, " ");
+  return h.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+function get90Plus(row: CxcRow): number {
+  return Number(row.d_91_120) + Number(row.d_121_180) + Number(row.d_181_270) + Number(row.d_271_365) + Number(row.d_mas_365);
 }
 
 function getClientStatus(row: CxcRow): "corriente" | "vigilancia" | "vencido" {
@@ -52,6 +56,30 @@ const STATUS_COLORS = {
   corriente: { bg: "bg-green-50", text: "text-green-600", label: "Corriente" },
   vigilancia: { bg: "bg-yellow-50", text: "text-yellow-600", label: "Vigilancia" },
   vencido: { bg: "bg-red-50", text: "text-red-600", label: "Vencido" },
+};
+
+const HEADER_MAP: Record<string, string> = {
+  "CODIGO": "codigo",
+  "NOMBRE": "nombre",
+  "CORREO": "correo",
+  "TELEFONO": "telefono",
+  "CELULAR": "celular",
+  "CONTACTO": "contacto",
+  "PAIS": "pais",
+  "PROVINCIA": "provincia",
+  "DISTRITO": "distrito",
+  "CORREGIMIENTO": "corregimiento",
+  "LIMITE CREDITO": "limite_credito",
+  "LIMITE MOROSIDAD": "limite_morosidad",
+  "0-30": "d_0_30",
+  "31-60": "d_31_60",
+  "61-90": "d_61_90",
+  "91-120": "d_91_120",
+  "121-180": "d_121_180",
+  "181-270": "d_181_270",
+  "271-365": "d_271_365",
+  "MAS DE 365": "d_mas_365",
+  "TOTAL": "total",
 };
 
 export default function CxcPage() {
@@ -90,19 +118,25 @@ export default function CxcPage() {
       header: true,
       encoding: "latin1",
       complete: async (results) => {
-        const headers = results.meta.fields?.map(normalizeHeader) || [];
-        const headerMap: Record<string, string> = {};
-        headers.forEach((h, i) => {
-          headerMap[h] = results.meta.fields?.[i] || h;
+        // Build mapping: normalized header → original header
+        const originalFields = results.meta.fields || [];
+        const normalizedToOriginal: Record<string, string> = {};
+        originalFields.forEach((f) => {
+          normalizedToOriginal[normalizeHeader(f)] = f;
         });
 
         const parsed = (results.data as Record<string, string>[])
           .filter((row) => {
-            const nombre = row[headerMap["NOMBRE"]] || row["NOMBRE"];
+            const origKey = normalizedToOriginal["NOMBRE"] || "NOMBRE";
+            const nombre = row[origKey];
             return nombre && nombre.trim().length > 0;
           })
           .map((row) => {
-            const get = (key: string) => row[headerMap[key]] || row[key] || "";
+            const get = (normalizedKey: string): string => {
+              const origKey = normalizedToOriginal[normalizedKey];
+              if (origKey && row[origKey] !== undefined) return row[origKey];
+              return "";
+            };
             const nombre = get("NOMBRE").trim();
             return {
               codigo: get("CODIGO"),
@@ -125,7 +159,7 @@ export default function CxcPage() {
               d_121_180: parseNum(get("121-180")),
               d_181_270: parseNum(get("181-270")),
               d_271_365: parseNum(get("271-365")),
-              d_mas_365: parseNum(get("Mas de 365")),
+              d_mas_365: parseNum(get("MAS DE 365")),
               total: parseNum(get("TOTAL")),
             };
           });
@@ -170,14 +204,10 @@ export default function CxcPage() {
       d_0_30: acc.d_0_30 + Number(r.d_0_30),
       d_31_60: acc.d_31_60 + Number(r.d_31_60),
       d_61_90: acc.d_61_90 + Number(r.d_61_90),
-      d_91_120: acc.d_91_120 + Number(r.d_91_120),
-      d_121_180: acc.d_121_180 + Number(r.d_121_180),
-      d_181_270: acc.d_181_270 + Number(r.d_181_270),
-      d_271_365: acc.d_271_365 + Number(r.d_271_365),
-      d_mas_365: acc.d_mas_365 + Number(r.d_mas_365),
+      plus90: acc.plus90 + get90Plus(r),
       total: acc.total + Number(r.total),
     }),
-    { d_0_30: 0, d_31_60: 0, d_61_90: 0, d_91_120: 0, d_121_180: 0, d_181_270: 0, d_271_365: 0, d_mas_365: 0, total: 0 }
+    { d_0_30: 0, d_31_60: 0, d_61_90: 0, plus90: 0, total: 0 }
   );
 
   // Freshness indicator
@@ -240,7 +270,6 @@ export default function CxcPage() {
         <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
       ) : rows.length === 0 ? (
         <div className="text-center py-24">
-          <div className="text-6xl mb-4 opacity-20">📊</div>
           <p className="text-gray-400 text-lg mb-3">No hay datos de CxC</p>
           {canUpload && <p className="text-gray-400 text-sm">Cargue un archivo CSV para comenzar</p>}
         </div>
@@ -254,11 +283,7 @@ export default function CxcPage() {
                 <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">0-30</th>
                 <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">31-60</th>
                 <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">61-90</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">91-120</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">121-180</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">181-270</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">271-365</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">+365</th>
+                <th className="px-3 py-3 text-xs font-semibold text-red-600 text-right whitespace-nowrap">90+</th>
                 <th className="px-4 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">Total</th>
               </tr>
             </thead>
@@ -266,11 +291,12 @@ export default function CxcPage() {
               {filtered.map((r) => {
                 const status = getClientStatus(r);
                 const sc = STATUS_COLORS[status];
+                const p90 = get90Plus(r);
                 return (
                   <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-gray-900 font-medium">
                       <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.bg.replace("50", "500").replace("bg-green-500", "bg-green-500").replace("bg-yellow-500", "bg-yellow-500").replace("bg-red-500", "bg-red-500")}`}
+                        <span className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{ backgroundColor: status === "corriente" ? "#22c55e" : status === "vigilancia" ? "#eab308" : "#ef4444" }}
                         ></span>
                         {r.nombre}
@@ -279,11 +305,7 @@ export default function CxcPage() {
                     <td className="px-3 py-3 text-right text-gray-600 tabular-nums">{Number(r.d_0_30) ? fmt(r.d_0_30) : "-"}</td>
                     <td className="px-3 py-3 text-right text-gray-600 tabular-nums">{Number(r.d_31_60) ? fmt(r.d_31_60) : "-"}</td>
                     <td className="px-3 py-3 text-right text-gray-600 tabular-nums">{Number(r.d_61_90) ? fmt(r.d_61_90) : "-"}</td>
-                    <td className="px-3 py-3 text-right text-yellow-600 tabular-nums">{Number(r.d_91_120) ? fmt(r.d_91_120) : "-"}</td>
-                    <td className="px-3 py-3 text-right text-red-500 tabular-nums">{Number(r.d_121_180) ? fmt(r.d_121_180) : "-"}</td>
-                    <td className="px-3 py-3 text-right text-red-500 tabular-nums">{Number(r.d_181_270) ? fmt(r.d_181_270) : "-"}</td>
-                    <td className="px-3 py-3 text-right text-red-600 tabular-nums">{Number(r.d_271_365) ? fmt(r.d_271_365) : "-"}</td>
-                    <td className="px-3 py-3 text-right text-red-700 font-semibold tabular-nums">{Number(r.d_mas_365) ? fmt(r.d_mas_365) : "-"}</td>
+                    <td className={`px-3 py-3 text-right tabular-nums font-semibold ${p90 > 0 ? "text-red-600" : "text-gray-600"}`}>{p90 > 0 ? fmt(p90) : "-"}</td>
                     <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{fmt(r.total)}</td>
                   </tr>
                 );
@@ -295,11 +317,7 @@ export default function CxcPage() {
                 <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_0_30)}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_31_60)}</td>
                 <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_61_90)}</td>
-                <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_91_120)}</td>
-                <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_121_180)}</td>
-                <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_181_270)}</td>
-                <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_271_365)}</td>
-                <td className="px-3 py-3 text-right tabular-nums">{fmt(totals.d_mas_365)}</td>
+                <td className="px-3 py-3 text-right tabular-nums text-red-600">{fmt(totals.plus90)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{fmt(totals.total)}</td>
               </tr>
             </tfoot>
@@ -311,6 +329,7 @@ export default function CxcPage() {
           {filtered.map((r) => {
             const status = getClientStatus(r);
             const sc = STATUS_COLORS[status];
+            const p90 = get90Plus(r);
             return (
               <div key={r.id} className="bg-white rounded-2xl border border-gray-50 p-5 hover:shadow-md transition-all">
                 <div className="flex items-start justify-between mb-3">
@@ -324,11 +343,7 @@ export default function CxcPage() {
                   {Number(r.d_0_30) > 0 && <div className="text-center"><p className="text-gray-400">0-30</p><p className="font-semibold text-gray-600">{fmt(r.d_0_30)}</p></div>}
                   {Number(r.d_31_60) > 0 && <div className="text-center"><p className="text-gray-400">31-60</p><p className="font-semibold text-gray-600">{fmt(r.d_31_60)}</p></div>}
                   {Number(r.d_61_90) > 0 && <div className="text-center"><p className="text-gray-400">61-90</p><p className="font-semibold text-gray-600">{fmt(r.d_61_90)}</p></div>}
-                  {Number(r.d_91_120) > 0 && <div className="text-center"><p className="text-yellow-500">91-120</p><p className="font-semibold text-yellow-600">{fmt(r.d_91_120)}</p></div>}
-                  {Number(r.d_121_180) > 0 && <div className="text-center"><p className="text-red-400">121-180</p><p className="font-semibold text-red-500">{fmt(r.d_121_180)}</p></div>}
-                  {Number(r.d_181_270) > 0 && <div className="text-center"><p className="text-red-400">181-270</p><p className="font-semibold text-red-500">{fmt(r.d_181_270)}</p></div>}
-                  {Number(r.d_271_365) > 0 && <div className="text-center"><p className="text-red-500">271-365</p><p className="font-semibold text-red-600">{fmt(r.d_271_365)}</p></div>}
-                  {Number(r.d_mas_365) > 0 && <div className="text-center"><p className="text-red-600">+365</p><p className="font-semibold text-red-700">{fmt(r.d_mas_365)}</p></div>}
+                  {p90 > 0 && <div className="text-center"><p className="text-red-500">90+</p><p className="font-semibold text-red-600">{fmt(p90)}</p></div>}
                 </div>
               </div>
             );

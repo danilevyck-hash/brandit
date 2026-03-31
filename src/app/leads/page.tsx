@@ -8,7 +8,8 @@ type Lead = {
   empresa: string;
   telefono: string;
   email: string;
-  estado: "interesado" | "no_interesado" | "seguimiento";
+  estado: "interesado" | "no_interesado";
+  estado_venta: "activo" | "convertido" | "perdido";
   notas: string;
   vendedora: string;
   fecha_seguimiento: string | null;
@@ -24,11 +25,16 @@ type Comentario = {
   created_at: string;
 };
 
-const ESTADOS = [
-  { value: "interesado", label: "Interesado", bg: "bg-green-50", text: "text-green-600" },
-  { value: "seguimiento", label: "Seguimiento", bg: "bg-yellow-50", text: "text-yellow-600" },
-  { value: "no_interesado", label: "No Interesado", bg: "bg-gray-100", text: "text-gray-500" },
+const ESTADOS_PROSPECTO = [
+  { value: "interesado", label: "Prospecto", bg: "bg-green-50", text: "text-green-600" },
+  { value: "no_interesado", label: "No Califica", bg: "bg-gray-100", text: "text-gray-500" },
 ] as const;
+
+const ESTADOS_VENTA: Record<string, { bg: string; text: string; label: string }> = {
+  activo: { bg: "bg-blue-50", text: "text-blue-600", label: "Activo" },
+  convertido: { bg: "bg-green-50", text: "text-green-600", label: "Convertido" },
+  perdido: { bg: "bg-red-50", text: "text-red-500", label: "Perdido" },
+};
 
 type LeadForm = {
   nombre: string;
@@ -36,6 +42,7 @@ type LeadForm = {
   telefono: string;
   email: string;
   estado: Lead["estado"];
+  estado_venta: Lead["estado_venta"];
   notas: string;
   vendedora: string;
   fecha_seguimiento: string;
@@ -48,7 +55,8 @@ export default function LeadsPage() {
   const [filtro, setFiltro] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<LeadForm>({
-    nombre: "", empresa: "", telefono: "", email: "", estado: "interesado", notas: "", vendedora: "", fecha_seguimiento: "", asignado_a: "",
+    nombre: "", empresa: "", telefono: "", email: "", estado: "interesado",
+    estado_venta: "activo", notas: "", vendedora: "", fecha_seguimiento: "", asignado_a: "",
   });
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showPanel, setShowPanel] = useState(false);
@@ -57,14 +65,18 @@ export default function LeadsPage() {
   const [role, setRole] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
+  const [userEmpresa, setUserEmpresa] = useState("");
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [newComment, setNewComment] = useState("");
   const [addingComment, setAddingComment] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [empresaTab, setEmpresaTab] = useState<string>("todas");
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
     setUserEmail(localStorage.getItem("brandit_email") || "");
     setUserName(localStorage.getItem("brandit_nombre") || "");
+    setUserEmpresa(localStorage.getItem("brandit_empresa") || "");
   }, []);
 
   const isVendedora = role === "vendedora";
@@ -73,13 +85,12 @@ export default function LeadsPage() {
     if (!role) return;
     setLoading(true);
     const params = new URLSearchParams();
-    if (filtro) params.set("estado", filtro);
-    if (isVendedora && userEmail) params.set("vendedora", userEmail);
+    if (isVendedora && userEmpresa) params.set("empresa", userEmpresa);
     const res = await fetch(`/api/leads?${params}`);
     const data = await res.json();
     setLeads(Array.isArray(data) ? data : []);
     setLoading(false);
-  }, [filtro, role, isVendedora, userEmail]);
+  }, [role, isVendedora, userEmpresa]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -102,46 +113,60 @@ export default function LeadsPage() {
     loadComentarios(selectedLead.id);
   };
 
-  const estadoInfo = (estado: string) => ESTADOS.find((e) => e.value === estado);
+  const prospectoInfo = (estado: string) => ESTADOS_PROSPECTO.find((e) => e.value === estado) || ESTADOS_PROSPECTO[0];
 
-  const filtered = leads.filter((l) =>
+  // Filtering
+  const filteredByEmpresa = !isVendedora && empresaTab !== "todas"
+    ? leads.filter((l) => l.empresa === empresaTab)
+    : leads;
+
+  const filteredByFiltro = filteredByEmpresa.filter((l) => {
+    if (!filtro) return true;
+    if (filtro === "interesado" || filtro === "no_interesado") return l.estado === filtro;
+    if (filtro === "convertido") return l.estado_venta === "convertido";
+    if (filtro === "perdido") return l.estado_venta === "perdido";
+    return true;
+  });
+
+  const filtered = filteredByFiltro.filter((l) =>
     !search ||
     l.nombre?.toLowerCase().includes(search.toLowerCase()) ||
     l.empresa?.toLowerCase().includes(search.toLowerCase())
   );
 
   const counts = {
-    total: leads.length,
-    interesado: leads.filter((l) => l.estado === "interesado").length,
-    seguimiento: leads.filter((l) => l.estado === "seguimiento").length,
-    no_interesado: leads.filter((l) => l.estado === "no_interesado").length,
+    total: filteredByEmpresa.length,
+    interesado: filteredByEmpresa.filter((l) => l.estado === "interesado").length,
+    no_interesado: filteredByEmpresa.filter((l) => l.estado === "no_interesado").length,
+    convertido: filteredByEmpresa.filter((l) => l.estado_venta === "convertido").length,
   };
 
   const today = new Date().toISOString().split("T")[0];
 
-  const isSeguimientoDue = (lead: Lead) => {
-    return lead.fecha_seguimiento && lead.fecha_seguimiento <= today;
-  };
+  const isSeguimientoDue = (lead: Lead) => lead.fecha_seguimiento && lead.fecha_seguimiento <= today;
 
   const openNew = () => {
     setForm({
-      nombre: "", empresa: "", telefono: "", email: "", estado: "interesado", notas: "",
-      vendedora: isVendedora ? userName : "", fecha_seguimiento: "", asignado_a: "",
+      nombre: "", empresa: "", telefono: "", email: "", estado: "interesado",
+      estado_venta: "activo", notas: "",
+      vendedora: userName || "",
+      fecha_seguimiento: "", asignado_a: "",
     });
     setShowNewForm(true);
     setShowPanel(false);
     setSelectedLead(null);
+    setEditMode(false);
   };
 
   const openPanel = (lead: Lead) => {
-    if (!canEdit(lead)) return;
     setSelectedLead(lead);
     setForm({
       nombre: lead.nombre || "",
       empresa: lead.empresa || "",
       telefono: lead.telefono || "",
       email: lead.email || "",
-      estado: lead.estado,
+      estado: lead.estado || "interesado",
+      estado_venta: lead.estado_venta || "activo",
       notas: lead.notas || "",
       vendedora: lead.vendedora || "",
       fecha_seguimiento: lead.fecha_seguimiento || "",
@@ -149,6 +174,7 @@ export default function LeadsPage() {
     });
     setShowPanel(true);
     setShowNewForm(false);
+    setEditMode(false);
     loadComentarios(lead.id);
   };
 
@@ -157,28 +183,47 @@ export default function LeadsPage() {
     setSelectedLead(null);
     setComentarios([]);
     setNewComment("");
+    setEditMode(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitNew = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    if (selectedLead) {
-      await fetch(`/api/leads/${selectedLead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      closePanel();
-    } else {
-      await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      setShowNewForm(false);
-    }
+    await fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setShowNewForm(false);
     setSaving(false);
     load();
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLead) return;
+    setSaving(true);
+    await fetch(`/api/leads/${selectedLead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setSaving(false);
+    setEditMode(false);
+    closePanel();
+    load();
+  };
+
+  const updateEstadoVenta = async (lead: Lead, estado_venta: string) => {
+    await fetch(`/api/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado_venta }),
+    });
+    load();
+    if (selectedLead?.id === lead.id) {
+      setSelectedLead({ ...lead, estado_venta: estado_venta as Lead["estado_venta"] });
+    }
   };
 
   const deleteLead = async (id: string) => {
@@ -188,17 +233,7 @@ export default function LeadsPage() {
     load();
   };
 
-  const canDelete = (lead: Lead) => {
-    if (role === "admin" || role === "secretaria") return true;
-    if (isVendedora && (lead.vendedora === userEmail || lead.vendedora === userName)) return true;
-    return false;
-  };
-
-  const canEdit = (lead: Lead) => {
-    if (role === "admin" || role === "secretaria") return true;
-    if (isVendedora && (lead.vendedora === userEmail || lead.vendedora === userName)) return true;
-    return false;
-  };
+  const canDelete = !isVendedora;
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
@@ -209,272 +244,377 @@ export default function LeadsPage() {
     return new Date(d).toLocaleDateString("es-PA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   };
 
-  const renderForm = (isNew: boolean) => (
-    <form onSubmit={handleSubmit}>
-      <div className="space-y-4 mb-4">
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Nombre *</label>
-          <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required
-            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+  return (
+    <div className="bg-white min-h-screen">
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold text-brandit-black tracking-tight">Leads</h1>
         </div>
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Empresa</label>
-          <input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })}
-            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+
+        {/* KPI row - horizontal scrollable */}
+        <div className="flex gap-3 overflow-x-auto pb-3 mb-4 -mx-4 px-4 scrollbar-hide">
+          {[
+            { label: "Total", value: counts.total, color: "text-brandit-black" },
+            { label: "Prospectos", value: counts.interesado, color: "text-green-600" },
+            { label: "No Califica", value: counts.no_interesado, color: "text-gray-500" },
+            { label: "Convertidos", value: counts.convertido, color: "text-green-600" },
+          ].map((k) => (
+            <div key={k.label} className="bg-gray-50 rounded-xl px-4 py-3 min-w-[100px] flex-shrink-0">
+              <p className="text-[10px] uppercase tracking-widest text-gray-400">{k.label}</p>
+              <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
+            </div>
+          ))}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Teléfono</label>
-            <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Email</label>
-            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Estado</label>
-            <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as Lead["estado"] })}
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
-              {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Vendedora</label>
-            <input
-              value={form.vendedora}
-              onChange={(e) => setForm({ ...form, vendedora: e.target.value })}
-              readOnly={isVendedora}
-              className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent ${isVendedora ? "text-gray-400" : ""}`}
-            />
-          </div>
-        </div>
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Fecha de Seguimiento</label>
-          <input type="date" value={form.fecha_seguimiento} onChange={(e) => setForm({ ...form, fecha_seguimiento: e.target.value })}
-            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
-        </div>
+
+        {/* Empresa tabs (admin/secretaria only) */}
         {!isVendedora && (
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Asignado a</label>
-            <input value={form.asignado_a} onChange={(e) => setForm({ ...form, asignado_a: e.target.value })}
-              placeholder="Nombre de la persona asignada"
-              className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            {[
+              { key: "todas", label: "Todas" },
+              { key: "confecciones_boston", label: "Confecciones Boston" },
+              { key: "brand_it", label: "Brand It" },
+            ].map((t) => (
+              <button key={t.key} onClick={() => setEmpresaTab(t.key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                  empresaTab === t.key ? "bg-brandit-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}>
+                {t.label}
+              </button>
+            ))}
           </div>
         )}
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Notas</label>
-          <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={2}
-            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent resize-none" />
-        </div>
-      </div>
-      <div className="flex gap-3">
-        <button type="submit" disabled={saving}
-          className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90 transition-colors disabled:opacity-50">
-          {saving ? "Guardando..." : isNew ? "Guardar" : "Actualizar"}
-        </button>
-        <button type="button" onClick={() => isNew ? setShowNewForm(false) : closePanel()}
-          className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2 text-sm hover:border-gray-300 transition-colors">
-          Cancelar
-        </button>
-      </div>
-    </form>
-  );
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Ventas</p>
-          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Leads</h1>
-          <p className="text-sm text-gray-400 mt-1">Registro de clientes potenciales</p>
-        </div>
-        <button onClick={openNew}
-          className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90 transition-colors">
-          + Nuevo Lead
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total Leads</p>
-          <p className="text-3xl font-bold text-brandit-black">{counts.total}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Interesados</p>
-          <p className="text-3xl font-bold text-green-600">{counts.interesado}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Seguimiento</p>
-          <p className="text-3xl font-bold text-yellow-600">{counts.seguimiento}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">No Interesados</p>
-          <p className="text-3xl font-bold text-gray-400">{counts.no_interesado}</p>
-        </div>
-      </div>
-
-      {/* Filters + Search */}
-      <div className="flex items-center justify-between mb-6 gap-4">
-        <div className="flex gap-2">
-          <button onClick={() => setFiltro("")}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              filtro === "" ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-            }`}>
-            Todos
-          </button>
-          {ESTADOS.map((e) => (
-            <button key={e.value} onClick={() => setFiltro(e.value)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filtro === e.value ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+        {/* Filter pills */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+          {[
+            { key: "", label: "Todos" },
+            { key: "interesado", label: "Prospecto" },
+            { key: "no_interesado", label: "No Califica" },
+            { key: "convertido", label: "Convertido" },
+            { key: "perdido", label: "Perdido" },
+          ].map((f) => (
+            <button key={f.key} onClick={() => setFiltro(f.key)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                filtro === f.key ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}>
-              {e.label}
+              {f.label}
             </button>
           ))}
         </div>
+
+        {/* Search */}
         <input
           type="text"
           placeholder="Buscar nombre o empresa..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent w-64"
+          className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brandit-orange/20 mb-4"
         />
-      </div>
 
-      {/* New Lead Form (inline) */}
-      {showNewForm && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Nuevo Lead</p>
-          {renderForm(true)}
-        </div>
-      )}
-
-      {/* List */}
-      {loading ? (
-        <div className="text-center py-24 text-gray-300">Cargando...</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-24">
-          <p className="text-gray-300 text-lg mb-2">
-            {search || filtro ? "Sin resultados" : "No hay leads"}
-          </p>
-          {!search && !filtro && (
-            <button onClick={openNew} className="text-brandit-orange font-medium hover:underline text-sm">
-              Agregar el primer lead
-            </button>
-          )}
-        </div>
-      ) : (
-        <div>
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">
-            {filtered.length} lead{filtered.length !== 1 ? "s" : ""}
-          </p>
-          <div className="space-y-3">
+        {/* Lead cards */}
+        {loading ? (
+          <div className="text-center py-24 text-gray-300">Cargando...</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-24">
+            <p className="text-gray-300 text-lg mb-2">
+              {search || filtro ? "Sin resultados" : "No hay leads"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2 pb-24">
             {filtered.map((lead) => {
-              const ei = estadoInfo(lead.estado);
+              const pi = prospectoInfo(lead.estado);
               const due = isSeguimientoDue(lead);
+              const vi = ESTADOS_VENTA[lead.estado_venta] || ESTADOS_VENTA.activo;
               return (
                 <div
                   key={lead.id}
                   onClick={() => openPanel(lead)}
-                  className={`bg-white rounded-2xl border px-6 py-5 hover:border-brandit-orange/20 hover:shadow-md transition-all group ${
-                    canEdit(lead) ? "cursor-pointer" : ""
-                  } ${selectedLead?.id === lead.id ? "border-brandit-orange/30 shadow-md" : "border-gray-100"}`}
+                  className="bg-white border border-gray-100 rounded-xl px-4 py-3.5 active:bg-gray-50 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-brandit-orange/10 flex items-center justify-center text-brandit-orange font-bold text-sm">
-                        {lead.nombre?.charAt(0).toUpperCase()}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-gray-900 text-sm truncate">{lead.nombre}</h3>
+                        {due && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 flex-shrink-0">
+                            Seguimiento
+                          </span>
+                        )}
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
-                          {lead.nombre}
-                          {lead.empresa && <span className="text-gray-400 font-normal"> · {lead.empresa}</span>}
-                        </h3>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {lead.vendedora && <span className="text-brandit-orange/70">{lead.vendedora}</span>}
-                          {lead.vendedora && (lead.telefono || lead.email) && " · "}
-                          {lead.telefono || lead.email || (!lead.vendedora && "Sin contacto")}
-                          {lead.asignado_a && <span className="ml-2 text-gray-400">→ {lead.asignado_a}</span>}
-                        </p>
+                      {lead.empresa && <p className="text-xs text-gray-400 mt-0.5">{lead.empresa}</p>}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {lead.telefono && (
+                          <a href={`tel:${lead.telefono}`} onClick={(e) => e.stopPropagation()}
+                            className="text-xs text-brandit-orange">
+                            {lead.telefono}
+                          </a>
+                        )}
+                        {lead.vendedora && <span className="text-[10px] text-gray-400">{lead.vendedora}</span>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {due && (
-                        <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-brandit-orange/10 text-brandit-orange">
-                          Seguimiento {lead.fecha_seguimiento ? formatDate(lead.fecha_seguimiento) : ""}
-                        </span>
-                      )}
-                      {!due && lead.fecha_seguimiento && (
-                        <span className="text-[10px] text-gray-400">
-                          {formatDate(lead.fecha_seguimiento)}
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${ei?.bg} ${ei?.text}`}>
-                        {ei?.label}
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${pi.bg} ${pi.text}`}>
+                        {pi.label}
                       </span>
-                      {canDelete(lead) && (
+                      {lead.estado_venta !== "activo" && (
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${vi.bg} ${vi.text}`}>
+                          {vi.label}
+                        </span>
+                      )}
+                      {lead.estado_venta === "activo" && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); deleteLead(lead.id); }}
-                          className="text-xs text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); updateEstadoVenta(lead, "convertido"); }}
+                          className="text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full hover:bg-green-100 transition-colors"
                         >
-                          Eliminar
+                          Convertido
                         </button>
                       )}
                     </div>
                   </div>
-                  {lead.notas && (
-                    <p className="text-xs text-gray-400 mt-2 pl-14 line-clamp-1">{lead.notas}</p>
-                  )}
                 </div>
               );
             })}
           </div>
-        </div>
+        )}
+
+        {/* FAB - New Lead */}
+        <button
+          onClick={openNew}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-brandit-orange text-white rounded-full shadow-lg hover:bg-brandit-orange/90 active:scale-95 transition-all flex items-center justify-center text-2xl font-light z-30"
+        >
+          +
+        </button>
+      </div>
+
+      {/* Bottom Sheet: New Lead */}
+      {showNewForm && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowNewForm(false)} />
+          <div className="fixed inset-x-0 bottom-0 md:inset-y-0 md:right-0 md:left-auto md:w-full md:max-w-lg bg-white rounded-t-2xl md:rounded-none shadow-2xl z-50 flex flex-col max-h-[90vh] md:max-h-full">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-brandit-black">Nuevo Lead</h2>
+              <button onClick={() => setShowNewForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <form onSubmit={handleSubmitNew} className="flex-1 overflow-y-auto px-5 py-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Nombre *</label>
+                  <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required
+                    className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Empresa *</label>
+                  <input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })} required
+                    className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Teléfono *</label>
+                  <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} required
+                    className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Email</label>
+                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-2">Estado</label>
+                  <div className="flex gap-2">
+                    {ESTADOS_PROSPECTO.map((e) => (
+                      <button key={e.value} type="button"
+                        onClick={() => setForm({ ...form, estado: e.value as Lead["estado"] })}
+                        className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${
+                          form.estado === e.value
+                            ? "bg-brandit-orange text-white"
+                            : "bg-gray-100 text-gray-500"
+                        }`}>
+                        {e.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Notas *</label>
+                  <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={3} required
+                    className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent resize-none" />
+                </div>
+              </div>
+              <div className="mt-6 pb-4">
+                <button type="submit" disabled={saving}
+                  className="w-full bg-brandit-orange text-white rounded-xl py-3 text-sm font-medium hover:bg-brandit-orange/90 transition-colors disabled:opacity-50">
+                  {saving ? "Guardando..." : "Guardar Lead"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
       )}
 
-      {/* Slide-over Panel */}
+      {/* Panel: Lead Detail */}
       {showPanel && selectedLead && (
         <>
-          {/* Backdrop */}
           <div className="fixed inset-0 bg-black/30 z-40" onClick={closePanel} />
-
-          {/* Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl z-50 flex flex-col">
+          <div className="fixed inset-x-0 bottom-0 md:inset-y-0 md:right-0 md:left-auto md:w-full md:max-w-lg bg-white rounded-t-2xl md:rounded-none shadow-2xl z-50 flex flex-col max-h-[90vh] md:max-h-full">
             {/* Panel header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-widest text-gray-400">Detalle del Lead</p>
+                <p className="text-xs uppercase tracking-widest text-gray-400">Lead</p>
                 <h2 className="text-lg font-bold text-brandit-black">{selectedLead.nombre}</h2>
               </div>
               <button onClick={closePanel} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
 
-            {/* Panel content */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {/* Edit form */}
-              <div className="mb-6">
-                <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Información</p>
-                {renderForm(false)}
-              </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {!editMode ? (
+                <>
+                  {/* Read-only info */}
+                  <div className="space-y-3 mb-5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${prospectoInfo(selectedLead.estado).bg} ${prospectoInfo(selectedLead.estado).text}`}>
+                        {prospectoInfo(selectedLead.estado).label}
+                      </span>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ESTADOS_VENTA[selectedLead.estado_venta]?.bg} ${ESTADOS_VENTA[selectedLead.estado_venta]?.text}`}>
+                        {ESTADOS_VENTA[selectedLead.estado_venta]?.label}
+                      </span>
+                    </div>
+                    {selectedLead.empresa && (
+                      <div><p className="text-xs text-gray-400">Empresa</p><p className="text-sm">{selectedLead.empresa}</p></div>
+                    )}
+                    {selectedLead.telefono && (
+                      <div><p className="text-xs text-gray-400">Teléfono</p><a href={`tel:${selectedLead.telefono}`} className="text-sm text-brandit-orange">{selectedLead.telefono}</a></div>
+                    )}
+                    {selectedLead.email && (
+                      <div><p className="text-xs text-gray-400">Email</p><p className="text-sm">{selectedLead.email}</p></div>
+                    )}
+                    {selectedLead.vendedora && (
+                      <div><p className="text-xs text-gray-400">Vendedora</p><p className="text-sm">{selectedLead.vendedora}</p></div>
+                    )}
+                    {selectedLead.notas && (
+                      <div><p className="text-xs text-gray-400">Notas</p><p className="text-sm text-gray-700">{selectedLead.notas}</p></div>
+                    )}
+                    {selectedLead.fecha_seguimiento && (
+                      <div><p className="text-xs text-gray-400">Seguimiento</p><p className="text-sm">{formatDate(selectedLead.fecha_seguimiento)}</p></div>
+                    )}
+                    {selectedLead.asignado_a && (
+                      <div><p className="text-xs text-gray-400">Asignado a</p><p className="text-sm">{selectedLead.asignado_a}</p></div>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    <button onClick={() => setEditMode(true)}
+                      className="bg-brandit-orange text-white rounded-xl px-4 py-2 text-sm font-medium">
+                      Editar
+                    </button>
+                    {selectedLead.estado_venta === "activo" && (
+                      <>
+                        <button onClick={() => { updateEstadoVenta(selectedLead, "convertido"); closePanel(); }}
+                          className="bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-medium">
+                          Convertido
+                        </button>
+                        <button onClick={() => { updateEstadoVenta(selectedLead, "perdido"); closePanel(); }}
+                          className="bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-medium">
+                          Perdido
+                        </button>
+                      </>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => deleteLead(selectedLead.id)}
+                        className="border border-red-200 text-red-500 rounded-xl px-4 py-2 text-sm hover:bg-red-50 transition-colors">
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Edit form */
+                <form onSubmit={handleSubmitEdit} className="mb-6">
+                  <div className="space-y-4 mb-4">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Nombre *</label>
+                      <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required
+                        className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Empresa</label>
+                      <input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })}
+                        className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Teléfono</label>
+                      <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                        className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Email</label>
+                      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-2">Estado</label>
+                      <div className="flex gap-2">
+                        {ESTADOS_PROSPECTO.map((e) => (
+                          <button key={e.value} type="button"
+                            onClick={() => setForm({ ...form, estado: e.value as Lead["estado"] })}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                              form.estado === e.value ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500"
+                            }`}>
+                            {e.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Vendedora</label>
+                      <input value={form.vendedora} onChange={(e) => setForm({ ...form, vendedora: e.target.value })}
+                        readOnly={isVendedora}
+                        className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent ${isVendedora ? "text-gray-400" : ""}`} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Fecha de Seguimiento</label>
+                      <input type="date" value={form.fecha_seguimiento} onChange={(e) => setForm({ ...form, fecha_seguimiento: e.target.value })}
+                        className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                    </div>
+                    {!isVendedora && (
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Asignado a</label>
+                        <input value={form.asignado_a} onChange={(e) => setForm({ ...form, asignado_a: e.target.value })}
+                          className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Notas</label>
+                      <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} rows={2}
+                        className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent resize-none" />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={saving}
+                      className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90 transition-colors disabled:opacity-50">
+                      {saving ? "Guardando..." : "Actualizar"}
+                    </button>
+                    <button type="button" onClick={() => setEditMode(false)}
+                      className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2 text-sm hover:border-gray-300 transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Comments section */}
-              <div className="border-t border-gray-100 pt-6">
+              <div className="border-t border-gray-100 pt-5">
                 <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">
                   Comentarios ({comentarios.length})
                 </p>
 
-                {/* Add comment */}
                 <div className="flex gap-2 mb-4">
                   <input
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Agregar comentario..."
-                    className="flex-1 border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent"
+                    className="flex-1 bg-gray-50 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brandit-orange/20"
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && addComentario()}
                   />
                   <button
@@ -486,8 +626,7 @@ export default function LeadsPage() {
                   </button>
                 </div>
 
-                {/* Comments list */}
-                <div className="space-y-3">
+                <div className="space-y-2 pb-4">
                   {comentarios.map((c) => (
                     <div key={c.id} className="bg-gray-50 rounded-xl p-3">
                       <div className="flex items-center justify-between mb-1">

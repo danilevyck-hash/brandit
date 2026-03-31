@@ -29,6 +29,7 @@ export default function LoginPage() {
     localStorage.setItem("brandit_role", data.role);
     localStorage.setItem("brandit_email", data.email);
     localStorage.setItem("brandit_nombre", data.nombre);
+    localStorage.setItem("brandit_empresa", data.empresa || "");
 
     if (data.role === "vendedora") {
       window.location.href = "/leads";
@@ -41,13 +42,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-brandit-black flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight uppercase">
-            <span className="text-brandit-black">BRAND</span>
-            <span className="text-brandit-blue">/</span>
-            <span className="text-brandit-black">IT</span>
-            <span className="text-brandit-orange">.</span>
-          </h1>
-          <p className="text-[11px] text-brandit-gray font-medium mt-1">by Confecciones Boston</p>
+          <img src="/brandit-logo.svg" alt="Brand It" className="h-16 w-16 mx-auto mb-4 object-contain rounded-xl" />
         </div>
 
         <form onSubmit={handleLogin}>

@@ -129,13 +129,7 @@ export default function CajaDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white p-8 print:p-4">
           <div className="text-center mb-6 border-b-2 border-brandit-orange pb-4">
-            <h1 className="text-xl font-bold tracking-tight uppercase">
-              <span className="text-brandit-black">BRAND</span>
-              <span className="text-brandit-blue">/</span>
-              <span className="text-brandit-black">IT</span>
-              <span className="text-brandit-orange">.</span>
-            </h1>
-            <p className="text-[10px] text-gray-500 font-medium">Confecciones Boston</p>
+            <p className="text-sm font-bold text-brandit-black tracking-tight uppercase">BRAND IT | Confecciones Boston</p>
             <p className="text-sm font-bold text-brandit-black mt-2">REPORTE DE CAJA MENUDA</p>
           </div>
 
@@ -232,13 +226,7 @@ export default function CajaDetailPage() {
       <div className="max-w-md mx-auto px-4 py-8">
         <div className="bg-white p-8 print:p-4">
           <div className="text-center mb-6 border-b-2 border-brandit-orange pb-4">
-            <h1 className="text-xl font-bold tracking-tight uppercase">
-              <span className="text-brandit-black">BRAND</span>
-              <span className="text-brandit-blue">/</span>
-              <span className="text-brandit-black">IT</span>
-              <span className="text-brandit-orange">.</span>
-            </h1>
-            <p className="text-[10px] text-gray-500 font-medium">Confecciones Boston</p>
+            <p className="text-sm font-bold text-brandit-black tracking-tight uppercase">BRAND IT | Confecciones Boston</p>
             <p className="text-sm font-bold text-brandit-black mt-2">COMPROBANTE DE CAJA MENUDA</p>
           </div>
 
@@ -312,13 +300,7 @@ export default function CajaDetailPage() {
       <div className="max-w-md mx-auto px-4 py-8">
         <div className="bg-white p-8 print:p-4">
           <div className="text-center mb-6 border-b-2 border-brandit-orange pb-4">
-            <h1 className="text-xl font-bold tracking-tight uppercase">
-              <span className="text-brandit-black">BRAND</span>
-              <span className="text-brandit-blue">/</span>
-              <span className="text-brandit-black">IT</span>
-              <span className="text-brandit-orange">.</span>
-            </h1>
-            <p className="text-[10px] text-gray-500 font-medium">Confecciones Boston</p>
+            <p className="text-sm font-bold text-brandit-black tracking-tight uppercase">BRAND IT | Confecciones Boston</p>
             <p className="text-sm font-bold text-brandit-black mt-2">VALE DE ENTREGA DE CAJA MENUDA</p>
           </div>
 
