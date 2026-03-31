@@ -13,6 +13,10 @@ export async function POST(req: NextRequest) {
     .eq("activo", true)
     .single();
 
+  console.log("[AUTH] password recibida:", password?.slice(0, 3));
+  console.log("[AUTH] data:", JSON.stringify(data));
+  console.log("[AUTH] error:", JSON.stringify(error));
+
   if (error || !data) {
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }
