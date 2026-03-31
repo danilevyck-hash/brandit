@@ -29,7 +29,7 @@ export async function GET() {
     .eq("upload_id", latestUpload.id)
     .order("nombre", { ascending: true });
 
-  console.log("[CXC GET] upload:", latestUpload.id, "rows:", rows?.length, "error:", error?.message);
+  console.log("[CXC GET] upload_id:", latestUpload?.id, "rows_count:", rows?.length, "error:", error?.message, "SUPABASE_URL:", process.env.APPS_FAMILIA_SUPABASE_URL?.slice(0, 30));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -56,5 +56,6 @@ export async function GET() {
   return NextResponse.json({
     rows: mergedRows,
     upload: latestUpload,
+    _debug: { rows_count: rows?.length, upload_id: latestUpload?.id },
   });
 }
