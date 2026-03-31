@@ -31,8 +31,18 @@ export async function POST(request: NextRequest) {
     .eq("company_key", COMPANY_KEY)
     .neq("upload_id", upload.id);
 
+  // Filter junk rows (numeric names, header echoes)
+  const JUNK_CODIGOS = new Set(["0-30", "31-60", "61-90", "91-120", "121-180", "181-270", "271-365", "MAS DE 365", "TOTAL"]);
+  const validRows = rows.filter((row: Record<string, unknown>) => {
+    const nombre = String(row.nombre || "").trim();
+    if (!nombre || !isNaN(Number(nombre))) return false;
+    const codigo = String(row.codigo || "").trim().toUpperCase();
+    if (JUNK_CODIGOS.has(codigo)) return false;
+    return true;
+  });
+
   // Insert new rows
-  const dbRows = rows.map((row: Record<string, unknown>) => ({
+  const dbRows = validRows.map((row: Record<string, unknown>) => ({
     upload_id: upload.id,
     company_key: COMPANY_KEY,
     codigo: row.codigo || null,

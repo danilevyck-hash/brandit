@@ -25,6 +25,18 @@ type Upload = {
   filename: string;
 };
 
+type SortKey = "nombre" | "total" | "plus90";
+
+const JUNK_CODIGOS = new Set(["0-30", "31-60", "61-90", "91-120", "121-180", "181-270", "271-365", "MAS DE 365", "TOTAL"]);
+
+function isValidClientName(nombre: string | undefined | null): boolean {
+  if (!nombre) return false;
+  const trimmed = nombre.trim();
+  if (trimmed.length === 0) return false;
+  if (!isNaN(Number(trimmed))) return false;
+  return true;
+}
+
 function normalizeName(name: string): string {
   return name.toUpperCase().replace(/[.,]/g, "").trim();
 }
@@ -58,30 +70,6 @@ const STATUS_COLORS = {
   vencido: { bg: "bg-red-50", text: "text-red-600", label: "Vencido" },
 };
 
-const HEADER_MAP: Record<string, string> = {
-  "CODIGO": "codigo",
-  "NOMBRE": "nombre",
-  "CORREO": "correo",
-  "TELEFONO": "telefono",
-  "CELULAR": "celular",
-  "CONTACTO": "contacto",
-  "PAIS": "pais",
-  "PROVINCIA": "provincia",
-  "DISTRITO": "distrito",
-  "CORREGIMIENTO": "corregimiento",
-  "LIMITE CREDITO": "limite_credito",
-  "LIMITE MOROSIDAD": "limite_morosidad",
-  "0-30": "d_0_30",
-  "31-60": "d_31_60",
-  "61-90": "d_61_90",
-  "91-120": "d_91_120",
-  "121-180": "d_121_180",
-  "181-270": "d_181_270",
-  "271-365": "d_271_365",
-  "MAS DE 365": "d_mas_365",
-  "TOTAL": "total",
-};
-
 export default function CxcPage() {
   const [rows, setRows] = useState<CxcRow[]>([]);
   const [upload, setUpload] = useState<Upload | null>(null);
@@ -90,10 +78,25 @@ export default function CxcPage() {
   const [view, setView] = useState<"tabla" | "cards">("tabla");
   const [uploading, setUploading] = useState(false);
   const [role, setRole] = useState("");
+  const [sort, setSort] = useState<SortKey>("nombre");
+  const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [showFavs, setShowFavs] = useState(false);
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
+    try {
+      const saved = localStorage.getItem("cxc_favoritos");
+      if (saved) setFavoritos(JSON.parse(saved));
+    } catch { /* ignore */ }
   }, []);
+
+  const toggleFav = (nombre: string) => {
+    setFavoritos((prev) => {
+      const next = prev.includes(nombre) ? prev.filter((f) => f !== nombre) : [...prev, nombre];
+      localStorage.setItem("cxc_favoritos", JSON.stringify(next));
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,7 +126,6 @@ export default function CxcPage() {
       header: true,
       encoding: "latin1",
       complete: async (results) => {
-        // Build mapping: normalized header → original header
         const originalFields = results.meta.fields || [];
         const normalizedToOriginal: Record<string, string> = {};
         originalFields.forEach((f) => {
@@ -134,7 +136,11 @@ export default function CxcPage() {
           .filter((row) => {
             const origKey = normalizedToOriginal["NOMBRE"] || "NOMBRE";
             const nombre = row[origKey];
-            return nombre && nombre.trim().length > 0;
+            if (!isValidClientName(nombre)) return false;
+            const codigoKey = normalizedToOriginal["CODIGO"] || "CODIGO";
+            const codigo = (row[codigoKey] || "").trim().toUpperCase();
+            if (JUNK_CODIGOS.has(codigo)) return false;
+            return true;
           })
           .map((row) => {
             const get = (normalizedKey: string): string => {
@@ -202,9 +208,27 @@ export default function CxcPage() {
     e.target.value = "";
   };
 
-  const filtered = rows.filter((r) =>
+  // Filter
+  const searched = rows.filter((r) =>
     !search || (r.nombre || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const favsFiltered = showFavs ? searched.filter((r) => favoritos.includes(r.nombre)) : searched;
+
+  // Sort
+  const sorted = [...favsFiltered].sort((a, b) => {
+    if (showFavs) {
+      const aFav = favoritos.includes(a.nombre) ? 0 : 1;
+      const bFav = favoritos.includes(b.nombre) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
+    }
+    if (sort === "nombre") return (a.nombre || "").localeCompare(b.nombre || "");
+    if (sort === "total") return Number(b.total) - Number(a.total);
+    if (sort === "plus90") return get90Plus(b) - get90Plus(a);
+    return 0;
+  });
+
+  const filtered = sorted;
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n));
@@ -220,7 +244,6 @@ export default function CxcPage() {
     { d_0_30: 0, d_31_60: 0, d_61_90: 0, plus90: 0, total: 0 }
   );
 
-  // Freshness indicator
   const getFreshness = () => {
     if (!upload) return null;
     const days = Math.floor((Date.now() - new Date(upload.uploaded_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -267,7 +290,7 @@ export default function CxcPage() {
       </div>
 
       {/* Search */}
-      <div className="mb-6">
+      <div className="mb-4">
         <input
           placeholder="Buscar por nombre de cliente..."
           value={search}
@@ -275,6 +298,32 @@ export default function CxcPage() {
           className="w-full max-w-md bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
         />
       </div>
+
+      {/* Sort + Favoritos */}
+      {rows.length > 0 && (
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-xs text-gray-400 mr-1">Ordenar:</span>
+          {([
+            { key: "nombre" as SortKey, label: "Nombre" },
+            { key: "total" as SortKey, label: "Total" },
+            { key: "plus90" as SortKey, label: "90+" },
+          ]).map((s) => (
+            <button key={s.key} onClick={() => setSort(s.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                sort === s.key ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}>
+              {s.label}
+            </button>
+          ))}
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <button onClick={() => setShowFavs(!showFavs)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              showFavs ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}>
+            ★ Favoritos
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
@@ -284,7 +333,6 @@ export default function CxcPage() {
           {canUpload && <p className="text-gray-400 text-sm">Cargue un archivo CSV para comenzar</p>}
         </div>
       ) : view === "tabla" ? (
-        /* Table view */
         <div className="bg-white rounded-2xl border border-gray-50 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -300,12 +348,13 @@ export default function CxcPage() {
             <tbody>
               {filtered.map((r) => {
                 const status = getClientStatus(r);
-                const sc = STATUS_COLORS[status];
                 const p90 = get90Plus(r);
+                const isFav = favoritos.includes(r.nombre);
                 return (
                   <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-gray-900 font-medium">
                       <div className="flex items-center gap-2">
+                        <button onClick={() => toggleFav(r.nombre)} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>
                         <span className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{ backgroundColor: status === "corriente" ? "#22c55e" : status === "vigilancia" ? "#eab308" : "#ef4444" }}
                         ></span>
@@ -334,16 +383,19 @@ export default function CxcPage() {
           </table>
         </div>
       ) : (
-        /* Cards view */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((r) => {
             const status = getClientStatus(r);
             const sc = STATUS_COLORS[status];
             const p90 = get90Plus(r);
+            const isFav = favoritos.includes(r.nombre);
             return (
               <div key={r.id} className="bg-white rounded-2xl border border-gray-50 p-5 hover:shadow-md transition-all">
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900 text-sm leading-tight">{r.nombre}</h3>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => toggleFav(r.nombre)} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>
+                    <h3 className="font-semibold text-gray-900 text-sm leading-tight">{r.nombre}</h3>
+                  </div>
                   <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} flex-shrink-0 ml-2`}>
                     {sc.label}
                   </span>
