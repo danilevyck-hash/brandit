@@ -97,12 +97,17 @@ export default function CxcPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/cxc", { cache: "no-store" });
-    const data = await res.json();
-    console.log("[FRONTEND] setRows llamado con", data.rows?.length, "items");
-    setRows(data.rows || []);
-    setUpload(data.upload || null);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/cxc", { cache: "no-store" });
+      const data = await res.json();
+      console.log("[FRONTEND] setRows llamado con", data.rows?.length, "items");
+      setRows(data.rows || []);
+      setUpload(data.upload || null);
+    } catch (err) {
+      console.error("[FRONTEND] Error en load:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -199,7 +204,7 @@ export default function CxcPage() {
   };
 
   const filtered = rows.filter((r) =>
-    !search || r.nombre.toLowerCase().includes(search.toLowerCase())
+    !search || (r.nombre || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const fmt = (n: number) =>
@@ -271,6 +276,8 @@ export default function CxcPage() {
           className="w-full max-w-md bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
         />
       </div>
+
+      <p className="text-xs text-red-500 mb-2">DEBUG: rows={rows.length} filtered={filtered.length} search=&quot;{search}&quot; loading={String(loading)}</p>
 
       {loading ? (
         <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
