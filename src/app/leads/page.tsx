@@ -8,10 +8,11 @@ type Lead = {
   empresa: string;
   telefono: string;
   email: string;
-  estado: "interesado" | "no_interesado";
-  estado_venta: "activo" | "convertido" | "perdido";
+  estado: string;
+  estado_venta: string;
   notas: string;
   vendedora: string;
+  empresa_vendedora: string | null;
   fecha_seguimiento: string | null;
   asignado_a: string | null;
   created_at: string;
@@ -26,23 +27,34 @@ type Comentario = {
 };
 
 const ESTADOS_PROSPECTO = [
-  { value: "interesado", label: "Prospecto", bg: "bg-green-50", text: "text-green-600" },
-  { value: "no_interesado", label: "No Califica", bg: "bg-gray-100", text: "text-gray-500" },
+  { value: "prospecto", label: "Prospecto", bg: "bg-green-50", text: "text-green-600" },
+  { value: "no_califica", label: "No Califica", bg: "bg-gray-100", text: "text-gray-500" },
 ] as const;
 
 const ESTADOS_VENTA: Record<string, { bg: string; text: string; label: string }> = {
-  activo: { bg: "bg-blue-50", text: "text-blue-600", label: "Activo" },
-  convertido: { bg: "bg-green-50", text: "text-green-600", label: "Convertido" },
-  perdido: { bg: "bg-red-50", text: "text-red-500", label: "Perdido" },
+  convertido: { bg: "bg-green-100", text: "text-green-700", label: "Convertido" },
+  no_convertido: { bg: "bg-red-50", text: "text-red-400", label: "No Convertido" },
 };
+
+// Map legacy DB values to new display values
+function normalizeEstado(estado: string): string {
+  if (estado === "interesado") return "prospecto";
+  if (estado === "no_interesado") return "no_califica";
+  return estado;
+}
+
+function normalizeEstadoVenta(ev: string): string {
+  if (ev === "perdido") return "no_convertido";
+  return ev;
+}
 
 type LeadForm = {
   nombre: string;
   empresa: string;
   telefono: string;
   email: string;
-  estado: Lead["estado"];
-  estado_venta: Lead["estado_venta"];
+  estado: string;
+  estado_venta: string;
   notas: string;
   vendedora: string;
   fecha_seguimiento: string;
@@ -55,7 +67,7 @@ export default function LeadsPage() {
   const [filtro, setFiltro] = useState("");
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<LeadForm>({
-    nombre: "", empresa: "", telefono: "", email: "", estado: "interesado",
+    nombre: "", empresa: "", telefono: "", email: "", estado: "prospecto",
     estado_venta: "activo", notas: "", vendedora: "", fecha_seguimiento: "", asignado_a: "",
   });
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -113,18 +125,24 @@ export default function LeadsPage() {
     loadComentarios(selectedLead.id);
   };
 
-  const prospectoInfo = (estado: string) => ESTADOS_PROSPECTO.find((e) => e.value === estado) || ESTADOS_PROSPECTO[0];
+  const prospectoInfo = (estado: string) => {
+    const normalized = normalizeEstado(estado);
+    return ESTADOS_PROSPECTO.find((e) => e.value === normalized) || ESTADOS_PROSPECTO[0];
+  };
 
-  // Filtering
+  // Filtering — empresa tabs filter by empresa_vendedora
   const filteredByEmpresa = !isVendedora && empresaTab !== "todas"
-    ? leads.filter((l) => l.empresa === empresaTab)
+    ? leads.filter((l) => l.empresa_vendedora === empresaTab)
     : leads;
 
   const filteredByFiltro = filteredByEmpresa.filter((l) => {
     if (!filtro) return true;
-    if (filtro === "interesado" || filtro === "no_interesado") return l.estado === filtro;
-    if (filtro === "convertido") return l.estado_venta === "convertido";
-    if (filtro === "perdido") return l.estado_venta === "perdido";
+    const ne = normalizeEstado(l.estado);
+    const nv = normalizeEstadoVenta(l.estado_venta);
+    if (filtro === "prospecto") return ne === "prospecto";
+    if (filtro === "no_califica") return ne === "no_califica";
+    if (filtro === "convertido") return nv === "convertido";
+    if (filtro === "no_convertido") return nv === "no_convertido";
     return true;
   });
 
@@ -136,9 +154,9 @@ export default function LeadsPage() {
 
   const counts = {
     total: filteredByEmpresa.length,
-    interesado: filteredByEmpresa.filter((l) => l.estado === "interesado").length,
-    no_interesado: filteredByEmpresa.filter((l) => l.estado === "no_interesado").length,
-    convertido: filteredByEmpresa.filter((l) => l.estado_venta === "convertido").length,
+    prospecto: filteredByEmpresa.filter((l) => normalizeEstado(l.estado) === "prospecto").length,
+    no_califica: filteredByEmpresa.filter((l) => normalizeEstado(l.estado) === "no_califica").length,
+    convertido: filteredByEmpresa.filter((l) => normalizeEstadoVenta(l.estado_venta) === "convertido").length,
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -147,7 +165,7 @@ export default function LeadsPage() {
 
   const openNew = () => {
     setForm({
-      nombre: "", empresa: "", telefono: "", email: "", estado: "interesado",
+      nombre: "", empresa: "", telefono: "", email: "", estado: "prospecto",
       estado_venta: "activo", notas: "",
       vendedora: userName || "",
       fecha_seguimiento: "", asignado_a: "",
@@ -165,8 +183,8 @@ export default function LeadsPage() {
       empresa: lead.empresa || "",
       telefono: lead.telefono || "",
       email: lead.email || "",
-      estado: lead.estado || "interesado",
-      estado_venta: lead.estado_venta || "activo",
+      estado: normalizeEstado(lead.estado),
+      estado_venta: normalizeEstadoVenta(lead.estado_venta || "activo"),
       notas: lead.notas || "",
       vendedora: lead.vendedora || "",
       fecha_seguimiento: lead.fecha_seguimiento || "",
@@ -192,7 +210,7 @@ export default function LeadsPage() {
     await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, empresa_vendedora: userEmpresa }),
     });
     setShowNewForm(false);
     setSaving(false);
@@ -222,7 +240,7 @@ export default function LeadsPage() {
     });
     load();
     if (selectedLead?.id === lead.id) {
-      setSelectedLead({ ...lead, estado_venta: estado_venta as Lead["estado_venta"] });
+      setSelectedLead({ ...lead, estado_venta });
     }
   };
 
@@ -244,6 +262,10 @@ export default function LeadsPage() {
     return new Date(d).toLocaleDateString("es-PA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   };
 
+  // Helper: is this lead a prospecto with active sale status?
+  const isProspectoActivo = (lead: Lead) =>
+    normalizeEstado(lead.estado) === "prospecto" && normalizeEstadoVenta(lead.estado_venta || "activo") === "activo";
+
   return (
     <div className="bg-white min-h-screen">
       <div className="max-w-2xl mx-auto px-4 py-6">
@@ -256,9 +278,9 @@ export default function LeadsPage() {
         <div className="flex gap-3 overflow-x-auto pb-3 mb-4 -mx-4 px-4 scrollbar-hide">
           {[
             { label: "Total", value: counts.total, color: "text-brandit-black" },
-            { label: "Prospectos", value: counts.interesado, color: "text-green-600" },
-            { label: "No Califica", value: counts.no_interesado, color: "text-gray-500" },
-            { label: "Convertidos", value: counts.convertido, color: "text-green-600" },
+            { label: "Prospectos", value: counts.prospecto, color: "text-green-600" },
+            { label: "No Califica", value: counts.no_califica, color: "text-gray-500" },
+            { label: "Convertidos", value: counts.convertido, color: "text-green-700" },
           ].map((k) => (
             <div key={k.label} className="bg-gray-50 rounded-xl px-4 py-3 min-w-[100px] flex-shrink-0">
               <p className="text-[10px] uppercase tracking-widest text-gray-400">{k.label}</p>
@@ -289,10 +311,10 @@ export default function LeadsPage() {
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
           {[
             { key: "", label: "Todos" },
-            { key: "interesado", label: "Prospecto" },
-            { key: "no_interesado", label: "No Califica" },
+            { key: "prospecto", label: "Prospecto" },
+            { key: "no_califica", label: "No Califica" },
             { key: "convertido", label: "Convertido" },
-            { key: "perdido", label: "Perdido" },
+            { key: "no_convertido", label: "No Convertido" },
           ].map((f) => (
             <button key={f.key} onClick={() => setFiltro(f.key)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
@@ -326,7 +348,8 @@ export default function LeadsPage() {
             {filtered.map((lead) => {
               const pi = prospectoInfo(lead.estado);
               const due = isSeguimientoDue(lead);
-              const vi = ESTADOS_VENTA[lead.estado_venta] || ESTADOS_VENTA.activo;
+              const nev = normalizeEstadoVenta(lead.estado_venta || "activo");
+              const vi = ESTADOS_VENTA[nev];
               return (
                 <div
                   key={lead.id}
@@ -358,12 +381,12 @@ export default function LeadsPage() {
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${pi.bg} ${pi.text}`}>
                         {pi.label}
                       </span>
-                      {lead.estado_venta !== "activo" && (
+                      {vi && (
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${vi.bg} ${vi.text}`}>
                           {vi.label}
                         </span>
                       )}
-                      {lead.estado_venta === "activo" && (
+                      {isProspectoActivo(lead) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); updateEstadoVenta(lead, "convertido"); }}
                           className="text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full hover:bg-green-100 transition-colors"
@@ -395,7 +418,7 @@ export default function LeadsPage() {
           <div className="fixed inset-x-0 bottom-0 md:inset-y-0 md:right-0 md:left-auto md:w-full md:max-w-lg bg-white rounded-t-2xl md:rounded-none shadow-2xl z-50 flex flex-col max-h-[90vh] md:max-h-full">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-lg font-bold text-brandit-black">Nuevo Lead</h2>
-              <button onClick={() => setShowNewForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button onClick={() => setShowNewForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
             </div>
             <form onSubmit={handleSubmitNew} className="flex-1 overflow-y-auto px-5 py-4">
               <div className="space-y-4">
@@ -424,7 +447,7 @@ export default function LeadsPage() {
                   <div className="flex gap-2">
                     {ESTADOS_PROSPECTO.map((e) => (
                       <button key={e.value} type="button"
-                        onClick={() => setForm({ ...form, estado: e.value as Lead["estado"] })}
+                        onClick={() => setForm({ ...form, estado: e.value })}
                         className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${
                           form.estado === e.value
                             ? "bg-brandit-orange text-white"
@@ -463,7 +486,7 @@ export default function LeadsPage() {
                 <p className="text-xs uppercase tracking-widest text-gray-400">Lead</p>
                 <h2 className="text-lg font-bold text-brandit-black">{selectedLead.nombre}</h2>
               </div>
-              <button onClick={closePanel} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button onClick={closePanel} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -475,9 +498,11 @@ export default function LeadsPage() {
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${prospectoInfo(selectedLead.estado).bg} ${prospectoInfo(selectedLead.estado).text}`}>
                         {prospectoInfo(selectedLead.estado).label}
                       </span>
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ESTADOS_VENTA[selectedLead.estado_venta]?.bg} ${ESTADOS_VENTA[selectedLead.estado_venta]?.text}`}>
-                        {ESTADOS_VENTA[selectedLead.estado_venta]?.label}
-                      </span>
+                      {ESTADOS_VENTA[normalizeEstadoVenta(selectedLead.estado_venta || "activo")] && (
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ESTADOS_VENTA[normalizeEstadoVenta(selectedLead.estado_venta || "activo")].bg} ${ESTADOS_VENTA[normalizeEstadoVenta(selectedLead.estado_venta || "activo")].text}`}>
+                          {ESTADOS_VENTA[normalizeEstadoVenta(selectedLead.estado_venta || "activo")].label}
+                        </span>
+                      )}
                     </div>
                     {selectedLead.empresa && (
                       <div><p className="text-xs text-gray-400">Empresa</p><p className="text-sm">{selectedLead.empresa}</p></div>
@@ -508,15 +533,15 @@ export default function LeadsPage() {
                       className="bg-brandit-orange text-white rounded-xl px-4 py-2 text-sm font-medium">
                       Editar
                     </button>
-                    {selectedLead.estado_venta === "activo" && (
+                    {isProspectoActivo(selectedLead) && (
                       <>
                         <button onClick={() => { updateEstadoVenta(selectedLead, "convertido"); closePanel(); }}
                           className="bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-medium">
                           Convertido
                         </button>
-                        <button onClick={() => { updateEstadoVenta(selectedLead, "perdido"); closePanel(); }}
-                          className="bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-medium">
-                          Perdido
+                        <button onClick={() => { updateEstadoVenta(selectedLead, "no_convertido"); closePanel(); }}
+                          className="bg-red-400 text-white rounded-xl px-4 py-2 text-sm font-medium">
+                          No Convertido
                         </button>
                       </>
                     )}
@@ -557,7 +582,7 @@ export default function LeadsPage() {
                       <div className="flex gap-2">
                         {ESTADOS_PROSPECTO.map((e) => (
                           <button key={e.value} type="button"
-                            onClick={() => setForm({ ...form, estado: e.value as Lead["estado"] })}
+                            onClick={() => setForm({ ...form, estado: e.value })}
                             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                               form.estado === e.value ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500"
                             }`}>

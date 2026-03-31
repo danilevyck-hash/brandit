@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   if (estado) query = query.eq("estado", estado);
   if (vendedora) query = query.eq("vendedora", vendedora);
-  if (empresa) query = query.eq("empresa", empresa);
+  if (empresa) query = query.eq("empresa_vendedora", empresa);
 
   const { data, error } = await query;
 
@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
       empresa: body.empresa || null,
       telefono: body.telefono || null,
       email: body.email || null,
-      estado: body.estado || "interesado",
+      estado: body.estado || "prospecto",
       estado_venta: body.estado_venta || "activo",
       notas: body.notas || null,
       vendedora: body.vendedora || null,
+      empresa_vendedora: body.empresa_vendedora || null,
       fecha_seguimiento: body.fecha_seguimiento || null,
       asignado_a: body.asignado_a || null,
     }])
