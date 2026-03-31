@@ -25,7 +25,8 @@ type Upload = {
   filename: string;
 };
 
-type SortKey = "nombre" | "total" | "plus90";
+type SortKey = "nombre" | "d_0_30" | "d_31_60" | "d_61_90" | "plus90" | "total";
+type SortDir = "asc" | "desc";
 
 const JUNK_CODIGOS = new Set(["0-30", "31-60", "61-90", "91-120", "121-180", "181-270", "271-365", "MAS DE 365", "TOTAL"]);
 
@@ -79,8 +80,20 @@ export default function CxcPage() {
   const [uploading, setUploading] = useState(false);
   const [role, setRole] = useState("");
   const [sort, setSort] = useState<SortKey>("nombre");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [showFavs, setShowFavs] = useState(false);
+
+  const handleSort = (key: SortKey) => {
+    if (sort === key) {
+      setSortDir((d) => d === "asc" ? "desc" : "asc");
+    } else {
+      setSort(key);
+      setSortDir(key === "nombre" ? "asc" : "desc");
+    }
+  };
+
+  const sortArrow = (key: SortKey) => sort === key ? (sortDir === "asc" ? " ↑" : " ↓") : "";
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
@@ -222,10 +235,12 @@ export default function CxcPage() {
       const bFav = favoritos.includes(b.nombre) ? 0 : 1;
       if (aFav !== bFav) return aFav - bFav;
     }
-    if (sort === "nombre") return (a.nombre || "").localeCompare(b.nombre || "");
-    if (sort === "total") return Number(b.total) - Number(a.total);
-    if (sort === "plus90") return get90Plus(b) - get90Plus(a);
-    return 0;
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sort === "nombre") return (a.nombre || "").localeCompare(b.nombre || "") * dir;
+    if (sort === "plus90") return (get90Plus(a) - get90Plus(b)) * dir;
+    const aVal = Number((a as Record<string, unknown>)[sort]) || 0;
+    const bVal = Number((b as Record<string, unknown>)[sort]) || 0;
+    return (aVal - bVal) * dir;
   });
 
   const filtered = sorted;
@@ -299,23 +314,9 @@ export default function CxcPage() {
         />
       </div>
 
-      {/* Sort + Favoritos */}
+      {/* Favoritos filter */}
       {rows.length > 0 && (
         <div className="flex items-center gap-2 mb-6">
-          <span className="text-xs text-gray-400 mr-1">Ordenar:</span>
-          {([
-            { key: "nombre" as SortKey, label: "Nombre" },
-            { key: "total" as SortKey, label: "Total" },
-            { key: "plus90" as SortKey, label: "90+" },
-          ]).map((s) => (
-            <button key={s.key} onClick={() => setSort(s.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                sort === s.key ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}>
-              {s.label}
-            </button>
-          ))}
-          <div className="w-px h-5 bg-gray-200 mx-1" />
           <button onClick={() => setShowFavs(!showFavs)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               showFavs ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
@@ -337,12 +338,24 @@ export default function CxcPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left">
-                <th className="px-4 py-3 text-xs font-semibold text-brandit-black whitespace-nowrap">Cliente</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">0-30</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">31-60</th>
-                <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">61-90</th>
-                <th className="px-3 py-3 text-xs font-semibold text-red-600 text-right whitespace-nowrap">90+</th>
-                <th className="px-4 py-3 text-xs font-semibold text-brandit-black text-right whitespace-nowrap">Total</th>
+                <th className="px-4 py-3 text-xs font-semibold whitespace-nowrap cursor-pointer select-none hover:text-brandit-orange transition-colors" onClick={() => handleSort("nombre")}>
+                  <span className={sort === "nombre" ? "text-brandit-orange" : "text-brandit-black"}>Cliente{sortArrow("nombre")}</span>
+                </th>
+                <th className="px-3 py-3 text-xs font-semibold text-right whitespace-nowrap cursor-pointer select-none hover:text-brandit-orange transition-colors" onClick={() => handleSort("d_0_30")}>
+                  <span className={sort === "d_0_30" ? "text-brandit-orange" : "text-brandit-black"}>0-30{sortArrow("d_0_30")}</span>
+                </th>
+                <th className="px-3 py-3 text-xs font-semibold text-right whitespace-nowrap cursor-pointer select-none hover:text-brandit-orange transition-colors" onClick={() => handleSort("d_31_60")}>
+                  <span className={sort === "d_31_60" ? "text-brandit-orange" : "text-brandit-black"}>31-60{sortArrow("d_31_60")}</span>
+                </th>
+                <th className="px-3 py-3 text-xs font-semibold text-right whitespace-nowrap cursor-pointer select-none hover:text-brandit-orange transition-colors" onClick={() => handleSort("d_61_90")}>
+                  <span className={sort === "d_61_90" ? "text-brandit-orange" : "text-brandit-black"}>61-90{sortArrow("d_61_90")}</span>
+                </th>
+                <th className="px-3 py-3 text-xs font-semibold text-right whitespace-nowrap cursor-pointer select-none hover:text-brandit-orange transition-colors" onClick={() => handleSort("plus90")}>
+                  <span className={sort === "plus90" ? "text-brandit-orange" : "text-red-600"}>90+{sortArrow("plus90")}</span>
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold text-right whitespace-nowrap cursor-pointer select-none hover:text-brandit-orange transition-colors" onClick={() => handleSort("total")}>
+                  <span className={sort === "total" ? "text-brandit-orange" : "text-brandit-black"}>Total{sortArrow("total")}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
