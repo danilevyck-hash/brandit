@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 
 type CxcRow = {
   id: string;
+  codigo: string;
   nombre: string;
   d_0_30: number;
   d_31_60: number;
@@ -131,8 +132,9 @@ export default function CxcPage() {
   const canUpload = role === "admin" || role === "secretaria";
 
   const handleExportExcel = () => {
-    const exportRows = filtered.map((r) => ({
-      "Código": r.id,
+    const cleanRows = filtered.filter((r) => isValidClientName(r.nombre) && !JUNK_CODIGOS.has((r.codigo || "").trim().toUpperCase()));
+    const exportRows = cleanRows.map((r) => ({
+      "Código": r.codigo || "",
       "Cliente": r.nombre,
       "0-30": Number(r.d_0_30),
       "31-60": Number(r.d_31_60),
