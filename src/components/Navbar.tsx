@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 type NavLink = { href: string; label: string; match: (p: string) => boolean };
 
 const ALL_LINKS: NavLink[] = [
-  { href: "/", label: "Cotizaciones", match: (p) => p === "/" || p.startsWith("/cotizacion") },
+  { href: "/", label: "Inicio", match: (p) => p === "/" },
+  { href: "/cotizaciones", label: "Cotizaciones", match: (p) => p === "/cotizaciones" || p.startsWith("/cotizacion") },
   { href: "/caja", label: "Caja", match: (p) => p.startsWith("/caja") },
   { href: "/guias", label: "Guías", match: (p) => p.startsWith("/guias") },
   { href: "/cxc", label: "CxC", match: (p) => p.startsWith("/cxc") },
@@ -16,7 +17,7 @@ const ALL_LINKS: NavLink[] = [
 ];
 
 const ROLE_LINKS: Record<string, string[]> = {
-  admin: ["/", "/caja", "/guias", "/cxc", "/leads", "/admin/usuarios"],
+  admin: ["/", "/cotizaciones", "/caja", "/guias", "/cxc", "/leads", "/admin/usuarios"],
   secretaria: ["/", "/caja", "/guias", "/cxc", "/leads"],
   vendedora: ["/leads"],
 };

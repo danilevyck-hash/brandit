@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 type CxcRow = {
   id: string;
@@ -128,6 +129,24 @@ export default function CxcPage() {
   useEffect(() => { load(); }, [load]);
 
   const canUpload = role === "admin" || role === "secretaria";
+
+  const handleExportExcel = () => {
+    const exportRows = filtered.map((r) => ({
+      "Código": r.id,
+      "Cliente": r.nombre,
+      "0-30": Number(r.d_0_30),
+      "31-60": Number(r.d_31_60),
+      "61-90": Number(r.d_61_90),
+      "90+": get90Plus(r),
+      "Total": Number(r.total),
+      "Estado": getClientStatus(r) === "corriente" ? "Corriente" : getClientStatus(r) === "vigilancia" ? "Vigilancia" : "Vencido",
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "CxC");
+    const today = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `cxc_confecciones_boston_${today}.xlsx`);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -296,10 +315,19 @@ export default function CxcPage() {
             </button>
           </div>
           {canUpload && (
-            <label className={`bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
-              {uploading ? "Cargando..." : "Cargar CSV"}
-              <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-            </label>
+            <>
+              <button
+                onClick={handleExportExcel}
+                disabled={rows.length === 0}
+                className="bg-white border border-gray-200 text-brandit-black font-semibold px-6 py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50 disabled:pointer-events-none"
+              >
+                Exportar Excel
+              </button>
+              <label className={`bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+                {uploading ? "Cargando..." : "Cargar CSV"}
+                <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+              </label>
+            </>
           )}
         </div>
       </div>

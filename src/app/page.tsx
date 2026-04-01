@@ -1,110 +1,132 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { Quotation, QUOTATION_STATUSES } from "@/lib/supabase";
-import { formatDate } from "@/lib/format";
+import { useState, useEffect } from "react";
 
-export default function Dashboard() {
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+type DashboardData = {
+  leads: {
+    total: number;
+    prospectos_activos: number;
+    convertidos_mes: number;
+    seguimientos_vencidos: number;
+  };
+  cxc: {
+    total_clientes: number;
+    deuda_90_plus: number;
+    deuda_0_30: number;
+    ultimo_upload: string | null;
+  };
+  operaciones: {
+    guias_mes: number;
+    gastos_caja_mes: number;
+  };
+};
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (statusFilter) params.set("status", statusFilter);
-    if (search) params.set("search", search);
-    const res = await fetch(`/api/quotations?${params}`);
-    const data = await res.json();
-    setQuotations(Array.isArray(data) ? data : []);
-    setLoading(false);
-  }, [statusFilter, search]);
+function KpiCard({ label, value, sub, danger }: { label: string; value: string; sub?: string; danger?: boolean }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm">
+      <p className="text-xs font-medium text-gray-400 mb-1">{label}</p>
+      <p className={`text-3xl font-extrabold tracking-tight ${danger ? "text-red-600" : "text-brandit-black"}`}>
+        {value}
+      </p>
+      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    </div>
+  );
+}
 
-  useEffect(() => { load(); }, [load]);
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm animate-pulse">
+      <div className="h-3 w-24 bg-gray-100 rounded mb-3" />
+      <div className="h-8 w-20 bg-gray-100 rounded" />
+    </div>
+  );
+}
 
-  const statusInfo = (status: string) => QUOTATION_STATUSES.find(s => s.value === status);
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [nombre, setNombre] = useState("");
+
+  useEffect(() => {
+    setNombre(localStorage.getItem("brandit_nombre") || "");
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {});
+  }, []);
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? "Buenos días" : now.getHours() < 18 ? "Buenas tardes" : "Buenas noches";
+  const dateStr = now.toLocaleDateString("es-PA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-PA", { day: "2-digit", month: "short", year: "numeric" });
+  };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cotizaciones</h1>
-          <p className="text-sm text-gray-400 mt-1">Gestión de costos de producción</p>
-        </div>
-        <Link
-          href="/cotizacion/nueva"
-          className="bg-brandit-orange text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-brandit-orange/90 transition-colors shadow-sm"
-        >
-          + Nueva Cotización
-        </Link>
+      <div className="mb-10">
+        <h1 className="text-3xl font-extrabold text-brandit-black tracking-tight">
+          {greeting}, {nombre || "usuario"}
+        </h1>
+        <p className="text-sm text-gray-400 mt-1 capitalize">{dateStr}</p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <input
-          placeholder="Buscar por cliente..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
-        />
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange/40 outline-none shadow-sm"
-        >
-          <option value="">Todos los estados</option>
-          {QUOTATION_STATUSES.map(s => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* List */}
-      {loading ? (
-        <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
-      ) : quotations.length === 0 ? (
-        <div className="text-center py-24">
-          <div className="text-6xl mb-4 opacity-20">📋</div>
-          <p className="text-gray-400 text-lg mb-3">No hay cotizaciones</p>
-          <Link href="/cotizacion/nueva" className="text-brandit-black font-medium hover:underline text-sm">Crear la primera cotización</Link>
-        </div>
+      {!data ? (
+        <>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Leads</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Cuentas por Cobrar</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Operaciones</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        </>
       ) : (
-        <div className="space-y-2">
-          {quotations.map(q => {
-            const si = statusInfo(q.status);
-            return (
-              <Link
-                key={q.id}
-                href={`/cotizacion/${q.id}`}
-                className="flex items-center justify-between bg-white rounded-2xl border border-gray-50 px-5 py-4 hover:border-brandit-orange/10 hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 font-bold text-xs group-hover:bg-brandit-orange/5 group-hover:text-brandit-black transition-colors">
-                    #{q.id}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm group-hover:text-brandit-black transition-colors">
-                      {(q.client as { name?: string })?.name || "Sin cliente"}
-                    </h3>
-                    <p className="text-xs text-gray-400">{formatDate(q.date)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                    style={{ backgroundColor: si?.color + "15", color: si?.color }}
-                  >
-                    {si?.label}
-                  </span>
-                  <span className="text-gray-300 group-hover:text-brandit-black transition-colors text-sm">→</span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        <>
+          {/* Row 1 — Leads */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Leads</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            <KpiCard label="Total leads" value={String(data.leads.total)} />
+            <KpiCard label="Prospectos activos" value={String(data.leads.prospectos_activos)} />
+            <KpiCard label="Convertidos este mes" value={String(data.leads.convertidos_mes)} />
+            <KpiCard
+              label="Seguimientos vencidos"
+              value={String(data.leads.seguimientos_vencidos)}
+              danger={data.leads.seguimientos_vencidos > 0}
+            />
+          </div>
+
+          {/* Row 2 — CxC */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Cuentas por Cobrar</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            <KpiCard label="Clientes en CxC" value={String(data.cxc.total_clientes)} />
+            <KpiCard
+              label="Deuda 90+ días"
+              value={`$${fmt(data.cxc.deuda_90_plus)}`}
+              danger={data.cxc.deuda_90_plus > 0}
+            />
+            <KpiCard label="Deuda 0-30 días" value={`$${fmt(data.cxc.deuda_0_30)}`} />
+            <KpiCard label="Último upload" value={fmtDate(data.cxc.ultimo_upload)} />
+          </div>
+
+          {/* Row 3 — Operaciones */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Operaciones</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <KpiCard label="Guías este mes" value={String(data.operaciones.guias_mes)} />
+            <KpiCard label="Gastos caja menuda" value={`$${fmt(data.operaciones.gastos_caja_mes)}`} />
+          </div>
+        </>
       )}
     </div>
   );
