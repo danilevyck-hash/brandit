@@ -85,7 +85,6 @@ export default function CxcPage() {
   const [rows, setRows] = useState<CxcRow[]>([]);
   const [upload, setUpload] = useState<Upload | null>(null);
   const [uploads, setUploads] = useState<Upload[]>([]);
-  const [uploadCounts, setUploadCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"tabla" | "cards">("tabla");
@@ -135,7 +134,10 @@ export default function CxcPage() {
       const params = uploadId ? `?upload_id=${uploadId}` : "";
       const res = await fetch(`/api/cxc${params}`, { cache: "no-store" });
       const data = await res.json();
-      setRows(data.rows || []);
+      const clean = (data.rows || []).filter((r: CxcRow) =>
+        isValidClientName(r.nombre) && !JUNK_CODIGOS.has((r.nombre || "").trim().toUpperCase())
+      );
+      setRows(clean);
       setUpload(data.upload || null);
       if (data.upload) setActiveUploadId(data.upload.id);
     } catch {
@@ -149,37 +151,13 @@ export default function CxcPage() {
     try {
       const res = await fetch("/api/cxc/uploads");
       const data = await res.json();
-      const list = Array.isArray(data) ? data.slice(0, 5) : [];
-      setUploads(list);
-      // Load row counts for each upload
-      const counts: Record<string, number> = {};
-      await Promise.all(list.map(async (u: Upload) => {
-        const r = await fetch(`/api/cxc?upload_id=${u.id}`);
-        const d = await r.json();
-        counts[u.id] = (d.rows || []).length;
-      }));
-      setUploadCounts(counts);
+      setUploads(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
   }, []);
 
   useEffect(() => { loadData(); loadUploads(); }, [loadData, loadUploads]);
 
   const canUpload = role === "admin" || role === "secretaria";
-
-  const selectUpload = (id: string) => {
-    setActiveUploadId(id);
-    setShowCompare(false);
-    loadData(id);
-  };
-
-  const deleteUpload = async (id: string) => {
-    if (!confirm("¿Eliminar este upload y todos sus datos?")) return;
-    await fetch(`/api/cxc/uploads/${id}`, { method: "DELETE" });
-    loadUploads();
-    if (activeUploadId === id) {
-      loadData(); // reload latest
-    }
-  };
 
   const handleCompare = async () => {
     if (!compareA || !compareB || compareA === compareB) return;
@@ -438,37 +416,16 @@ export default function CxcPage() {
         </div>
       </div>
 
-      {/* Upload History */}
-      {canUpload && uploads.length > 0 && (
+      {/* Last upload info */}
+      {canUpload && upload && (
         <div className="mb-6">
-          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Historial de uploads</p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {uploads.map((u) => (
-              <div
-                key={u.id}
-                onClick={() => selectUpload(u.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors flex-shrink-0 ${
-                  activeUploadId === u.id
-                    ? "bg-brandit-orange text-white"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <div>
-                  <p className="font-medium">{formatUploadDate(u.uploaded_at)}</p>
-                  <p className={`text-[10px] ${activeUploadId === u.id ? "text-white/70" : "text-gray-400"}`}>
-                    {u.filename} · {uploadCounts[u.id] ?? "..."} rows
-                  </p>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteUpload(u.id); }}
-                  className={`ml-1 text-sm font-bold flex-shrink-0 ${
-                    activeUploadId === u.id ? "text-white/60 hover:text-white" : "text-gray-300 hover:text-red-500"
-                  }`}
-                >
-                  &times;
-                </button>
-              </div>
-            ))}
+          <div className="inline-flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 text-xs text-gray-600">
+            <span className="font-medium">Última carga:</span>
+            <span>{formatUploadDate(upload.uploaded_at)}</span>
+            <span className="text-gray-300">·</span>
+            <span>{upload.filename}</span>
+            <span className="text-gray-300">·</span>
+            <span>{rows.length} clientes</span>
           </div>
         </div>
       )}
