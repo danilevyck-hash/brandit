@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Avatar from "@/components/Avatar";
 
 type Lead = {
   id: string;
@@ -423,11 +424,12 @@ export default function LeadsPage() {
                     <div
                       key={lead.id}
                       onClick={() => openPanel(lead)}
-                      className="bg-white border border-gray-100 rounded-xl px-4 py-3.5 active:bg-gray-50 transition-colors cursor-pointer"
+                      className="bg-white border border-gray-100 rounded-xl px-4 py-3.5 active:bg-gray-50 transition-all duration-150 active:scale-[0.98] cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <Avatar nombre={lead.nombre} size="sm" />
                             <h3 className="font-semibold text-gray-900 text-sm truncate">{lead.nombre}</h3>
                             {due && (
                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 flex-shrink-0">

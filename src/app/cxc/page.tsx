@@ -415,7 +415,7 @@ export default function CxcPage() {
                 const p90 = get90Plus(r);
                 const isFav = favoritos.includes(r.nombre);
                 return (
-                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors duration-100">
                     <td className="px-4 py-3 text-gray-900 font-medium">
                       <div className="flex items-center gap-2">
                         <button onClick={() => toggleFav(r.nombre)} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>

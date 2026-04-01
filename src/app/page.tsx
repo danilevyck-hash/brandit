@@ -23,7 +23,7 @@ type DashboardData = {
 
 function KpiCard({ label, value, sub, danger }: { label: string; value: string; sub?: string; danger?: boolean }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm">
+    <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5">
       <p className="text-xs font-medium text-gray-400 mb-1">{label}</p>
       <p className={`text-3xl font-extrabold tracking-tight ${danger ? "text-red-600" : "text-brandit-black"}`}>
         {value}

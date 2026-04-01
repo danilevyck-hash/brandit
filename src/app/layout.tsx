@@ -29,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="apple-touch-icon" href="/brandit-logo.svg" />
       </head>
+      <script dangerouslySetInnerHTML={{__html: `try{if(localStorage.getItem('brandit_dark_mode')==='1')document.documentElement.classList.add('dark')}catch(e){}`}} />
       <body className={`${inter.className} bg-cream min-h-screen`}>
         <NavbarWrapper />
         <main className="pb-10">{children}</main>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
+import Avatar from "./Avatar";
 
 type NavLink = { href: string; label: string; match: (p: string) => boolean };
 
@@ -37,11 +38,15 @@ export default function Navbar() {
   const [searchLeads, setSearchLeads] = useState<SearchResultLead[]>([]);
   const [searchCxc, setSearchCxc] = useState<SearchResultCxc[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [dark, setDark] = useState(false);
+  const [nombre, setNombre] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
+    setNombre(localStorage.getItem("brandit_nombre") || "");
+    setDark(document.documentElement.classList.contains("dark"));
   }, [pathname]);
 
   useEffect(() => {
@@ -125,6 +130,18 @@ export default function Navbar() {
   const allowed = ROLE_LINKS[role] || [];
   const links = ALL_LINKS.filter((l) => allowed.includes(l.href));
 
+  const toggleDark = () => {
+    const next = !dark;
+    setDark(next);
+    if (next) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("brandit_dark_mode", "1");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.removeItem("brandit_dark_mode");
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("brandit_role");
     localStorage.removeItem("brandit_email");
@@ -186,6 +203,14 @@ export default function Navbar() {
                 </button>
               )}
               <button
+                onClick={toggleDark}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-white/10 transition-colors ml-1"
+                aria-label="Toggle dark mode"
+              >
+                {dark ? "☀️" : "🌙"}
+              </button>
+              {nombre && <Avatar nombre={nombre} size="sm" />}
+              <button
                 onClick={handleLogout}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-brandit-orange transition-colors ml-1"
               >
@@ -237,6 +262,12 @@ export default function Navbar() {
                 )}
               </Link>
             ))}
+            <button
+              onClick={toggleDark}
+              className="block w-full text-left py-4 px-6 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-colors border-t border-white/10"
+            >
+              {dark ? "☀️ Modo claro" : "🌙 Modo oscuro"}
+            </button>
             <button
               onClick={handleLogout}
               className="block w-full text-left py-4 px-6 text-sm font-medium text-gray-400 hover:text-brandit-orange transition-colors border-t border-white/10"
