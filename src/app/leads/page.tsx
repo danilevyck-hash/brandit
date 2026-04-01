@@ -325,9 +325,14 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-brandit-black tracking-tight">Leads</h1>
           <div className="flex items-center gap-2">
             {!isVendedora && (
-              <Link href="/leads/reporte" className="text-xs text-brandit-orange hover:underline mr-2">
-                Reporte
-              </Link>
+              <>
+                <Link href="/leads/reporte" className="text-xs text-brandit-orange hover:underline mr-2">
+                  Reporte
+                </Link>
+                <Link href="/leads/calendario" className="text-xs text-brandit-orange hover:underline mr-2">
+                  Calendario
+                </Link>
+              </>
             )}
             <div className="flex bg-gray-100 rounded-lg p-0.5">
               <button onClick={() => setViewMode("lista")}

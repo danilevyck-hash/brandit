@@ -9,6 +9,10 @@ export async function GET() {
   const today = now.toISOString().split("T")[0];
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
+  // 6 months ago for chart data
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  const sixMonthsAgoStr = `${sixMonthsAgo.getFullYear()}-${String(sixMonthsAgo.getMonth() + 1).padStart(2, "0")}-01`;
+
   const [
     leadsRes,
     prospectosRes,
@@ -18,6 +22,7 @@ export async function GET() {
     cxcRowsLatestUpload,
     guiasRes,
     cajaRes,
+    leadsForCharts,
   ] = await Promise.all([
     // Total leads
     db.from("leads").select("id", { count: "exact", head: true }),
@@ -42,6 +47,9 @@ export async function GET() {
     // Caja: período abierto con sus gastos
     db.from("caja_periodos").select("*, gastos:caja_gastos(total)")
       .eq("estado", "abierto").limit(1),
+    // Leads for charts (last 6 months, with vendedora and estado_venta)
+    db.from("leads").select("created_at, vendedora, estado_venta")
+      .gte("created_at", sixMonthsAgoStr),
   ]);
 
   // CxC rows from latest upload
@@ -74,6 +82,41 @@ export async function GET() {
     );
   }
 
+  // Build leadsPorMes — last 6 months
+  const mesesAbrev = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const leadsPorMesMap: Record<string, number> = {};
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    leadsPorMesMap[key] = 0;
+  }
+  for (const l of leadsForCharts.data || []) {
+    const key = (l.created_at as string).slice(0, 7); // "YYYY-MM"
+    if (key in leadsPorMesMap) leadsPorMesMap[key]++;
+  }
+  const leadsPorMes = Object.entries(leadsPorMesMap).map(([key, count]) => {
+    const [y, m] = key.split("-");
+    return { mes: `${mesesAbrev[Number(m) - 1]} ${y.slice(2)}`, count };
+  });
+
+  // Build conversionPorVendedora
+  const vendedoraMap: Record<string, { total: number; convertidos: number }> = {};
+  for (const l of leadsForCharts.data || []) {
+    const v = (l.vendedora as string) || "Sin asignar";
+    if (!vendedoraMap[v]) vendedoraMap[v] = { total: 0, convertidos: 0 };
+    vendedoraMap[v].total++;
+    const ev = l.estado_venta === "perdido" ? "no_convertido" : (l.estado_venta as string);
+    if (ev === "convertido") vendedoraMap[v].convertidos++;
+  }
+  const conversionPorVendedora = Object.entries(vendedoraMap)
+    .filter(([, v]) => v.total >= 1)
+    .map(([vendedora, v]) => ({
+      vendedora,
+      porcentaje: Math.round((v.convertidos / v.total) * 100),
+      total: v.total,
+    }))
+    .sort((a, b) => b.porcentaje - a.porcentaje);
+
   return NextResponse.json({
     leads: {
       total: leadsRes.count || 0,
@@ -91,5 +134,7 @@ export async function GET() {
       guias_mes: guiasRes.count || 0,
       gastos_caja_mes: cajaGastosMes,
     },
+    leadsPorMes,
+    conversionPorVendedora,
   });
 }
