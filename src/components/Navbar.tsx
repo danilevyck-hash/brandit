@@ -13,11 +13,12 @@ const ALL_LINKS: NavLink[] = [
   { href: "/guias", label: "Guías", match: (p) => p.startsWith("/guias") },
   { href: "/cxc", label: "CxC", match: (p) => p.startsWith("/cxc") },
   { href: "/leads", label: "Leads", match: (p) => p.startsWith("/leads") },
-  { href: "/admin/usuarios", label: "Usuarios", match: (p) => p.startsWith("/admin/usuarios") },
+  { href: "/admin/usuarios", label: "Usuarios", match: (p) => p === "/admin/usuarios" },
+  { href: "/admin/log", label: "Log", match: (p) => p === "/admin/log" },
 ];
 
 const ROLE_LINKS: Record<string, string[]> = {
-  admin: ["/", "/cotizaciones", "/caja", "/guias", "/cxc", "/leads", "/admin/usuarios"],
+  admin: ["/", "/cotizaciones", "/caja", "/guias", "/cxc", "/leads", "/admin/usuarios", "/admin/log"],
   secretaria: ["/", "/caja", "/guias", "/cxc", "/leads"],
   vendedora: ["/leads"],
 };

@@ -1,4 +1,5 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
+import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
   }
+
+  logActivity("Sistema", "CXC_UPLOAD", `${filename || "upload.csv"} — ${dbRows.length} clientes`);
 
   return NextResponse.json({ success: true, count: dbRows.length, upload_id: upload.id });
 }

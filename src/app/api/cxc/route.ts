@@ -1,35 +1,45 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 const COMPANY_KEY = "confecciones_boston";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const db = getSupabaseAF();
+  const uploadId = request.nextUrl.searchParams.get("upload_id");
 
-  // Get latest upload
-  const { data: uploads } = await db
-    .from("cxc_uploads")
-    .select("id, uploaded_at, filename")
-    .eq("company_key", COMPANY_KEY)
-    .order("uploaded_at", { ascending: false })
-    .limit(1);
+  let latestUpload;
 
-  const latestUpload = uploads && uploads.length > 0 ? uploads[0] : null;
+  if (uploadId) {
+    // Load specific upload
+    const { data } = await db
+      .from("cxc_uploads")
+      .select("id, uploaded_at, filename")
+      .eq("id", uploadId)
+      .single();
+    latestUpload = data;
+  } else {
+    // Get latest upload
+    const { data: uploads } = await db
+      .from("cxc_uploads")
+      .select("id, uploaded_at, filename")
+      .eq("company_key", COMPANY_KEY)
+      .order("uploaded_at", { ascending: false })
+      .limit(1);
+    latestUpload = uploads && uploads.length > 0 ? uploads[0] : null;
+  }
 
   if (!latestUpload) {
     return NextResponse.json({ rows: [], upload: null });
   }
 
-  // Get rows for the latest upload
+  // Get rows for the upload
   const { data: rows, error } = await db
     .from("cxc_rows")
     .select("*")
     .eq("upload_id", latestUpload.id)
     .order("nombre", { ascending: true });
-
-  console.log("[CXC GET] upload_id:", latestUpload?.id, "rows_count:", rows?.length, "error:", error?.message, "SUPABASE_URL:", process.env.APPS_FAMILIA_SUPABASE_URL?.slice(0, 30));
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -56,6 +66,5 @@ export async function GET() {
   return NextResponse.json({
     rows: mergedRows,
     upload: latestUpload,
-    _debug: { rows_count: rows?.length, upload_id: latestUpload?.id },
   });
 }

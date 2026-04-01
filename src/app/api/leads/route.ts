@@ -1,4 +1,5 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
+import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -45,5 +46,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  logActivity(body.vendedora || "Sistema", "LEAD_CREATED", body.nombre);
+
   return NextResponse.json(data);
 }

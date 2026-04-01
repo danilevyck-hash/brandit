@@ -8,6 +8,7 @@ type CxcRow = {
   id: string;
   codigo: string;
   nombre: string;
+  nombre_normalized: string;
   d_0_30: number;
   d_31_60: number;
   d_61_90: number;
@@ -73,9 +74,18 @@ const STATUS_COLORS = {
   vencido: { bg: "bg-red-50", text: "text-red-600", label: "Vencido" },
 };
 
+type CompareRow = {
+  nombre: string;
+  totalA: number;
+  totalB: number;
+  cambio: number;
+};
+
 export default function CxcPage() {
   const [rows, setRows] = useState<CxcRow[]>([]);
   const [upload, setUpload] = useState<Upload | null>(null);
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const [uploadCounts, setUploadCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"tabla" | "cards">("tabla");
@@ -85,6 +95,12 @@ export default function CxcPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [showFavs, setShowFavs] = useState(false);
+  const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
+  const [compareA, setCompareA] = useState<string>("");
+  const [compareB, setCompareB] = useState<string>("");
+  const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   const handleSort = (key: SortKey) => {
     if (sort === key) {
@@ -113,13 +129,15 @@ export default function CxcPage() {
     });
   };
 
-  const load = useCallback(async () => {
+  const loadData = useCallback(async (uploadId?: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/cxc", { cache: "no-store" });
+      const params = uploadId ? `?upload_id=${uploadId}` : "";
+      const res = await fetch(`/api/cxc${params}`, { cache: "no-store" });
       const data = await res.json();
       setRows(data.rows || []);
       setUpload(data.upload || null);
+      if (data.upload) setActiveUploadId(data.upload.id);
     } catch {
       // silently fail
     } finally {
@@ -127,9 +145,74 @@ export default function CxcPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const loadUploads = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cxc/uploads");
+      const data = await res.json();
+      const list = Array.isArray(data) ? data.slice(0, 5) : [];
+      setUploads(list);
+      // Load row counts for each upload
+      const counts: Record<string, number> = {};
+      await Promise.all(list.map(async (u: Upload) => {
+        const r = await fetch(`/api/cxc?upload_id=${u.id}`);
+        const d = await r.json();
+        counts[u.id] = (d.rows || []).length;
+      }));
+      setUploadCounts(counts);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadData(); loadUploads(); }, [loadData, loadUploads]);
 
   const canUpload = role === "admin" || role === "secretaria";
+
+  const selectUpload = (id: string) => {
+    setActiveUploadId(id);
+    setShowCompare(false);
+    loadData(id);
+  };
+
+  const deleteUpload = async (id: string) => {
+    if (!confirm("¿Eliminar este upload y todos sus datos?")) return;
+    await fetch(`/api/cxc/uploads/${id}`, { method: "DELETE" });
+    loadUploads();
+    if (activeUploadId === id) {
+      loadData(); // reload latest
+    }
+  };
+
+  const handleCompare = async () => {
+    if (!compareA || !compareB || compareA === compareB) return;
+    setCompareLoading(true);
+    const [resA, resB] = await Promise.all([
+      fetch(`/api/cxc?upload_id=${compareA}`).then((r) => r.json()),
+      fetch(`/api/cxc?upload_id=${compareB}`).then((r) => r.json()),
+    ]);
+    const rowsA: CxcRow[] = resA.rows || [];
+    const rowsB: CxcRow[] = resB.rows || [];
+
+    const mapA = new Map(rowsA.map((r) => [r.nombre_normalized || normalizeName(r.nombre), r]));
+    const mapB = new Map(rowsB.map((r) => [r.nombre_normalized || normalizeName(r.nombre), r]));
+
+    const result: CompareRow[] = [];
+    mapA.forEach((rA, key) => {
+      const rB = mapB.get(key);
+      if (rB) {
+        const totalA = Number(rA.total);
+        const totalB = Number(rB.total);
+        result.push({
+          nombre: rA.nombre,
+          totalA,
+          totalB,
+          cambio: totalB - totalA,
+        });
+      }
+    });
+
+    result.sort((a, b) => Math.abs(b.cambio) - Math.abs(a.cambio));
+    setCompareRows(result);
+    setCompareLoading(false);
+  };
 
   const handleExportExcel = () => {
     const cleanRows = filtered.filter((r) => isValidClientName(r.nombre) && !JUNK_CODIGOS.has((r.codigo || "").trim().toUpperCase()));
@@ -227,9 +310,11 @@ export default function CxcPage() {
           alert(data.error);
         } else if (data.success) {
           alert(`Cargado exitosamente: ${data.count} clientes`);
-          window.location.reload();
+          loadData();
+          loadUploads();
         } else {
-          load();
+          loadData();
+          loadUploads();
         }
         setUploading(false);
       },
@@ -290,9 +375,12 @@ export default function CxcPage() {
 
   const freshness = getFreshness();
 
+  const formatUploadDate = (d: string) =>
+    new Date(d).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-end justify-between mb-10">
+      <div className="flex items-end justify-between mb-6">
         <div>
           <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cuentas por Cobrar</h1>
           <div className="flex items-center gap-3 mt-1">
@@ -316,6 +404,22 @@ export default function CxcPage() {
               Cards
             </button>
           </div>
+          {canUpload && uploads.length >= 2 && (
+            <button
+              onClick={() => {
+                setShowCompare(!showCompare);
+                if (!showCompare && uploads.length >= 2) {
+                  setCompareA(uploads[1].id);
+                  setCompareB(uploads[0].id);
+                }
+              }}
+              className={`font-semibold px-6 py-3 rounded-xl text-sm transition-colors shadow-sm ${
+                showCompare ? "bg-brandit-orange text-white" : "bg-white border border-gray-200 text-brandit-black hover:bg-gray-50"
+              }`}
+            >
+              Comparar
+            </button>
+          )}
           {canUpload && (
             <>
               <button
@@ -333,6 +437,116 @@ export default function CxcPage() {
           )}
         </div>
       </div>
+
+      {/* Upload History */}
+      {canUpload && uploads.length > 0 && (
+        <div className="mb-6">
+          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Historial de uploads</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {uploads.map((u) => (
+              <div
+                key={u.id}
+                onClick={() => selectUpload(u.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors flex-shrink-0 ${
+                  activeUploadId === u.id
+                    ? "bg-brandit-orange text-white"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <div>
+                  <p className="font-medium">{formatUploadDate(u.uploaded_at)}</p>
+                  <p className={`text-[10px] ${activeUploadId === u.id ? "text-white/70" : "text-gray-400"}`}>
+                    {u.filename} · {uploadCounts[u.id] ?? "..."} rows
+                  </p>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteUpload(u.id); }}
+                  className={`ml-1 text-sm font-bold flex-shrink-0 ${
+                    activeUploadId === u.id ? "text-white/60 hover:text-white" : "text-gray-300 hover:text-red-500"
+                  }`}
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Compare View */}
+      {showCompare && (
+        <div className="mb-6 bg-gray-50 rounded-2xl p-5">
+          <h3 className="text-sm font-bold text-brandit-black mb-3">Comparar Uploads</h3>
+          <div className="flex items-end gap-3 mb-4">
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-gray-400 block mb-1">Upload A (antes)</label>
+              <select
+                value={compareA}
+                onChange={(e) => setCompareA(e.target.value)}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-brandit-orange"
+              >
+                {uploads.map((u) => (
+                  <option key={u.id} value={u.id}>{formatUploadDate(u.uploaded_at)} — {u.filename}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-gray-400 block mb-1">Upload B (después)</label>
+              <select
+                value={compareB}
+                onChange={(e) => setCompareB(e.target.value)}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-brandit-orange"
+              >
+                {uploads.map((u) => (
+                  <option key={u.id} value={u.id}>{formatUploadDate(u.uploaded_at)} — {u.filename}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleCompare}
+              disabled={!compareA || !compareB || compareA === compareB || compareLoading}
+              className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium hover:bg-brandit-orange/90 disabled:opacity-50 transition-colors"
+            >
+              {compareLoading ? "Cargando..." : "Comparar"}
+            </button>
+          </div>
+
+          {compareRows.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left">
+                    <th className="px-4 py-3 text-xs font-semibold text-brandit-black">Cliente</th>
+                    <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right">Deuda A</th>
+                    <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right">Deuda B</th>
+                    <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-right">Cambio</th>
+                    <th className="px-3 py-3 text-xs font-semibold text-brandit-black text-center">Tendencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compareRows.map((r) => (
+                    <tr key={r.nombre} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{r.nombre}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-600 tabular-nums">{fmt(r.totalA)}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-600 tabular-nums">{fmt(r.totalB)}</td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${
+                        r.cambio > 0 ? "text-red-600" : r.cambio < 0 ? "text-green-600" : "text-gray-400"
+                      }`}>
+                        {r.cambio > 0 ? "+" : ""}{fmt(r.cambio)}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-lg">
+                        {r.cambio > 0 ? <span className="text-red-500">↑</span> :
+                         r.cambio < 0 ? <span className="text-green-500">↓</span> :
+                         <span className="text-gray-400">=</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search */}
       <div className="mb-4">

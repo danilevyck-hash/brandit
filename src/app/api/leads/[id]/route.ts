@@ -1,4 +1,5 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
+import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(_request: NextRequest, { params }: { params: { id: string } }) {
@@ -12,6 +13,11 @@ export async function PATCH(_request: NextRequest, { params }: { params: { id: s
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (body.estado_venta === "convertido" && data) {
+    logActivity("Sistema", "LEAD_CONVERTED", data.nombre);
+  }
+
   return NextResponse.json(data);
 }
 
