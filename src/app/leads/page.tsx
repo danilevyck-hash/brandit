@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 type Lead = {
   id: string;
@@ -61,6 +62,8 @@ type LeadForm = {
   asignado_a: string;
 };
 
+type ViewMode = "lista" | "kanban";
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +86,8 @@ export default function LeadsPage() {
   const [addingComment, setAddingComment] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [empresaTab, setEmpresaTab] = useState<string>("todas");
+  const [viewMode, setViewMode] = useState<ViewMode>("lista");
+  const [kanbanTab, setKanbanTab] = useState<"prospectos" | "convertidos" | "no_convertidos">("prospectos");
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
@@ -266,12 +271,74 @@ export default function LeadsPage() {
   const isProspectoActivo = (lead: Lead) =>
     normalizeEstado(lead.estado) === "prospecto" && normalizeEstadoVenta(lead.estado_venta || "activo") === "activo";
 
+  // Kanban columns
+  const kanbanProspectos = filteredByEmpresa.filter((l) =>
+    normalizeEstado(l.estado) === "prospecto" && normalizeEstadoVenta(l.estado_venta || "activo") === "activo"
+  );
+  const kanbanConvertidos = filteredByEmpresa.filter((l) =>
+    normalizeEstadoVenta(l.estado_venta) === "convertido"
+  );
+  const kanbanNoConvertidos = filteredByEmpresa.filter((l) =>
+    normalizeEstadoVenta(l.estado_venta) === "no_convertido"
+  );
+
+  const KanbanCard = ({ lead }: { lead: Lead }) => (
+    <div
+      onClick={() => openPanel(lead)}
+      className="bg-white border border-gray-100 rounded-xl px-3.5 py-3 cursor-pointer hover:shadow-md transition-all"
+    >
+      <h4 className="font-semibold text-sm text-gray-900 truncate">{lead.nombre}</h4>
+      {lead.empresa && <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.empresa}</p>}
+      <div className="flex items-center gap-2 mt-2">
+        {lead.telefono && (
+          <a href={`tel:${lead.telefono}`} onClick={(e) => e.stopPropagation()}
+            className="text-xs text-brandit-orange truncate">
+            {lead.telefono}
+          </a>
+        )}
+      </div>
+      {lead.vendedora && <p className="text-[10px] text-gray-400 mt-1">{lead.vendedora}</p>}
+    </div>
+  );
+
+  const KanbanColumn = ({ title, leads: colLeads, color, countBg }: { title: string; leads: Lead[]; color: string; countBg: string }) => (
+    <div className="flex-1 min-w-[280px] flex flex-col min-h-0">
+      <div className={`flex items-center gap-2 mb-3 px-1`}>
+        <h3 className={`text-sm font-bold ${color}`}>{title}</h3>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${countBg}`}>{colLeads.length}</span>
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-4">
+        {colLeads.map((l) => <KanbanCard key={l.id} lead={l} />)}
+        {colLeads.length === 0 && (
+          <p className="text-center text-gray-300 text-xs py-8">Sin leads</p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="bg-white min-h-screen">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className={`mx-auto px-4 py-6 ${viewMode === "kanban" ? "max-w-6xl" : "max-w-2xl"}`}>
         {/* Header */}
-        <div className="mb-5">
+        <div className="flex items-center justify-between mb-5">
           <h1 className="text-2xl font-bold text-brandit-black tracking-tight">Leads</h1>
+          <div className="flex items-center gap-2">
+            {!isVendedora && (
+              <Link href="/leads/reporte" className="text-xs text-brandit-orange hover:underline mr-2">
+                Reporte
+              </Link>
+            )}
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              <button onClick={() => setViewMode("lista")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === "lista" ? "bg-white text-brandit-black shadow-sm" : "text-gray-500"}`}>
+                Lista
+              </button>
+              <button onClick={() => setViewMode("kanban")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === "kanban" ? "bg-white text-brandit-black shadow-sm" : "text-gray-500"}`}>
+                Kanban
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* KPI row - horizontal scrollable */}
@@ -307,99 +374,171 @@ export default function LeadsPage() {
           </div>
         )}
 
-        {/* Filter pills */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-          {[
-            { key: "", label: "Todos" },
-            { key: "prospecto", label: "Prospecto" },
-            { key: "no_califica", label: "No Califica" },
-            { key: "convertido", label: "Convertido" },
-            { key: "no_convertido", label: "No Convertido" },
-          ].map((f) => (
-            <button key={f.key} onClick={() => setFiltro(f.key)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                filtro === f.key ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {viewMode === "lista" && (
+          <>
+            {/* Filter pills */}
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+              {[
+                { key: "", label: "Todos" },
+                { key: "prospecto", label: "Prospecto" },
+                { key: "no_califica", label: "No Califica" },
+                { key: "convertido", label: "Convertido" },
+                { key: "no_convertido", label: "No Convertido" },
+              ].map((f) => (
+                <button key={f.key} onClick={() => setFiltro(f.key)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                    filtro === f.key ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
 
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Buscar nombre o empresa..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brandit-orange/20 mb-4"
-        />
+            {/* Search */}
+            <input
+              type="text"
+              placeholder="Buscar nombre o empresa..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brandit-orange/20 mb-4"
+            />
 
-        {/* Lead cards */}
-        {loading ? (
-          <div className="text-center py-24 text-gray-300">Cargando...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-24">
-            <p className="text-gray-300 text-lg mb-2">
-              {search || filtro ? "Sin resultados" : "No hay leads"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2 pb-24">
-            {filtered.map((lead) => {
-              const pi = prospectoInfo(lead.estado);
-              const due = isSeguimientoDue(lead);
-              const nev = normalizeEstadoVenta(lead.estado_venta || "activo");
-              const vi = ESTADOS_VENTA[nev];
-              return (
-                <div
-                  key={lead.id}
-                  onClick={() => openPanel(lead)}
-                  className="bg-white border border-gray-100 rounded-xl px-4 py-3.5 active:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-gray-900 text-sm truncate">{lead.nombre}</h3>
-                        {due && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 flex-shrink-0">
-                            Seguimiento
+            {/* Lead cards */}
+            {loading ? (
+              <div className="text-center py-24 text-gray-300">Cargando...</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-24">
+                <p className="text-gray-300 text-lg mb-2">
+                  {search || filtro ? "Sin resultados" : "No hay leads"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 pb-24">
+                {filtered.map((lead) => {
+                  const pi = prospectoInfo(lead.estado);
+                  const due = isSeguimientoDue(lead);
+                  const nev = normalizeEstadoVenta(lead.estado_venta || "activo");
+                  const vi = ESTADOS_VENTA[nev];
+                  return (
+                    <div
+                      key={lead.id}
+                      onClick={() => openPanel(lead)}
+                      className="bg-white border border-gray-100 rounded-xl px-4 py-3.5 active:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-gray-900 text-sm truncate">{lead.nombre}</h3>
+                            {due && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 flex-shrink-0">
+                                Seguimiento
+                              </span>
+                            )}
+                          </div>
+                          {lead.empresa && <p className="text-xs text-gray-400 mt-0.5">{lead.empresa}</p>}
+                          <div className="flex items-center gap-2 mt-1.5">
+                            {lead.telefono && (
+                              <a href={`tel:${lead.telefono}`} onClick={(e) => e.stopPropagation()}
+                                className="text-xs text-brandit-orange">
+                                {lead.telefono}
+                              </a>
+                            )}
+                            {lead.vendedora && <span className="text-[10px] text-gray-400">{lead.vendedora}</span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${pi.bg} ${pi.text}`}>
+                            {pi.label}
                           </span>
-                        )}
-                      </div>
-                      {lead.empresa && <p className="text-xs text-gray-400 mt-0.5">{lead.empresa}</p>}
-                      <div className="flex items-center gap-2 mt-1.5">
-                        {lead.telefono && (
-                          <a href={`tel:${lead.telefono}`} onClick={(e) => e.stopPropagation()}
-                            className="text-xs text-brandit-orange">
-                            {lead.telefono}
-                          </a>
-                        )}
-                        {lead.vendedora && <span className="text-[10px] text-gray-400">{lead.vendedora}</span>}
+                          {vi && (
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${vi.bg} ${vi.text}`}>
+                              {vi.label}
+                            </span>
+                          )}
+                          {isProspectoActivo(lead) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); updateEstadoVenta(lead, "convertido"); }}
+                              className="text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full hover:bg-green-100 transition-colors"
+                            >
+                              Convertido
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${pi.bg} ${pi.text}`}>
-                        {pi.label}
-                      </span>
-                      {vi && (
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${vi.bg} ${vi.text}`}>
-                          {vi.label}
-                        </span>
-                      )}
-                      {isProspectoActivo(lead) && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); updateEstadoVenta(lead, "convertido"); }}
-                          className="text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full hover:bg-green-100 transition-colors"
-                        >
-                          Convertido
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {viewMode === "kanban" && (
+          <>
+            {loading ? (
+              <div className="text-center py-24 text-gray-300">Cargando...</div>
+            ) : (
+              <>
+                {/* Mobile: tabs */}
+                <div className="md:hidden flex gap-2 mb-4">
+                  {([
+                    { key: "prospectos" as const, label: "Prospectos", count: kanbanProspectos.length },
+                    { key: "convertidos" as const, label: "Convertidos", count: kanbanConvertidos.length },
+                    { key: "no_convertidos" as const, label: "No Conv.", count: kanbanNoConvertidos.length },
+                  ]).map((t) => (
+                    <button key={t.key} onClick={() => setKanbanTab(t.key)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${
+                        kanbanTab === t.key ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500"
+                      }`}>
+                      {t.label} ({t.count})
+                    </button>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
+                <div className="md:hidden pb-24">
+                  {kanbanTab === "prospectos" && (
+                    <div className="space-y-2">
+                      {kanbanProspectos.map((l) => <KanbanCard key={l.id} lead={l} />)}
+                      {kanbanProspectos.length === 0 && <p className="text-center text-gray-300 text-xs py-8">Sin leads</p>}
+                    </div>
+                  )}
+                  {kanbanTab === "convertidos" && (
+                    <div className="space-y-2">
+                      {kanbanConvertidos.map((l) => <KanbanCard key={l.id} lead={l} />)}
+                      {kanbanConvertidos.length === 0 && <p className="text-center text-gray-300 text-xs py-8">Sin leads</p>}
+                    </div>
+                  )}
+                  {kanbanTab === "no_convertidos" && (
+                    <div className="space-y-2">
+                      {kanbanNoConvertidos.map((l) => <KanbanCard key={l.id} lead={l} />)}
+                      {kanbanNoConvertidos.length === 0 && <p className="text-center text-gray-300 text-xs py-8">Sin leads</p>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop: 3 columns */}
+                <div className="hidden md:flex gap-4 pb-8" style={{ height: "calc(100vh - 320px)" }}>
+                  <KanbanColumn
+                    title="Prospectos"
+                    leads={kanbanProspectos}
+                    color="text-brandit-orange"
+                    countBg="bg-orange-100 text-brandit-orange"
+                  />
+                  <KanbanColumn
+                    title="Convertidos"
+                    leads={kanbanConvertidos}
+                    color="text-green-600"
+                    countBg="bg-green-100 text-green-700"
+                  />
+                  <KanbanColumn
+                    title="No Convertidos"
+                    leads={kanbanNoConvertidos}
+                    color="text-gray-500"
+                    countBg="bg-gray-200 text-gray-600"
+                  />
+                </div>
+              </>
+            )}
+          </>
         )}
 
         {/* FAB - New Lead */}
