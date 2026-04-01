@@ -44,10 +44,10 @@ export default function ClaudeChat() {
       if (data.reply) {
         setMessages([...updated, { role: "assistant", content: data.reply }]);
       } else {
-        setMessages([...updated, { role: "assistant", content: "Error al obtener respuesta." }]);
+        setMessages([...updated, { role: "assistant", content: `Error: ${data.error || "Respuesta vacía"}` }]);
       }
-    } catch {
-      setMessages([...updated, { role: "assistant", content: "Error de conexión." }]);
+    } catch (err) {
+      setMessages([...updated, { role: "assistant", content: `Error de conexión: ${err instanceof Error ? err.message : String(err)}` }]);
     }
     setLoading(false);
   };

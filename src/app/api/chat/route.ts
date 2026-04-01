@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    return NextResponse.json({ error: err }, { status: res.status });
+    const errorText = await res.text();
+    console.error("[CHAT] Anthropic error status:", res.status, "body:", errorText);
+    return NextResponse.json({ error: errorText }, { status: res.status });
   }
 
   const data = await res.json();
