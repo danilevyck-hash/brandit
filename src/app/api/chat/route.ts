@@ -1,3 +1,4 @@
+// v2 - with API key
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
