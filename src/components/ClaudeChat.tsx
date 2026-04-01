@@ -41,8 +41,8 @@ export default function ClaudeChat() {
         body: JSON.stringify({ messages: updated }),
       });
       const data = await res.json();
-      if (data.reply) {
-        setMessages([...updated, { role: "assistant", content: data.reply }]);
+      if (data.content) {
+        setMessages([...updated, { role: "assistant", content: data.content }]);
       } else {
         setMessages([...updated, { role: "assistant", content: `Error: ${data.error || "Respuesta vacía"}` }]);
       }
