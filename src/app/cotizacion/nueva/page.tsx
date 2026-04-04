@@ -8,11 +8,13 @@ import ConfectionTable, { emptyItem, calcTotalCost } from "@/components/Confecti
 import PrintSection, { emptyPrint, calcPrintTotal } from "@/components/PrintSection";
 import type { PrintDraft } from "@/components/PrintSection";
 import { formatCurrency } from "@/lib/format";
+import { useToast } from "@/components/Toast";
 
 type ItemDraft = ReturnType<typeof emptyItem>;
 
 export default function NuevaQuotation() {
   const router = useRouter();
+  const { toast } = useToast();
   const [client, setClient] = useState<Client | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
@@ -25,8 +27,14 @@ export default function NuevaQuotation() {
   const grandTotal = totalConfection + totalPrint;
 
   async function save() {
-    if (!client) return alert("Selecciona un cliente");
-    if (items.length === 0 && prints.length === 0) return alert("Agrega al menos un item o impresión");
+    if (!client) {
+      toast("Selecciona un cliente", "error");
+      return;
+    }
+    if (items.length === 0 && prints.length === 0) {
+      toast("Agrega al menos un item o impresión", "error");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -35,6 +43,7 @@ export default function NuevaQuotation() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_id: client.id, date, notes }),
       });
+      if (!qRes.ok) throw new Error("Error creando cotización");
       const quotation = await qRes.json();
       if (quotation.error) throw new Error(quotation.error);
 
@@ -43,11 +52,12 @@ export default function NuevaQuotation() {
           .filter(i => i.description.trim())
           .map(({ _key, ...rest }) => ({ ...rest, quotation_id: quotation.id }));
         if (itemsToSave.length > 0) {
-          await fetch("/api/quotation-items", {
+          const res = await fetch("/api/quotation-items", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(itemsToSave),
           });
+          if (!res.ok) throw new Error("Error guardando items");
         }
       }
 
@@ -56,24 +66,26 @@ export default function NuevaQuotation() {
           .filter(p => p.description.trim())
           .map(({ _key, ...rest }) => ({ ...rest, quotation_id: quotation.id }));
         if (printsToSave.length > 0) {
-          await fetch("/api/print-jobs", {
+          const res = await fetch("/api/print-jobs", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(printsToSave),
           });
+          if (!res.ok) throw new Error("Error guardando impresiones");
         }
       }
 
+      toast("Cotización guardada");
       router.push(`/cotizacion/${quotation.id}`);
     } catch (err: unknown) {
-      alert("Error al guardar: " + (err as Error).message);
+      toast((err as Error).message || "Error al guardar", "error");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-extrabold text-brandit-black tracking-tight">Nueva Cotización</h1>
@@ -81,7 +93,7 @@ export default function NuevaQuotation() {
         </div>
         <button
           onClick={() => router.back()}
-          className="text-sm text-gray-400 hover:text-gray-600 transition-colors font-medium"
+          className="text-sm text-gray-400 hover:text-gray-600 transition-colors font-medium min-h-[44px] px-3"
         >
           ← Volver
         </button>
@@ -89,16 +101,16 @@ export default function NuevaQuotation() {
 
       <div className="space-y-6">
         {/* Client & Date */}
-        <div className="bg-white rounded-2xl border border-gray-50 p-6 shadow-sm space-y-5">
+        <div className="bg-white rounded-2xl border border-gray-50 p-5 sm:p-6 shadow-sm space-y-5">
           <ClientSelector selectedClientId={client?.id ?? null} onSelect={setClient} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
               <input
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-3 text-base focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none min-h-[48px]"
               />
             </div>
             <div>
@@ -107,37 +119,37 @@ export default function NuevaQuotation() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Notas opcionales..."
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none"
+                className="w-full border border-gray-200 rounded-xl px-3 py-3 text-base focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none min-h-[48px]"
               />
             </div>
           </div>
         </div>
 
         {/* Confection Items */}
-        <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6">
+        <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-4 sm:p-6">
           <ConfectionTable items={items} onChange={setItems} />
         </div>
 
         {/* Print Jobs */}
-        <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6">
+        <div className="bg-gray-50/50 rounded-2xl border border-gray-100 p-4 sm:p-6">
           <PrintSection prints={prints} onChange={setPrints} />
         </div>
 
         {/* Summary */}
-        <div className="bg-brandit-orange rounded-2xl p-6">
+        <div className="bg-brandit-orange rounded-2xl p-5 sm:p-6">
           <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4">Resumen de Costos</h3>
-          <div className="grid grid-cols-3 gap-6 text-center">
+          <div className="grid grid-cols-3 gap-4 sm:gap-6 text-center">
             <div>
-              <p className="text-[10px] text-white/40 uppercase">Confección</p>
-              <p className="text-xl font-bold text-white mt-1">{formatCurrency(totalConfection)}</p>
+              <p className="text-[11px] text-white/40 uppercase">Confección</p>
+              <p className="text-lg sm:text-xl font-bold text-white mt-1">{formatCurrency(totalConfection)}</p>
             </div>
             <div>
-              <p className="text-[10px] text-white/40 uppercase">Impresión</p>
-              <p className="text-xl font-bold text-white mt-1">{formatCurrency(totalPrint)}</p>
+              <p className="text-[11px] text-white/40 uppercase">Impresión</p>
+              <p className="text-lg sm:text-xl font-bold text-white mt-1">{formatCurrency(totalPrint)}</p>
             </div>
-            <div className="border-l border-white/10 pl-6">
-              <p className="text-[10px] text-white/60 uppercase font-semibold">Total</p>
-              <p className="text-xl font-bold text-white mt-1">{formatCurrency(grandTotal)}</p>
+            <div className="border-l border-white/10 pl-3 sm:pl-6">
+              <p className="text-[11px] text-white/60 uppercase font-semibold">Total</p>
+              <p className="text-lg sm:text-xl font-bold text-white mt-1">{formatCurrency(grandTotal)}</p>
             </div>
           </div>
         </div>
@@ -146,9 +158,16 @@ export default function NuevaQuotation() {
         <button
           onClick={save}
           disabled={saving}
-          className="w-full bg-brandit-orange text-white font-bold py-4 rounded-2xl text-sm hover:bg-brandit-orange/90 transition-colors disabled:opacity-50 shadow-sm"
+          className="w-full bg-brandit-orange text-white font-bold py-4 rounded-2xl text-base hover:bg-brandit-orange/90 transition-colors disabled:opacity-50 shadow-sm min-h-[56px] active:scale-[0.99]"
         >
-          {saving ? "Guardando..." : "Guardar Cotización"}
+          {saving ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Guardando...
+            </span>
+          ) : (
+            "Guardar Cotización"
+          )}
         </button>
       </div>
     </div>

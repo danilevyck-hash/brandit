@@ -52,7 +52,7 @@ export default function ClientSelector({ selectedClientId, onSelect }: Props) {
             const c = clients.find(c => c.id === Number(e.target.value));
             if (c) onSelect(c);
           }}
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none bg-white"
+          className="flex-1 border border-gray-200 rounded-xl px-3 py-3 text-base focus:ring-2 focus:ring-brandit-orange/20 focus:border-brandit-orange outline-none bg-white min-h-[48px]"
         >
           <option value="">Seleccionar cliente...</option>
           {clients.map(c => (
@@ -62,7 +62,7 @@ export default function ClientSelector({ selectedClientId, onSelect }: Props) {
         <button
           type="button"
           onClick={() => setShowNew(!showNew)}
-          className="px-4 py-2.5 bg-brandit-orange text-white rounded-xl text-sm font-medium hover:bg-brandit-orange/90 transition-colors"
+          className="px-4 py-3 bg-brandit-orange text-white rounded-xl text-sm font-medium hover:bg-brandit-orange/90 transition-colors min-h-[48px] active:scale-[0.98]"
         >
           + Nuevo
         </button>

@@ -142,12 +142,12 @@ export default function Navbar() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("brandit_role");
     localStorage.removeItem("brandit_email");
     localStorage.removeItem("brandit_nombre");
     localStorage.removeItem("brandit_empresa");
-    document.cookie = "brandit_session=; path=/; max-age=0";
+    await fetch("/api/auth", { method: "DELETE" });
     window.location.href = "/login";
   };
 
@@ -177,7 +177,7 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] flex items-center ${
                     link.match(pathname)
                       ? "bg-brandit-orange text-white"
                       : "text-gray-300 hover:text-white hover:bg-white/10"
