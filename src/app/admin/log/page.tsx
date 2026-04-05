@@ -61,7 +61,7 @@ export default function LogPage() {
       <div className="flex items-end justify-between mb-8">
         <div>
           <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Administración</p>
-          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Log de Actividad</h1>
+          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Historial de actividad</h1>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/admin/usuarios" className="text-sm text-brandit-orange hover:underline">
@@ -83,7 +83,7 @@ export default function LogPage() {
       {loading ? (
         <div className="text-center py-24 text-gray-300">Cargando...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-24 text-gray-300">Sin registros</div>
+        <div className="text-center py-24 text-gray-300">No hay actividad registrada</div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">

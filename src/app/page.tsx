@@ -54,12 +54,12 @@ type ModuleConfig = {
 };
 
 const MODULES: ModuleConfig[] = [
-  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Cuentas por cobrar", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50" },
-  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Transporte y despacho", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50" },
-  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Control de gastos", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50" },
-  { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Clientes potenciales", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50" },
-  { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50" },
-  { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Permisos y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", adminOnly: true },
+  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50" },
+  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50" },
+  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50" },
+  { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Seguimiento de clientes nuevos", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50" },
+  { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Crear y ver presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50" },
+  { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Administrar personas y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", adminOnly: true },
 ];
 
 const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "caja", "leads", "cotizaciones", "usuarios"];
@@ -248,13 +248,13 @@ export default function DashboardPage() {
       {/* KPI row */}
       <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 mb-1">Total Leads</p>
+          <p className="text-xs font-medium text-gray-400 mb-1">Leads activos</p>
           <p className="text-3xl font-extrabold tracking-tight text-brandit-black dark:text-white">
             {data ? String(data.leads.total) : "-"}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 mb-1">CxC 90+ d\u00edas</p>
+          <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d\u00edas)</p>
           <p className={`text-3xl font-extrabold tracking-tight ${data && data.cxc.deuda_90_plus > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
             {data ? `$${fmt(data.cxc.deuda_90_plus)}` : "-"}
           </p>

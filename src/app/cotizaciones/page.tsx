@@ -49,7 +49,7 @@ export default function CotizacionesPage() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-brandit-black tracking-tight">Cotizaciones</h1>
-          <p className="text-sm text-gray-400 mt-1">Gestión de costos de producción</p>
+          <p className="text-sm text-gray-400 mt-1">Presupuestos y costos de producci\u00f3n</p>
         </div>
         <Link
           href="/cotizacion/nueva"
@@ -88,8 +88,8 @@ export default function CotizacionesPage() {
       ) : quotations.length === 0 ? (
         <div className="text-center py-24">
           <div className="text-6xl mb-4 opacity-20">📋</div>
-          <p className="text-gray-400 text-lg mb-3">No hay cotizaciones</p>
-          <Link href="/cotizacion/nueva" className="text-brandit-orange font-medium hover:underline text-sm">Crear la primera cotización</Link>
+          <p className="text-gray-400 text-lg mb-3">Todav\u00eda no hay cotizaciones</p>
+          <Link href="/cotizacion/nueva" className="text-brandit-orange font-medium hover:underline text-sm">Crear la primera cotizaci\u00f3n</Link>
         </div>
       ) : (
         <div className="space-y-2">

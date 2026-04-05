@@ -52,9 +52,9 @@ export default function GuiasPage() {
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Logística</p>
-          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Guías de Transporte</h1>
-          <p className="text-sm text-gray-400 mt-1">Control de envíos y entregas</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Log\u00edstica</p>
+          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Gu\u00edas de transporte</h1>
+          <p className="text-sm text-gray-400 mt-1">Registro de env\u00edos y entregas</p>
         </div>
         <Link
           href="/guias/nueva"
@@ -67,15 +67,15 @@ export default function GuiasPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total Guías</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total gu\u00edas</p>
           <p className="text-3xl font-bold text-brandit-black">{guias.length}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Guías Este Mes</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Este mes</p>
           <p className="text-3xl font-bold text-brandit-black">{guiasThisMonth}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Bultos Este Mes</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Bultos este mes</p>
           <p className="text-3xl font-bold text-brandit-black">{totalBultosMonth}</p>
         </div>
       </div>
@@ -97,11 +97,11 @@ export default function GuiasPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-24">
           <p className="text-gray-300 text-lg mb-2">
-            {search ? "Sin resultados" : "No hay guías de transporte"}
+            {search ? "No se encontraron gu\u00edas" : "Todav\u00eda no hay gu\u00edas registradas"}
           </p>
           {!search && (
             <Link href="/guias/nueva" className="text-brandit-orange font-medium hover:underline text-sm">
-              Crear la primera guía
+              Crear la primera gu\u00eda
             </Link>
           )}
         </div>

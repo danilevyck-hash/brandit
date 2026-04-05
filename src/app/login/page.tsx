@@ -21,7 +21,7 @@ export default function LoginPage() {
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error || "Error al ingresar");
+      setError(data.error || "Contrase\u00f1a incorrecta");
       setLoading(false);
       return;
     }
@@ -49,7 +49,7 @@ export default function LoginPage() {
           <div className="mb-6">
             <input
               type="password"
-              placeholder="Contraseña"
+              placeholder="Ingresa tu contrase\u00f1a"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

@@ -73,8 +73,8 @@ export default function ClaudeChat() {
             {/* Header */}
             <div className="px-4 py-3 bg-brandit-black text-white flex items-center justify-between flex-shrink-0">
               <div>
-                <p className="text-sm font-semibold">Asistente Brand It</p>
-                <p className="text-[10px] text-gray-400">Powered by Claude</p>
+                <p className="text-sm font-semibold">Asistente</p>
+                <p className="text-[10px] text-gray-400">Preg\u00fantale lo que sea</p>
               </div>
               <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white text-lg">&times;</button>
             </div>
@@ -82,7 +82,7 @@ export default function ClaudeChat() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
               {messages.length === 0 && !loading && (
-                <p className="text-center text-gray-400 text-xs mt-8">Pregunta lo que necesites sobre leads, CxC, guías o caja.</p>
+                <p className="text-center text-gray-400 text-xs mt-8">Puedes preguntar sobre leads, cuentas por cobrar, gu\u00edas o caja menuda.</p>
               )}
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -98,7 +98,7 @@ export default function ClaudeChat() {
               {loading && (
                 <div className="flex justify-start">
                   <div className="bg-gray-100 text-gray-500 px-3 py-2 rounded-xl rounded-bl-sm text-sm">
-                    Escribiendo...
+                    Pensando...
                   </div>
                 </div>
               )}

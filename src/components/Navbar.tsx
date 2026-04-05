@@ -299,7 +299,7 @@ export default function Navbar() {
                   <p className="text-center text-gray-400 text-sm py-6">Buscando...</p>
                 )}
                 {!searchLoading && searchQuery.length >= 2 && searchLeads.length === 0 && searchCxc.length === 0 && (
-                  <p className="text-center text-gray-400 text-sm py-6">Sin resultados</p>
+                  <p className="text-center text-gray-400 text-sm py-6">No se encontraron resultados</p>
                 )}
                 {searchLeads.length > 0 && (
                   <div className="px-5 py-3">

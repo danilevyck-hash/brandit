@@ -63,14 +63,14 @@ export default function NuevaGuiaPage() {
       </div>
 
       <div className="mb-8">
-        <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Logística</p>
-        <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Nueva Guía</h1>
+        <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Log\u00edstica</p>
+        <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Nueva gu\u00eda</h1>
       </div>
 
       <form onSubmit={handleSubmit}>
         {/* Transport data */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Datos del Transporte</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Datos del transporte</p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <label className="text-xs text-gray-400 block mb-1">Fecha</label>
@@ -98,7 +98,7 @@ export default function NuevaGuiaPage() {
         {/* Items */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs uppercase tracking-widest text-gray-400">Items de Entrega</p>
+            <p className="text-xs uppercase tracking-widest text-gray-400">Items de entrega</p>
             <button type="button" onClick={addItem} className="text-sm text-brandit-orange font-medium hover:text-brandit-orange/80">
               + Agregar item
             </button>

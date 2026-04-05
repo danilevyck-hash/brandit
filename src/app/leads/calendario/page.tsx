@@ -99,7 +99,7 @@ function CalendarioPage() {
 
   const connectGoogle = () => {
     if (!GOOGLE_CLIENT_ID) {
-      showToast("GOOGLE_CLIENT_ID no configurado");
+      showToast("Google Calendar no est\u00e1 configurado a\u00fan");
       return;
     }
     const redirectUri = `${window.location.origin}/api/google/callback`;

@@ -93,7 +93,7 @@ export default function UsuariosPage() {
   };
 
   const deleteUser = async (id: string) => {
-    if (!confirm("¿Eliminar este usuario?")) return;
+    if (!confirm("\u00bfSeguro que quieres eliminar este usuario?")) return;
     await fetch(`/api/admin/usuarios/${id}`, { method: "DELETE" });
     load();
   };

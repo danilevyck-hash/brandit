@@ -79,7 +79,7 @@ export default function ReporteVendedorasPage() {
   if (role && role !== "admin" && role !== "secretaria") {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <p className="text-gray-400 text-center">Acceso restringido</p>
+        <p className="text-gray-400 text-center">No tienes permiso para ver esta p\u00e1gina</p>
       </div>
     );
   }
@@ -101,11 +101,11 @@ export default function ReporteVendedorasPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-brandit-black tracking-tight">Reporte Vendedoras</h1>
-          <p className="text-sm text-gray-400 mt-1">Rendimiento por vendedora</p>
+          <h1 className="text-2xl font-bold text-brandit-black tracking-tight">Reporte de vendedoras</h1>
+          <p className="text-sm text-gray-400 mt-1">Rendimiento y conversiones por vendedora</p>
         </div>
         <Link href="/leads" className="text-sm text-brandit-orange hover:underline">
-          Volver a Leads
+          Volver a leads
         </Link>
       </div>
 

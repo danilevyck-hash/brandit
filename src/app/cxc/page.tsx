@@ -301,9 +301,9 @@ export default function CxcPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-end justify-between mb-6">
         <div>
-          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cuentas por Cobrar</h1>
+          <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cuentas por cobrar</h1>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-sm text-gray-400">Antigüedad de saldos</p>
+            <p className="text-sm text-gray-400">Antig\u00fcedad de saldos por cliente</p>
             {freshness && (
               <span className="flex items-center gap-1.5 text-xs text-gray-500">
                 <span className={`w-2 h-2 rounded-full ${freshness.color}`}></span>
@@ -381,8 +381,8 @@ export default function CxcPage() {
         <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
       ) : rows.length === 0 ? (
         <div className="text-center py-24">
-          <p className="text-gray-400 text-lg mb-3">No hay datos de CxC</p>
-          {canUpload && <p className="text-gray-400 text-sm">Cargue un archivo CSV para comenzar</p>}
+          <p className="text-gray-400 text-lg mb-3">No hay datos de CxC cargados</p>
+          {canUpload && <p className="text-gray-400 text-sm">Sube un archivo CSV para ver los saldos</p>}
         </div>
       ) : view === "tabla" ? (
         <div className="bg-white rounded-2xl border border-gray-50 overflow-x-auto">

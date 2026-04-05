@@ -30,12 +30,12 @@ type Comentario = {
 
 const ESTADOS_PROSPECTO = [
   { value: "prospecto", label: "Prospecto", bg: "bg-green-50", text: "text-green-600" },
-  { value: "no_califica", label: "No Califica", bg: "bg-gray-100", text: "text-gray-500" },
+  { value: "no_califica", label: "No califica", bg: "bg-gray-100", text: "text-gray-500" },
 ] as const;
 
 const ESTADOS_VENTA: Record<string, { bg: string; text: string; label: string }> = {
   convertido: { bg: "bg-green-100", text: "text-green-700", label: "Convertido" },
-  no_convertido: { bg: "bg-red-50", text: "text-red-400", label: "No Convertido" },
+  no_convertido: { bg: "bg-red-50", text: "text-red-400", label: "No convertido" },
 };
 
 // Map legacy DB values to new display values
@@ -251,7 +251,7 @@ export default function LeadsPage() {
   };
 
   const deleteLead = async (id: string) => {
-    if (!confirm("¿Eliminar este lead?")) return;
+    if (!confirm("¿Seguro que quieres eliminar este lead?")) return;
     await fetch(`/api/leads/${id}`, { method: "DELETE" });
     if (selectedLead?.id === id) closePanel();
     load();
@@ -352,7 +352,7 @@ export default function LeadsPage() {
           {[
             { label: "Total", value: counts.total, color: "text-brandit-black" },
             { label: "Prospectos", value: counts.prospecto, color: "text-green-600" },
-            { label: "No Califica", value: counts.no_califica, color: "text-gray-500" },
+            { label: "No califica", value: counts.no_califica, color: "text-gray-500" },
             { label: "Convertidos", value: counts.convertido, color: "text-green-700" },
           ].map((k) => (
             <div key={k.label} className="bg-gray-50 rounded-xl px-4 py-3 min-w-[100px] flex-shrink-0">
@@ -387,9 +387,9 @@ export default function LeadsPage() {
               {[
                 { key: "", label: "Todos" },
                 { key: "prospecto", label: "Prospecto" },
-                { key: "no_califica", label: "No Califica" },
+                { key: "no_califica", label: "No califica" },
                 { key: "convertido", label: "Convertido" },
-                { key: "no_convertido", label: "No Convertido" },
+                { key: "no_convertido", label: "No convertido" },
               ].map((f) => (
                 <button key={f.key} onClick={() => setFiltro(f.key)}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
@@ -403,7 +403,7 @@ export default function LeadsPage() {
             {/* Search */}
             <input
               type="text"
-              placeholder="Buscar nombre o empresa..."
+              placeholder="Buscar por nombre o empresa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brandit-orange/20 mb-4"
@@ -415,7 +415,7 @@ export default function LeadsPage() {
             ) : filtered.length === 0 ? (
               <div className="text-center py-24">
                 <p className="text-gray-300 text-lg mb-2">
-                  {search || filtro ? "Sin resultados" : "No hay leads"}
+                  {search || filtro ? "No se encontraron leads" : "Todav\u00eda no hay leads registrados"}
                 </p>
               </div>
             ) : (
@@ -491,7 +491,7 @@ export default function LeadsPage() {
                   {([
                     { key: "prospectos" as const, label: "Prospectos", count: kanbanProspectos.length },
                     { key: "convertidos" as const, label: "Convertidos", count: kanbanConvertidos.length },
-                    { key: "no_convertidos" as const, label: "No Conv.", count: kanbanNoConvertidos.length },
+                    { key: "no_convertidos" as const, label: "No convertidos", count: kanbanNoConvertidos.length },
                   ]).map((t) => (
                     <button key={t.key} onClick={() => setKanbanTab(t.key)}
                       className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${
@@ -537,7 +537,7 @@ export default function LeadsPage() {
                     countBg="bg-green-100 text-green-700"
                   />
                   <KanbanColumn
-                    title="No Convertidos"
+                    title="No convertidos"
                     leads={kanbanNoConvertidos}
                     color="text-gray-500"
                     countBg="bg-gray-200 text-gray-600"
@@ -744,7 +744,7 @@ export default function LeadsPage() {
                         className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent ${isVendedora ? "text-gray-400" : ""}`} />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">Fecha de Seguimiento</label>
+                      <label className="text-xs text-gray-400 block mb-1">Pr\u00f3ximo seguimiento</label>
                       <input type="date" value={form.fecha_seguimiento} onChange={(e) => setForm({ ...form, fecha_seguimiento: e.target.value })}
                         className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
                     </div>
@@ -808,7 +808,7 @@ export default function LeadsPage() {
                     </div>
                   ))}
                   {comentarios.length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">Sin comentarios</p>
+                    <p className="text-sm text-gray-400 text-center py-4">No hay comentarios a\u00fan</p>
                   )}
                 </div>
               </div>
