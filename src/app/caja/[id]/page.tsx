@@ -44,7 +44,10 @@ export default function CajaDetailPage() {
   const [showValeModal, setShowValeModal] = useState(false);
   const [vale, setVale] = useState({ beneficiario: "", concepto: "", monto: "", fecha: new Date().toISOString().split("T")[0] });
 
-  // New: vale de entrega state for the new flow
+  const [showHelp, setShowHelp] = useState(false);
+  const [showPostGasto, setShowPostGasto] = useState(false);
+
+  // Vale de entrega state for the vale flow
   const [valeEntrega, setValeEntrega] = useState({
     gastoId: "",
     beneficiario: "",
@@ -52,7 +55,6 @@ export default function CajaDetailPage() {
     montoGasto: 0,
     montoEntregado: "",
   });
-  const [vueltoConfirmado, setVueltoConfirmado] = useState(false);
 
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
@@ -83,19 +85,18 @@ export default function CajaDetailPage() {
     e.preventDefault();
     setSaving(true);
 
-    const res = await fetch("/api/caja/gastos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, periodo_id: params.id, estado: "pendiente" }),
-    });
-    const newGasto = await res.json();
-
-    // Calculate total for the vale
     const subtotal = Number(form.subtotal) || 0;
     const itbmsRate = Number(form.itbms) || 0;
     const total = subtotal + subtotal * (itbmsRate / 100);
 
-    // Open vale de entrega automatically
+    const res = await fetch("/api/caja/gastos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, periodo_id: params.id }),
+    });
+    const newGasto = await res.json();
+
+    // Prepare vale data in case user wants to print
     setValeEntrega({
       gastoId: newGasto.id || "",
       beneficiario: form.proveedor || form.responsable || "",
@@ -107,6 +108,20 @@ export default function CajaDetailPage() {
     setForm({ fecha: new Date().toISOString().split("T")[0], proveedor: "", categoria: "", descripcion: "", responsable: "", empresa: "", subtotal: "", itbms: "0" });
     setSaving(false);
     await load();
+    setShowPostGasto(true);
+  };
+
+  const startValeFlow = async () => {
+    setShowPostGasto(false);
+    // Mark gasto as pendiente since we're doing the vale flow
+    if (valeEntrega.gastoId) {
+      await fetch(`/api/caja/gastos/${valeEntrega.gastoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "pendiente" }),
+      });
+      await load();
+    }
     setPrintView("vale_entrega");
   };
 
@@ -115,10 +130,8 @@ export default function CajaDetailPage() {
     const vuelto = montoEntregado - valeEntrega.montoGasto;
 
     if (vuelto > 0) {
-      // Show comprobante de vuelto
       setPrintView("comprobante_vuelto");
     } else {
-      // No change needed — mark as completado
       await confirmarVuelto();
     }
   };
@@ -131,7 +144,6 @@ export default function CajaDetailPage() {
         body: JSON.stringify({ estado: "completado" }),
       });
     }
-    setVueltoConfirmado(false);
     setPrintView("none");
     setValeEntrega({ gastoId: "", beneficiario: "", concepto: "", montoGasto: 0, montoEntregado: "" });
     load();
@@ -577,6 +589,11 @@ export default function CajaDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowHelp(true)}
+            className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2 text-sm hover:border-gray-300 transition-colors"
+            title="Como usar Caja Menuda">
+            ?
+          </button>
           <button onClick={() => setPrintView("reporte")}
             className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2 text-sm hover:border-gray-300 transition-colors">
             Imprimir Reporte
@@ -797,6 +814,108 @@ export default function CajaDetailPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Post-gasto modal: ask what to do next */}
+      {showPostGasto && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowPostGasto(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-5">
+              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-brandit-black">Gasto registrado</h3>
+              <p className="text-sm text-gray-400 mt-1">Necesitas imprimir un vale de entrega?</p>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={startValeFlow}
+                className="w-full bg-brandit-orange text-white rounded-xl px-4 py-3 text-sm font-medium hover:bg-brandit-orange/90 transition-colors text-left"
+              >
+                <span className="font-bold">Imprimir vale de entrega</span>
+                <br />
+                <span className="text-xs text-white/70">Le vas a dar dinero a alguien y necesitas que firme</span>
+              </button>
+              <button
+                onClick={() => { setShowPostGasto(false); setPrintGasto(periodo?.gastos.find(g => g.id === valeEntrega.gastoId) || null); if (periodo?.gastos.find(g => g.id === valeEntrega.gastoId)) setPrintView("recibo"); }}
+                className="w-full border border-gray-200 text-gray-700 rounded-xl px-4 py-3 text-sm font-medium hover:border-gray-300 transition-colors text-left"
+              >
+                <span className="font-bold">Solo imprimir comprobante</span>
+                <br />
+                <span className="text-xs text-gray-400">El gasto ya se hizo, solo necesitas el recibo</span>
+              </button>
+              <button
+                onClick={() => setShowPostGasto(false)}
+                className="w-full text-sm text-gray-400 hover:text-brandit-black py-2 transition-colors"
+              >
+                No necesito nada, listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help modal */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowHelp(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-brandit-black">Como usar Caja Menuda</h3>
+              <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+
+            <div className="space-y-4 text-sm text-gray-600">
+              <div className="bg-amber-50 rounded-xl p-4">
+                <p className="font-bold text-amber-800 mb-1">Que es un periodo?</p>
+                <p className="text-amber-700">Es un ciclo de caja menuda. Se abre con un fondo inicial (ej: $200) y se van registrando gastos hasta que se acabe o se cierre.</p>
+              </div>
+
+              <div>
+                <p className="font-bold text-brandit-black mb-2">Flujo normal:</p>
+                <ol className="space-y-3">
+                  <li className="flex gap-3">
+                    <span className="bg-brandit-orange text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Registrar el gasto</p>
+                      <p className="text-gray-500">Llena el formulario con fecha, proveedor, monto, etc. y dale Agregar Gasto.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="bg-brandit-orange text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Decidir que hacer</p>
+                      <p className="text-gray-500">Te va a preguntar si necesitas imprimir un vale de entrega, un comprobante, o nada.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="bg-brandit-orange text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Listo</p>
+                      <p className="text-gray-500">El gasto queda registrado y se descuenta del saldo.</p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <p className="font-bold text-brandit-black mb-2">Cuando usar el vale de entrega?</p>
+                <p className="text-gray-500 mb-2">Cuando le vas a dar dinero de la caja a alguien para que vaya a comprar algo. El vale es para que firme que recibio el dinero.</p>
+                <p className="text-gray-500">Si le diste de mas (ej: el gasto era $15 pero le diste $20), el sistema te ayuda a registrar el vuelto con otro comprobante.</p>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <p className="font-bold text-brandit-black mb-2">Botones del header:</p>
+                <ul className="space-y-1.5 text-gray-500">
+                  <li><span className="font-semibold text-gray-700">Imprimir Reporte</span> — genera un reporte completo del periodo para imprimir</li>
+                  <li><span className="font-semibold text-gray-700">Vale de Entrega</span> — crea un vale suelto (sin registrar gasto)</li>
+                  <li><span className="font-semibold text-gray-700">Cerrar Periodo</span> — cierra el periodo para que no se agreguen mas gastos (solo admin)</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       )}
