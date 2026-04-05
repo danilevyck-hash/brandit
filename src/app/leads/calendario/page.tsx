@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -37,7 +37,15 @@ function formatDateKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export default function CalendarioPage() {
+export default function CalendarioPageWrapper() {
+  return (
+    <Suspense fallback={<div className="text-center py-24 text-gray-300">Cargando...</div>}>
+      <CalendarioPage />
+    </Suspense>
+  );
+}
+
+function CalendarioPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
