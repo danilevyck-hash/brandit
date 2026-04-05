@@ -716,82 +716,150 @@ export default function CajaDetailPage() {
         </form>
       )}
 
-      {/* Expenses table */}
+      {/* Expenses list */}
       {periodo.gastos.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-gray-300">No hay gastos registrados</p>
+          <p className="text-gray-300 text-lg mb-1">No hay gastos registrados</p>
+          {periodo.estado === "abierto" && (
+            <p className="text-sm text-gray-300">Usa el formulario de arriba para agregar el primer gasto</p>
+          )}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-gray-100">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
             <p className="text-xs uppercase tracking-widest text-gray-400">{periodo.gastos.length} Gastos</p>
+            <p className="text-sm font-bold text-brandit-black">Total: {fmt(periodo.total_gastado)}</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-left">
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Fecha</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Proveedor</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Descripci\u00f3n</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Categor\u00eda</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Responsable</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Empresa</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 text-right">Subtotal</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 text-right">ITBMS</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 text-right">Total</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Estado</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {periodo.gastos.map((g) => (
-                  <tr key={g.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{g.fecha}</td>
-                    <td className="px-4 py-3 text-gray-900">{g.proveedor || "\u2014"}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.descripcion}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.categoria || "\u2014"}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.responsable || "\u2014"}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.empresa || "\u2014"}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{fmt(g.subtotal)}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{fmt(g.itbms)}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{fmt(g.total)}</td>
-                    <td className="px-4 py-3">
-                      {g.estado === "pendiente" ? (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
-                          Pendiente vuelto
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-600">
-                          Completado
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => { setPrintGasto(g); setPrintView("recibo"); }}
-                        className="text-xs text-gray-400 hover:text-brandit-orange mr-2">Recibo</button>
-                      {periodo.estado === "abierto" && (
-                        <button onClick={() => deleteGasto(g.id)} className="text-xs text-red-300 hover:text-red-500">Eliminar</button>
-                      )}
-                    </td>
+
+          {/* ── MOBILE: Card layout ── */}
+          <div className="sm:hidden space-y-2">
+            {periodo.gastos.map((g) => (
+              <div key={g.id} className="bg-white rounded-xl shadow-sm p-4 border border-gray-50">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {g.categoria ? (
+                      <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-brandit-orange/10 text-brandit-orange">
+                        {g.categoria}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                        Sin cat.
+                      </span>
+                    )}
+                    {g.estado === "pendiente" && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                        Pendiente vuelto
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400">{g.fecha}</span>
+                </div>
+                <p className="text-lg font-bold text-brandit-black mb-1">{fmt(g.total)}</p>
+                <p className="text-sm text-gray-600 truncate">{g.descripcion}</p>
+                {g.proveedor && <p className="text-xs text-gray-400 mt-0.5">{g.proveedor}</p>}
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
+                  <div className="flex items-center gap-2">
+                    {g.responsable && <span className="text-xs text-gray-400">{g.responsable}</span>}
+                    {g.empresa && <span className="text-xs text-gray-400">{g.empresa}</span>}
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setPrintGasto(g); setPrintView("recibo"); }}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-brandit-orange/10 hover:text-brandit-orange transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                    </button>
+                    {periodo.estado === "abierto" && (
+                      <button onClick={() => deleteGasto(g.id)}
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── DESKTOP: Table layout ── */}
+          <div className="hidden sm:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-brandit-black text-white text-left">
+                    <th className="px-4 py-3 text-xs font-semibold">Fecha</th>
+                    <th className="px-4 py-3 text-xs font-semibold">Descripci&oacute;n</th>
+                    <th className="px-4 py-3 text-xs font-semibold">Categor&iacute;a</th>
+                    <th className="px-4 py-3 text-xs font-semibold">Proveedor</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-right">Total</th>
+                    <th className="px-4 py-3 text-xs font-semibold">Estado</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-center">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-gray-200 bg-gray-50/50">
-                  <td colSpan={6} className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Totales:</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-700">
-                    {fmt(periodo.gastos.reduce((s, g) => s + g.subtotal, 0))}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-700">
-                    {fmt(periodo.gastos.reduce((s, g) => s + g.itbms, 0))}
-                  </td>
-                  <td className="px-4 py-3 text-right font-bold text-brandit-black">
-                    {fmt(periodo.total_gastado)}
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {periodo.gastos.map((g, i) => (
+                    <tr key={g.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${i % 2 === 1 ? "bg-gray-50/30" : "bg-white"}`}>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{g.fecha}</td>
+                      <td className="px-4 py-3">
+                        <p className="text-gray-900 font-medium">{g.descripcion}</p>
+                        {g.responsable && <p className="text-xs text-gray-400 mt-0.5">{g.responsable} {g.empresa ? `\u2022 ${g.empresa}` : ""}</p>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {g.categoria ? (
+                          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-brandit-orange/10 text-brandit-orange">
+                            {g.categoria}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">&mdash;</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-sm">{g.proveedor || "\u2014"}</td>
+                      <td className="px-4 py-3 text-right font-bold text-brandit-black">{fmt(g.total)}</td>
+                      <td className="px-4 py-3">
+                        {g.estado === "pendiente" ? (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                            Pendiente vuelto
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-600">
+                            Completado
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => { setPrintGasto(g); setPrintView("recibo"); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-brandit-orange/10 hover:text-brandit-orange transition-colors"
+                            title="Recibo">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                          </button>
+                          {periodo.estado === "abierto" && (
+                            <button onClick={() => deleteGasto(g.id)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                              title="Eliminar">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 bg-gray-50">
+                    <td colSpan={4} className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total Gastado:</td>
+                    <td className="px-4 py-3 text-right font-bold text-brandit-black">{fmt(periodo.total_gastado)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         </div>
       )}
