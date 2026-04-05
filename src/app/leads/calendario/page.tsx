@@ -15,7 +15,7 @@ type Lead = {
   fecha_seguimiento: string | null;
 };
 
-const DIAS_SEMANA = ["Lun", "Mar", "Mi\u00e9", "Jue", "Vie", "S\u00e1b", "Dom"];
+const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -99,7 +99,7 @@ function CalendarioPage() {
 
   const connectGoogle = () => {
     if (!GOOGLE_CLIENT_ID) {
-      showToast("Google Calendar no est\u00e1 configurado a\u00fan");
+      showToast("Google Calendar no está configurado aún");
       return;
     }
     const redirectUri = `${window.location.origin}/api/google/callback`;
@@ -137,7 +137,7 @@ function CalendarioPage() {
         if (res.status === 401) {
           localStorage.removeItem("google_access_token");
           setGoogleConnected(false);
-          showToast("Sesi\u00f3n expirada. Reconecta Google Calendar.");
+          showToast("Sesión expirada. Reconecta Google Calendar.");
         } else {
           showToast(`Error: ${data.error}`);
         }
@@ -145,7 +145,7 @@ function CalendarioPage() {
         showToast("Evento agregado a Google Calendar");
       }
     } catch {
-      showToast("Error de conexi\u00f3n");
+      showToast("Error de conexión");
     }
     setSyncingLeadId(null);
   };
@@ -320,7 +320,7 @@ function CalendarioPage() {
                     </button>
                   </div>
                   {selectedLeads.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">Sin seguimientos este d\u00eda</p>
+                    <p className="text-sm text-gray-400 text-center py-6">Sin seguimientos este día</p>
                   ) : (
                     <div className="space-y-2">
                       {selectedLeads.map((lead) => (

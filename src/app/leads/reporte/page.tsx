@@ -79,7 +79,7 @@ export default function ReporteVendedorasPage() {
   if (role && role !== "admin" && role !== "secretaria") {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <p className="text-gray-400 text-center">No tienes permiso para ver esta p\u00e1gina</p>
+        <p className="text-gray-400 text-center">No tienes permiso para ver esta página</p>
       </div>
     );
   }

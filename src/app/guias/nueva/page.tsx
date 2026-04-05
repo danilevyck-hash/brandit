@@ -63,8 +63,8 @@ export default function NuevaGuiaPage() {
       </div>
 
       <div className="mb-8">
-        <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Log\u00edstica</p>
-        <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Nueva gu\u00eda</h1>
+        <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Logística</p>
+        <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Nueva guía</h1>
       </div>
 
       <form onSubmit={handleSubmit}>

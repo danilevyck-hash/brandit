@@ -415,7 +415,7 @@ export default function LeadsPage() {
             ) : filtered.length === 0 ? (
               <div className="text-center py-24">
                 <p className="text-gray-300 text-lg mb-2">
-                  {search || filtro ? "No se encontraron leads" : "Todav\u00eda no hay leads registrados"}
+                  {search || filtro ? "No se encontraron leads" : "Todavía no hay leads registrados"}
                 </p>
               </div>
             ) : (
@@ -744,7 +744,7 @@ export default function LeadsPage() {
                         className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent ${isVendedora ? "text-gray-400" : ""}`} />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">Pr\u00f3ximo seguimiento</label>
+                      <label className="text-xs text-gray-400 block mb-1">Próximo seguimiento</label>
                       <input type="date" value={form.fecha_seguimiento} onChange={(e) => setForm({ ...form, fecha_seguimiento: e.target.value })}
                         className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
                     </div>
@@ -808,7 +808,7 @@ export default function LeadsPage() {
                     </div>
                   ))}
                   {comentarios.length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">No hay comentarios a\u00fan</p>
+                    <p className="text-sm text-gray-400 text-center py-4">No hay comentarios aún</p>
                   )}
                 </div>
               </div>

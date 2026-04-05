@@ -52,9 +52,9 @@ export default function GuiasPage() {
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Log\u00edstica</p>
-          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Gu\u00edas de transporte</h1>
-          <p className="text-sm text-gray-400 mt-1">Registro de env\u00edos y entregas</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Logística</p>
+          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Guías de transporte</h1>
+          <p className="text-sm text-gray-400 mt-1">Registro de envíos y entregas</p>
         </div>
         <Link
           href="/guias/nueva"
@@ -67,7 +67,7 @@ export default function GuiasPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-2xl p-6 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total gu\u00edas</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total guías</p>
           <p className="text-3xl font-bold text-brandit-black">{guias.length}</p>
         </div>
         <div className="bg-white rounded-2xl p-6 border border-gray-100">
@@ -97,11 +97,11 @@ export default function GuiasPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-24">
           <p className="text-gray-300 text-lg mb-2">
-            {search ? "No se encontraron gu\u00edas" : "Todav\u00eda no hay gu\u00edas registradas"}
+            {search ? "No se encontraron guías" : "Todavía no hay guías registradas"}
           </p>
           {!search && (
             <Link href="/guias/nueva" className="text-brandit-orange font-medium hover:underline text-sm">
-              Crear la primera gu\u00eda
+              Crear la primera guía
             </Link>
           )}
         </div>

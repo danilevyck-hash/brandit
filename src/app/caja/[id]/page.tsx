@@ -150,13 +150,13 @@ export default function CajaDetailPage() {
   };
 
   const deleteGasto = async (id: string) => {
-    if (!confirm("\u00bfEliminar este gasto?")) return;
+    if (!confirm("¿Eliminar este gasto?")) return;
     await fetch(`/api/caja/gastos/${id}`, { method: "DELETE" });
     load();
   };
 
   const cerrarPeriodo = async () => {
-    if (!confirm("\u00bfCerrar este per\u00edodo? No podr\u00e1 agregar m\u00e1s gastos.")) return;
+    if (!confirm("¿Cerrar este período? No podrá agregar más gastos.")) return;
     await fetch(`/api/caja/periodos/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -166,7 +166,7 @@ export default function CajaDetailPage() {
   };
 
   const deletePeriodo = async () => {
-    if (!confirm("\u00bfEliminar este per\u00edodo y todos sus gastos?")) return;
+    if (!confirm("¿Eliminar este período y todos sus gastos?")) return;
     await fetch(`/api/caja/periodos/${params.id}`, { method: "DELETE" });
     router.push("/caja");
   };
@@ -192,7 +192,7 @@ export default function CajaDetailPage() {
   // Category summary
   const catSummary: Record<string, number> = {};
   periodo.gastos.forEach((g) => {
-    const cat = g.categoria || "Sin categor\u00eda";
+    const cat = g.categoria || "Sin categoría";
     catSummary[cat] = (catSummary[cat] || 0) + g.total;
   });
 
@@ -273,7 +273,7 @@ export default function CajaDetailPage() {
             onClick={finalizarVale}
             className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700"
           >
-            El beneficiario firm\u00f3 \u2014 Finalizar
+            El beneficiario firmó — Finalizar
           </button>
           <button onClick={() => { setPrintView("none"); }} className="text-sm text-gray-400 hover:text-brandit-black">
             Cancelar
@@ -340,7 +340,7 @@ export default function CajaDetailPage() {
             onClick={confirmarVuelto}
             className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700"
           >
-            Confirmar vuelto recibido \u2014 Cerrar
+            Confirmar vuelto recibido — Cerrar
           </button>
         </div>
       </div>
@@ -359,7 +359,7 @@ export default function CajaDetailPage() {
 
           <div className="flex justify-between text-sm mb-6">
             <div>
-              <p><span className="font-semibold">Per\u00edodo:</span> N\u00b0{periodo.numero}</p>
+              <p><span className="font-semibold">Período:</span> N°{periodo.numero}</p>
               <p><span className="font-semibold">Apertura:</span> {periodo.fecha_apertura}</p>
               {periodo.fecha_cierre && <p><span className="font-semibold">Cierre:</span> {periodo.fecha_cierre}</p>}
             </div>
@@ -375,8 +375,8 @@ export default function CajaDetailPage() {
               <tr className="border-b-2 border-brandit-orange text-left">
                 <th className="py-2 font-semibold">Fecha</th>
                 <th className="py-2 font-semibold">Proveedor</th>
-                <th className="py-2 font-semibold">Descripci\u00f3n</th>
-                <th className="py-2 font-semibold">Categor\u00eda</th>
+                <th className="py-2 font-semibold">Descripción</th>
+                <th className="py-2 font-semibold">Categoría</th>
                 <th className="py-2 font-semibold">Responsable</th>
                 <th className="py-2 font-semibold">Empresa</th>
                 <th className="py-2 text-right font-semibold">Subtotal</th>
@@ -409,7 +409,7 @@ export default function CajaDetailPage() {
 
           {/* Category summary */}
           <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Resumen por Categor\u00eda</p>
+            <p className="text-xs font-semibold text-gray-500 mb-2">Resumen por Categoría</p>
             <table className="w-full text-xs">
               <tbody>
                 {Object.entries(catSummary).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
@@ -439,7 +439,7 @@ export default function CajaDetailPage() {
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">
-          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">\u2190 Volver</button>
+          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">← Volver</button>
           <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium">Imprimir</button>
         </div>
       </div>
@@ -457,7 +457,7 @@ export default function CajaDetailPage() {
           </div>
 
           <div className="text-right text-xs text-gray-400 mb-4">
-            N\u00b0 {printGasto.id.substring(0, 8).toUpperCase()}
+            N° {printGasto.id.substring(0, 8).toUpperCase()}
           </div>
 
           <div className="space-y-2 text-sm mb-6">
@@ -470,20 +470,20 @@ export default function CajaDetailPage() {
               <span className="font-medium">{printGasto.proveedor || printGasto.empresa}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
-              <span className="text-gray-500">Descripci\u00f3n</span>
+              <span className="text-gray-500">Descripción</span>
               <span className="font-medium">{printGasto.descripcion}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
-              <span className="text-gray-500">Categor\u00eda</span>
-              <span className="font-medium">{printGasto.categoria || "\u2014"}</span>
+              <span className="text-gray-500">Categoría</span>
+              <span className="font-medium">{printGasto.categoria || "—"}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
               <span className="text-gray-500">Responsable</span>
-              <span className="font-medium">{printGasto.responsable || "\u2014"}</span>
+              <span className="font-medium">{printGasto.responsable || "—"}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
               <span className="text-gray-500">Empresa</span>
-              <span className="font-medium">{printGasto.empresa || "\u2014"}</span>
+              <span className="font-medium">{printGasto.empresa || "—"}</span>
             </div>
           </div>
 
@@ -513,7 +513,7 @@ export default function CajaDetailPage() {
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">
-          <button onClick={() => { setPrintView("none"); setPrintGasto(null); }} className="text-sm text-gray-400 hover:text-brandit-black">\u2190 Volver</button>
+          <button onClick={() => { setPrintView("none"); setPrintGasto(null); }} className="text-sm text-gray-400 hover:text-brandit-black">← Volver</button>
           <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium">Imprimir</button>
         </div>
       </div>
@@ -551,13 +551,13 @@ export default function CajaDetailPage() {
 
           <div className="mt-12 text-center">
             <div className="border-t border-gray-400 w-48 mx-auto mb-1"></div>
-            <p className="text-xs text-gray-500">Recib\u00ed conforme</p>
+            <p className="text-xs text-gray-500">Recibí conforme</p>
             <p className="text-[10px] text-gray-400 mt-1">Fecha: _______________</p>
           </div>
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">
-          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">\u2190 Volver</button>
+          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">← Volver</button>
           <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium">Imprimir</button>
         </div>
       </div>
@@ -569,7 +569,7 @@ export default function CajaDetailPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       {/* Breadcrumb */}
       <div className="mb-6">
-        <Link href="/caja" className="text-sm text-gray-400 hover:text-brandit-black transition-colors">\u2190 Caja</Link>
+        <Link href="/caja" className="text-sm text-gray-400 hover:text-brandit-black transition-colors">← Caja</Link>
       </div>
 
       {/* Header */}
@@ -583,9 +583,9 @@ export default function CajaDetailPage() {
               {periodo.estado === "abierto" ? "Abierto" : "Cerrado"}
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Per\u00edodo N\u00b0{periodo.numero}</h1>
+          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Período N°{periodo.numero}</h1>
           <p className="text-sm text-gray-400 mt-1">
-            {periodo.fecha_apertura}{periodo.fecha_cierre ? ` \u2192 ${periodo.fecha_cierre}` : ""}
+            {periodo.fecha_apertura}{periodo.fecha_cierre ? ` → ${periodo.fecha_cierre}` : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -605,7 +605,7 @@ export default function CajaDetailPage() {
           {periodo.estado === "abierto" && isAdmin && (
             <button onClick={cerrarPeriodo}
               className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2 text-sm hover:border-brandit-orange hover:text-brandit-orange transition-colors">
-              Cerrar Per\u00edodo
+              Cerrar Período
             </button>
           )}
           {periodo.estado === "cerrado" && isAdmin && (
@@ -664,14 +664,14 @@ export default function CajaDetailPage() {
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Categor\u00eda</label>
+              <label className="text-xs text-gray-400 block mb-1">Categoría</label>
               <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
                 placeholder="Ej: Limpieza, Oficina..."
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
             </div>
             {/* Row 2 */}
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Descripci\u00f3n</label>
+              <label className="text-xs text-gray-400 block mb-1">Descripción</label>
               <input value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required
                 placeholder="Detalle del gasto"
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
@@ -804,7 +804,7 @@ export default function CajaDetailPage() {
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{g.fecha}</td>
                       <td className="px-4 py-3">
                         <p className="text-gray-900 font-medium">{g.descripcion}</p>
-                        {g.responsable && <p className="text-xs text-gray-400 mt-0.5">{g.responsable} {g.empresa ? `\u2022 ${g.empresa}` : ""}</p>}
+                        {g.responsable && <p className="text-xs text-gray-400 mt-0.5">{g.responsable} {g.empresa ? `• ${g.empresa}` : ""}</p>}
                       </td>
                       <td className="px-4 py-3">
                         {g.categoria ? (
@@ -815,7 +815,7 @@ export default function CajaDetailPage() {
                           <span className="text-xs text-gray-300">&mdash;</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-600 text-sm">{g.proveedor || "\u2014"}</td>
+                      <td className="px-4 py-3 text-gray-600 text-sm">{g.proveedor || "—"}</td>
                       <td className="px-4 py-3 text-right font-bold text-brandit-black">{fmt(g.total)}</td>
                       <td className="px-4 py-3">
                         {g.estado === "pendiente" ? (
@@ -867,7 +867,7 @@ export default function CajaDetailPage() {
       {/* Category summary */}
       {Object.keys(catSummary).length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Resumen por Categor\u00eda</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Resumen por Categoría</p>
           <div className="space-y-2">
             {Object.entries(catSummary).sort((a, b) => b[1] - a[1]).map(([cat, total]) => {
               const catPct = periodo.total_gastado > 0 ? (total / periodo.total_gastado) * 100 : 0;

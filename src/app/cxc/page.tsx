@@ -303,7 +303,7 @@ export default function CxcPage() {
         <div>
           <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cuentas por cobrar</h1>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-sm text-gray-400">Antig\u00fcedad de saldos por cliente</p>
+            <p className="text-sm text-gray-400">Antigüedad de saldos por cliente</p>
             {freshness && (
               <span className="flex items-center gap-1.5 text-xs text-gray-500">
                 <span className={`w-2 h-2 rounded-full ${freshness.color}`}></span>
