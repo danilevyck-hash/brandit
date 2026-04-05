@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 type Lead = {
@@ -15,11 +15,14 @@ type Lead = {
   fecha_seguimiento: string | null;
 };
 
-const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const DIAS_SEMANA = ["Lun", "Mar", "Mi\u00e9", "Jue", "Vie", "S\u00e1b", "Dom"];
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+// Requiere en Vercel: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NEXT_PUBLIC_GOOGLE_CLIENT_ID
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -27,7 +30,6 @@ function getDaysInMonth(year: number, month: number) {
 
 function getFirstDayOfWeek(year: number, month: number) {
   const day = new Date(year, month, 1).getDay();
-  // Convert Sunday=0 to Monday-based (Mon=0, Sun=6)
   return day === 0 ? 6 : day - 1;
 }
 
@@ -37,11 +39,15 @@ function formatDateKey(year: number, month: number, day: number) {
 
 export default function CalendarioPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [syncingLeadId, setSyncingLeadId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -53,7 +59,18 @@ export default function CalendarioPage() {
     if (r !== "admin" && r !== "secretaria") {
       router.replace("/leads");
     }
+    // Check if Google is connected
+    const token = localStorage.getItem("google_access_token");
+    setGoogleConnected(!!token);
   }, [router]);
+
+  // Show toast if just connected
+  useEffect(() => {
+    if (searchParams.get("google") === "connected") {
+      setGoogleConnected(true);
+      showToast("Google Calendar conectado");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!role) return;
@@ -66,6 +83,64 @@ export default function CalendarioPage() {
       })
       .catch(() => setLoading(false));
   }, [role]);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const connectGoogle = () => {
+    if (!GOOGLE_CLIENT_ID) {
+      showToast("GOOGLE_CLIENT_ID no configurado");
+      return;
+    }
+    const redirectUri = `${window.location.origin}/api/google/callback`;
+    const scope = "https://www.googleapis.com/auth/calendar.events";
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
+    window.location.href = url;
+  };
+
+  const syncToGoogle = async (lead: Lead) => {
+    const token = localStorage.getItem("google_access_token");
+    if (!token) {
+      showToast("Conecta Google Calendar primero");
+      return;
+    }
+    setSyncingLeadId(lead.id);
+
+    try {
+      const res = await fetch("/api/google/sync-calendar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-google-token": token,
+        },
+        body: JSON.stringify({
+          leadId: lead.id,
+          nombre: lead.nombre,
+          fecha: lead.fecha_seguimiento,
+          nota: lead.empresa ? `Empresa: ${lead.empresa}` : undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        if (res.status === 401) {
+          localStorage.removeItem("google_access_token");
+          setGoogleConnected(false);
+          showToast("Sesi\u00f3n expirada. Reconecta Google Calendar.");
+        } else {
+          showToast(`Error: ${data.error}`);
+        }
+      } else {
+        showToast("Evento agregado a Google Calendar");
+      }
+    } catch {
+      showToast("Error de conexi\u00f3n");
+    }
+    setSyncingLeadId(null);
+  };
 
   // Group leads by fecha_seguimiento
   const leadsByDate = useMemo(() => {
@@ -102,6 +177,22 @@ export default function CalendarioPage() {
               <Link href="/leads/reporte" className="text-xs text-brandit-orange hover:underline">Reporte</Link>
             </div>
           </div>
+          <button
+            onClick={googleConnected ? () => { localStorage.removeItem("google_access_token"); setGoogleConnected(false); showToast("Google Calendar desconectado"); } : connectGoogle}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              googleConnected
+                ? "bg-green-50 text-green-700 hover:bg-green-100"
+                : "bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:shadow-sm"
+            }`}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            </svg>
+            {googleConnected ? "Google Calendar conectado" : "Conectar Google Calendar"}
+          </button>
         </div>
 
         {/* Month navigation */}
@@ -221,28 +312,45 @@ export default function CalendarioPage() {
                     </button>
                   </div>
                   {selectedLeads.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">Sin seguimientos este día</p>
+                    <p className="text-sm text-gray-400 text-center py-6">Sin seguimientos este d\u00eda</p>
                   ) : (
                     <div className="space-y-2">
                       {selectedLeads.map((lead) => (
-                        <Link
+                        <div
                           key={lead.id}
-                          href="/leads"
-                          className="block bg-white rounded-xl px-3.5 py-3 border border-gray-100 hover:shadow-md transition-all"
+                          className="bg-white rounded-xl px-3.5 py-3 border border-gray-100 hover:shadow-md transition-all"
                         >
-                          <h4 className="font-semibold text-sm text-gray-900 truncate">{lead.nombre}</h4>
-                          {lead.empresa && (
-                            <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.empresa}</p>
+                          <Link href="/leads">
+                            <h4 className="font-semibold text-sm text-gray-900 truncate">{lead.nombre}</h4>
+                            {lead.empresa && (
+                              <p className="text-xs text-gray-400 mt-0.5 truncate">{lead.empresa}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5">
+                              {lead.vendedora && (
+                                <span className="text-[10px] text-gray-400">{lead.vendedora}</span>
+                              )}
+                              {lead.telefono && (
+                                <span className="text-xs text-brandit-orange">{lead.telefono}</span>
+                              )}
+                            </div>
+                          </Link>
+                          {/* Google Calendar sync button */}
+                          {googleConnected && (
+                            <button
+                              onClick={() => syncToGoogle(lead)}
+                              disabled={syncingLeadId === lead.id}
+                              className="mt-2 w-full flex items-center justify-center gap-1.5 text-[11px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                              </svg>
+                              {syncingLeadId === lead.id ? "Sincronizando..." : "Sync con Google"}
+                            </button>
                           )}
-                          <div className="flex items-center gap-2 mt-1.5">
-                            {lead.vendedora && (
-                              <span className="text-[10px] text-gray-400">{lead.vendedora}</span>
-                            )}
-                            {lead.telefono && (
-                              <span className="text-xs text-brandit-orange">{lead.telefono}</span>
-                            )}
-                          </div>
-                        </Link>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -252,6 +360,13 @@ export default function CalendarioPage() {
           </div>
         )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-brandit-black text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg animate-fade-in">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ type Gasto = {
   proveedor: string;
   categoria: string;
   responsable: string;
+  estado: string;
 };
 
 type Periodo = {
@@ -29,7 +30,7 @@ type Periodo = {
   saldo: number;
 };
 
-type PrintView = "none" | "reporte" | "recibo" | "vale";
+type PrintView = "none" | "reporte" | "recibo" | "vale" | "vale_entrega" | "comprobante_vuelto";
 
 export default function CajaDetailPage() {
   const params = useParams();
@@ -42,6 +43,16 @@ export default function CajaDetailPage() {
   const [printGasto, setPrintGasto] = useState<Gasto | null>(null);
   const [showValeModal, setShowValeModal] = useState(false);
   const [vale, setVale] = useState({ beneficiario: "", concepto: "", monto: "", fecha: new Date().toISOString().split("T")[0] });
+
+  // New: vale de entrega state for the new flow
+  const [valeEntrega, setValeEntrega] = useState({
+    gastoId: "",
+    beneficiario: "",
+    concepto: "",
+    montoGasto: 0,
+    montoEntregado: "",
+  });
+  const [vueltoConfirmado, setVueltoConfirmado] = useState(false);
 
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split("T")[0],
@@ -71,24 +82,69 @@ export default function CajaDetailPage() {
   const addGasto = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await fetch("/api/caja/gastos", {
+
+    const res = await fetch("/api/caja/gastos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, periodo_id: params.id }),
+      body: JSON.stringify({ ...form, periodo_id: params.id, estado: "pendiente" }),
     });
+    const newGasto = await res.json();
+
+    // Calculate total for the vale
+    const subtotal = Number(form.subtotal) || 0;
+    const itbmsRate = Number(form.itbms) || 0;
+    const total = subtotal + subtotal * (itbmsRate / 100);
+
+    // Open vale de entrega automatically
+    setValeEntrega({
+      gastoId: newGasto.id || "",
+      beneficiario: form.proveedor || form.responsable || "",
+      concepto: form.descripcion,
+      montoGasto: total,
+      montoEntregado: String(total),
+    });
+
     setForm({ fecha: new Date().toISOString().split("T")[0], proveedor: "", categoria: "", descripcion: "", responsable: "", empresa: "", subtotal: "", itbms: "0" });
     setSaving(false);
+    await load();
+    setPrintView("vale_entrega");
+  };
+
+  const finalizarVale = async () => {
+    const montoEntregado = Number(valeEntrega.montoEntregado) || 0;
+    const vuelto = montoEntregado - valeEntrega.montoGasto;
+
+    if (vuelto > 0) {
+      // Show comprobante de vuelto
+      setPrintView("comprobante_vuelto");
+    } else {
+      // No change needed — mark as completado
+      await confirmarVuelto();
+    }
+  };
+
+  const confirmarVuelto = async () => {
+    if (valeEntrega.gastoId) {
+      await fetch(`/api/caja/gastos/${valeEntrega.gastoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "completado" }),
+      });
+    }
+    setVueltoConfirmado(false);
+    setPrintView("none");
+    setValeEntrega({ gastoId: "", beneficiario: "", concepto: "", montoGasto: 0, montoEntregado: "" });
     load();
   };
 
   const deleteGasto = async (id: string) => {
-    if (!confirm("¿Eliminar este gasto?")) return;
+    if (!confirm("\u00bfEliminar este gasto?")) return;
     await fetch(`/api/caja/gastos/${id}`, { method: "DELETE" });
     load();
   };
 
   const cerrarPeriodo = async () => {
-    if (!confirm("¿Cerrar este período? No podrá agregar más gastos.")) return;
+    if (!confirm("\u00bfCerrar este per\u00edodo? No podr\u00e1 agregar m\u00e1s gastos.")) return;
     await fetch(`/api/caja/periodos/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -98,7 +154,7 @@ export default function CajaDetailPage() {
   };
 
   const deletePeriodo = async () => {
-    if (!confirm("¿Eliminar este período y todos sus gastos?")) return;
+    if (!confirm("\u00bfEliminar este per\u00edodo y todos sus gastos?")) return;
     await fetch(`/api/caja/periodos/${params.id}`, { method: "DELETE" });
     router.push("/caja");
   };
@@ -111,6 +167,11 @@ export default function CajaDetailPage() {
     return s + s * (Number(form.itbms) / 100);
   };
 
+  const nowStr = () => {
+    const d = new Date();
+    return d.toLocaleString("es-PA", { dateStyle: "long", timeStyle: "short" });
+  };
+
   if (loading) return <div className="text-center py-24 text-gray-300">Cargando...</div>;
   if (!periodo) return null;
 
@@ -119,9 +180,160 @@ export default function CajaDetailPage() {
   // Category summary
   const catSummary: Record<string, number> = {};
   periodo.gastos.forEach((g) => {
-    const cat = g.categoria || "Sin categoría";
+    const cat = g.categoria || "Sin categor\u00eda";
     catSummary[cat] = (catSummary[cat] || 0) + g.total;
   });
+
+  // ══════════ PRINT: VALE DE ENTREGA (new flow) ══════════
+  if (printView === "vale_entrega") {
+    const montoEntregado = Number(valeEntrega.montoEntregado) || 0;
+    const vueltoEsperado = montoEntregado - valeEntrega.montoGasto;
+
+    return (
+      <div className="max-w-md mx-auto px-4 py-8">
+        <div className="bg-white p-8 print:p-4">
+          <div className="text-center mb-6 border-b-2 border-brandit-orange pb-4">
+            <p className="text-sm font-bold text-brandit-black tracking-tight uppercase">BRAND IT | Confecciones Boston</p>
+            <p className="text-sm font-bold text-brandit-black mt-2">VALE DE ENTREGA</p>
+          </div>
+
+          <div className="text-right text-xs text-gray-400 mb-4">
+            {nowStr()}
+          </div>
+
+          <div className="space-y-3 text-sm mb-6">
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="text-gray-500">Beneficiario</span>
+              <span className="font-medium">{valeEntrega.beneficiario}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="text-gray-500">Concepto</span>
+              <span className="font-medium">{valeEntrega.concepto}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="text-gray-500">Monto del gasto</span>
+              <span className="font-bold">{fmt(valeEntrega.montoGasto)}</span>
+            </div>
+          </div>
+
+          {/* Editable: monto entregado */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-6 print:hidden">
+            <label className="text-xs text-gray-400 block mb-1">Monto entregado al beneficiario</label>
+            <input
+              type="number"
+              step="0.01"
+              value={valeEntrega.montoEntregado}
+              onChange={(e) => setValeEntrega({ ...valeEntrega, montoEntregado: e.target.value })}
+              className="w-full border-b border-gray-200 py-2 text-lg font-bold outline-none focus:border-brandit-orange transition-colors bg-transparent"
+            />
+            {vueltoEsperado > 0 && (
+              <p className="text-sm text-amber-600 font-semibold mt-2">
+                Vuelto esperado: {fmt(vueltoEsperado)}
+              </p>
+            )}
+          </div>
+
+          {/* Print-only: show monto entregado */}
+          <div className="hidden print:block mb-6">
+            <div className="flex justify-between border-b border-gray-200 pb-2 text-sm">
+              <span className="text-gray-500 font-semibold">Monto entregado</span>
+              <span className="font-bold text-lg">{fmt(montoEntregado)}</span>
+            </div>
+            {vueltoEsperado > 0 && (
+              <div className="flex justify-between border-b border-gray-200 pb-2 text-sm mt-2">
+                <span className="text-gray-500">Vuelto esperado</span>
+                <span className="font-semibold text-amber-600">{fmt(vueltoEsperado)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-10 text-center">
+            <div className="border-t border-gray-400 w-48 mx-auto mb-1"></div>
+            <p className="text-xs text-gray-500">Firma del beneficiario</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-4 print:hidden">
+          <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90">
+            Imprimir
+          </button>
+          <button
+            onClick={finalizarVale}
+            className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700"
+          >
+            El beneficiario firm\u00f3 \u2014 Finalizar
+          </button>
+          <button onClick={() => { setPrintView("none"); }} className="text-sm text-gray-400 hover:text-brandit-black">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════ PRINT: COMPROBANTE DE VUELTO ══════════
+  if (printView === "comprobante_vuelto") {
+    const montoEntregado = Number(valeEntrega.montoEntregado) || 0;
+    const vueltoDevuelto = montoEntregado - valeEntrega.montoGasto;
+
+    return (
+      <div className="max-w-md mx-auto px-4 py-8">
+        <div className="bg-white p-8 print:p-4">
+          <div className="text-center mb-6 border-b-2 border-brandit-orange pb-4">
+            <p className="text-sm font-bold text-brandit-black tracking-tight uppercase">BRAND IT | Confecciones Boston</p>
+            <p className="text-sm font-bold text-brandit-black mt-2">COMPROBANTE DE VUELTO</p>
+          </div>
+
+          <div className="text-right text-xs text-gray-400 mb-4">
+            {nowStr()}
+          </div>
+
+          <div className="space-y-3 text-sm mb-6">
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="text-gray-500">Beneficiario</span>
+              <span className="font-medium">{valeEntrega.beneficiario}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-100 pb-2">
+              <span className="text-gray-500">Concepto</span>
+              <span className="font-medium">{valeEntrega.concepto}</span>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-4 mb-6">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-gray-500">Monto entregado</span>
+              <span>{fmt(montoEntregado)}</span>
+            </div>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-gray-500">Monto del gasto</span>
+              <span>{fmt(valeEntrega.montoGasto)}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold border-t border-gray-200 pt-2 mt-2">
+              <span>Vuelto devuelto</span>
+              <span className="text-green-600">{fmt(vueltoDevuelto)}</span>
+            </div>
+          </div>
+
+          <div className="mt-10 text-center">
+            <div className="border-t border-gray-400 w-48 mx-auto mb-1"></div>
+            <p className="text-xs text-gray-500">Firma de quien recibe el vuelto</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-4 print:hidden">
+          <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90">
+            Imprimir vuelto
+          </button>
+          <button
+            onClick={confirmarVuelto}
+            className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700"
+          >
+            Confirmar vuelto recibido \u2014 Cerrar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ══════════ PRINT: REPORTE ══════════
   if (printView === "reporte") {
@@ -135,7 +347,7 @@ export default function CajaDetailPage() {
 
           <div className="flex justify-between text-sm mb-6">
             <div>
-              <p><span className="font-semibold">Período:</span> N°{periodo.numero}</p>
+              <p><span className="font-semibold">Per\u00edodo:</span> N\u00b0{periodo.numero}</p>
               <p><span className="font-semibold">Apertura:</span> {periodo.fecha_apertura}</p>
               {periodo.fecha_cierre && <p><span className="font-semibold">Cierre:</span> {periodo.fecha_cierre}</p>}
             </div>
@@ -151,8 +363,8 @@ export default function CajaDetailPage() {
               <tr className="border-b-2 border-brandit-orange text-left">
                 <th className="py-2 font-semibold">Fecha</th>
                 <th className="py-2 font-semibold">Proveedor</th>
-                <th className="py-2 font-semibold">Descripción</th>
-                <th className="py-2 font-semibold">Categoría</th>
+                <th className="py-2 font-semibold">Descripci\u00f3n</th>
+                <th className="py-2 font-semibold">Categor\u00eda</th>
                 <th className="py-2 font-semibold">Responsable</th>
                 <th className="py-2 font-semibold">Empresa</th>
                 <th className="py-2 text-right font-semibold">Subtotal</th>
@@ -185,14 +397,16 @@ export default function CajaDetailPage() {
 
           {/* Category summary */}
           <div className="mb-6">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Resumen por Categoría</p>
+            <p className="text-xs font-semibold text-gray-500 mb-2">Resumen por Categor\u00eda</p>
             <table className="w-full text-xs">
-              {Object.entries(catSummary).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
-                <tr key={cat} className="border-b border-gray-100">
-                  <td className="py-1">{cat}</td>
-                  <td className="py-1 text-right font-semibold">{fmt(total)}</td>
-                </tr>
-              ))}
+              <tbody>
+                {Object.entries(catSummary).sort((a, b) => b[1] - a[1]).map(([cat, total]) => (
+                  <tr key={cat} className="border-b border-gray-100">
+                    <td className="py-1">{cat}</td>
+                    <td className="py-1 text-right font-semibold">{fmt(total)}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
 
@@ -213,7 +427,7 @@ export default function CajaDetailPage() {
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">
-          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">← Volver</button>
+          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">\u2190 Volver</button>
           <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium">Imprimir</button>
         </div>
       </div>
@@ -231,7 +445,7 @@ export default function CajaDetailPage() {
           </div>
 
           <div className="text-right text-xs text-gray-400 mb-4">
-            N° {printGasto.id.substring(0, 8).toUpperCase()}
+            N\u00b0 {printGasto.id.substring(0, 8).toUpperCase()}
           </div>
 
           <div className="space-y-2 text-sm mb-6">
@@ -244,20 +458,20 @@ export default function CajaDetailPage() {
               <span className="font-medium">{printGasto.proveedor || printGasto.empresa}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
-              <span className="text-gray-500">Descripción</span>
+              <span className="text-gray-500">Descripci\u00f3n</span>
               <span className="font-medium">{printGasto.descripcion}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
-              <span className="text-gray-500">Categoría</span>
-              <span className="font-medium">{printGasto.categoria || "—"}</span>
+              <span className="text-gray-500">Categor\u00eda</span>
+              <span className="font-medium">{printGasto.categoria || "\u2014"}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
               <span className="text-gray-500">Responsable</span>
-              <span className="font-medium">{printGasto.responsable || "—"}</span>
+              <span className="font-medium">{printGasto.responsable || "\u2014"}</span>
             </div>
             <div className="flex justify-between border-b border-gray-100 pb-1">
               <span className="text-gray-500">Empresa</span>
-              <span className="font-medium">{printGasto.empresa || "—"}</span>
+              <span className="font-medium">{printGasto.empresa || "\u2014"}</span>
             </div>
           </div>
 
@@ -287,14 +501,14 @@ export default function CajaDetailPage() {
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">
-          <button onClick={() => { setPrintView("none"); setPrintGasto(null); }} className="text-sm text-gray-400 hover:text-brandit-black">← Volver</button>
+          <button onClick={() => { setPrintView("none"); setPrintGasto(null); }} className="text-sm text-gray-400 hover:text-brandit-black">\u2190 Volver</button>
           <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium">Imprimir</button>
         </div>
       </div>
     );
   }
 
-  // ══════════ PRINT: VALE DE ENTREGA ══════════
+  // ══════════ PRINT: VALE DE ENTREGA (standalone) ══════════
   if (printView === "vale") {
     return (
       <div className="max-w-md mx-auto px-4 py-8">
@@ -325,13 +539,13 @@ export default function CajaDetailPage() {
 
           <div className="mt-12 text-center">
             <div className="border-t border-gray-400 w-48 mx-auto mb-1"></div>
-            <p className="text-xs text-gray-500">Recibí conforme</p>
+            <p className="text-xs text-gray-500">Recib\u00ed conforme</p>
             <p className="text-[10px] text-gray-400 mt-1">Fecha: _______________</p>
           </div>
         </div>
 
         <div className="flex gap-3 mt-4 print:hidden">
-          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">← Volver</button>
+          <button onClick={() => setPrintView("none")} className="text-sm text-gray-400 hover:text-brandit-black">\u2190 Volver</button>
           <button onClick={() => window.print()} className="bg-brandit-orange text-white rounded-xl px-6 py-2 text-sm font-medium">Imprimir</button>
         </div>
       </div>
@@ -343,7 +557,7 @@ export default function CajaDetailPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       {/* Breadcrumb */}
       <div className="mb-6">
-        <Link href="/caja" className="text-sm text-gray-400 hover:text-brandit-black transition-colors">← Caja</Link>
+        <Link href="/caja" className="text-sm text-gray-400 hover:text-brandit-black transition-colors">\u2190 Caja</Link>
       </div>
 
       {/* Header */}
@@ -357,9 +571,9 @@ export default function CajaDetailPage() {
               {periodo.estado === "abierto" ? "Abierto" : "Cerrado"}
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Período N°{periodo.numero}</h1>
+          <h1 className="text-3xl font-bold text-brandit-black tracking-tight">Per\u00edodo N\u00b0{periodo.numero}</h1>
           <p className="text-sm text-gray-400 mt-1">
-            {periodo.fecha_apertura}{periodo.fecha_cierre ? ` → ${periodo.fecha_cierre}` : ""}
+            {periodo.fecha_apertura}{periodo.fecha_cierre ? ` \u2192 ${periodo.fecha_cierre}` : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -374,7 +588,7 @@ export default function CajaDetailPage() {
           {periodo.estado === "abierto" && isAdmin && (
             <button onClick={cerrarPeriodo}
               className="border border-gray-200 text-gray-600 rounded-xl px-4 py-2 text-sm hover:border-brandit-orange hover:text-brandit-orange transition-colors">
-              Cerrar Período
+              Cerrar Per\u00edodo
             </button>
           )}
           {periodo.estado === "cerrado" && isAdmin && (
@@ -433,14 +647,14 @@ export default function CajaDetailPage() {
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Categoría</label>
+              <label className="text-xs text-gray-400 block mb-1">Categor\u00eda</label>
               <input value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
                 placeholder="Ej: Limpieza, Oficina..."
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
             </div>
             {/* Row 2 */}
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Descripción</label>
+              <label className="text-xs text-gray-400 block mb-1">Descripci\u00f3n</label>
               <input value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required
                 placeholder="Detalle del gasto"
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
@@ -501,13 +715,14 @@ export default function CajaDetailPage() {
                 <tr className="border-b border-gray-100 text-left">
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500">Fecha</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500">Proveedor</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Descripción</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Categoría</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Descripci\u00f3n</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Categor\u00eda</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500">Responsable</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500">Empresa</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 text-right">Subtotal</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 text-right">ITBMS</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 text-right">Total</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500">Estado</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -515,14 +730,25 @@ export default function CajaDetailPage() {
                 {periodo.gastos.map((g) => (
                   <tr key={g.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{g.fecha}</td>
-                    <td className="px-4 py-3 text-gray-900">{g.proveedor || "—"}</td>
+                    <td className="px-4 py-3 text-gray-900">{g.proveedor || "\u2014"}</td>
                     <td className="px-4 py-3 text-gray-600">{g.descripcion}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.categoria || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.responsable || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{g.empresa || "—"}</td>
+                    <td className="px-4 py-3 text-gray-600">{g.categoria || "\u2014"}</td>
+                    <td className="px-4 py-3 text-gray-600">{g.responsable || "\u2014"}</td>
+                    <td className="px-4 py-3 text-gray-600">{g.empresa || "\u2014"}</td>
                     <td className="px-4 py-3 text-right text-gray-600">{fmt(g.subtotal)}</td>
                     <td className="px-4 py-3 text-right text-gray-600">{fmt(g.itbms)}</td>
                     <td className="px-4 py-3 text-right font-semibold">{fmt(g.total)}</td>
+                    <td className="px-4 py-3">
+                      {g.estado === "pendiente" ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                          Pendiente vuelto
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-600">
+                          Completado
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button onClick={() => { setPrintGasto(g); setPrintView("recibo"); }}
                         className="text-xs text-gray-400 hover:text-brandit-orange mr-2">Recibo</button>
@@ -545,7 +771,7 @@ export default function CajaDetailPage() {
                   <td className="px-4 py-3 text-right font-bold text-brandit-black">
                     {fmt(periodo.total_gastado)}
                   </td>
-                  <td></td>
+                  <td colSpan={2}></td>
                 </tr>
               </tfoot>
             </table>
@@ -556,7 +782,7 @@ export default function CajaDetailPage() {
       {/* Category summary */}
       {Object.keys(catSummary).length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Resumen por Categoría</p>
+          <p className="text-xs uppercase tracking-widest text-gray-400 mb-4">Resumen por Categor\u00eda</p>
           <div className="space-y-2">
             {Object.entries(catSummary).sort((a, b) => b[1] - a[1]).map(([cat, total]) => {
               const catPct = periodo.total_gastado > 0 ? (total / periodo.total_gastado) * 100 : 0;
@@ -575,7 +801,7 @@ export default function CajaDetailPage() {
         </div>
       )}
 
-      {/* Vale Modal */}
+      {/* Vale Modal (standalone) */}
       {showValeModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowValeModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>

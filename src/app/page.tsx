@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -15,22 +16,10 @@ import {
   arrayMove,
   SortableContext,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
-
-type LeadsPorMes = { mes: string; count: number };
-type ConversionVendedora = { vendedora: string; porcentaje: number; total: number };
+import Avatar from "@/components/Avatar";
 
 type DashboardData = {
   leads: {
@@ -49,21 +38,38 @@ type DashboardData = {
     guias_mes: number;
     gastos_caja_mes: number;
   };
-  leadsPorMes: LeadsPorMes[];
-  conversionPorVendedora: ConversionVendedora[];
 };
 
-type ModuleId = "leads" | "cxc" | "operaciones" | "leadsPorMes" | "conversionPorVendedora";
+type ModuleId = "cxc" | "guias" | "caja" | "leads" | "cotizaciones" | "usuarios";
 
-const DEFAULT_ORDER: ModuleId[] = ["leads", "cxc", "operaciones", "leadsPorMes", "conversionPorVendedora"];
-const STORAGE_KEY = "brandit_module_order";
+type ModuleConfig = {
+  id: ModuleId;
+  icon: string;
+  label: string;
+  description: string;
+  href: string;
+  color: string;
+  bgColor: string;
+  adminOnly?: boolean;
+};
+
+const MODULES: ModuleConfig[] = [
+  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Cuentas por cobrar", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50" },
+  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Transporte y despacho", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50" },
+  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Control de gastos", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50" },
+  { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Clientes potenciales", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50" },
+  { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50" },
+  { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Permisos y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", adminOnly: true },
+];
+
+const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "caja", "leads", "cotizaciones", "usuarios"];
+const STORAGE_KEY = "brandit_home_module_order";
 
 function getStoredOrder(): ModuleId[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_ORDER;
     const parsed = JSON.parse(raw) as ModuleId[];
-    // Validate all modules present
     if (DEFAULT_ORDER.every((m) => parsed.includes(m)) && parsed.length === DEFAULT_ORDER.length) {
       return parsed;
     }
@@ -71,85 +77,61 @@ function getStoredOrder(): ModuleId[] {
   return DEFAULT_ORDER;
 }
 
-function KpiCard({ label, value, sub, danger }: { label: string; value: string; sub?: string; danger?: boolean }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5">
-      <p className="text-xs font-medium text-gray-400 mb-1">{label}</p>
-      <p className={`text-3xl font-extrabold tracking-tight ${danger ? "text-red-600" : "text-brandit-black"}`}>
-        {value}
-      </p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm animate-pulse">
-      <div className="h-3 w-24 bg-gray-100 rounded mb-3" />
-      <div className="h-8 w-20 bg-gray-100 rounded" />
-    </div>
-  );
-}
-
-const MODULE_ICONS: Record<ModuleId, string> = {
-  leads: "👥",
-  cxc: "💰",
-  operaciones: "📦",
-  leadsPorMes: "📊",
-  conversionPorVendedora: "📈",
-};
-
-const MODULE_LABELS: Record<ModuleId, string> = {
-  leads: "Leads",
-  cxc: "Cuentas por Cobrar",
-  operaciones: "Operaciones",
-  leadsPorMes: "Leads por mes",
-  conversionPorVendedora: "Conversión por vendedora",
-};
-
-function SortableModule({
-  id,
-  children,
+function SortableCard({
+  mod,
   activeId,
 }: {
-  id: ModuleId;
-  children: React.ReactNode;
+  mod: ModuleConfig;
   activeId: ModuleId | null;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: mod.id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`relative group ${isDragging ? "opacity-50" : ""} ${activeId && !isDragging ? "border-2 border-dashed border-gray-200 rounded-2xl" : ""}`}
-    >
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute top-2 right-2 z-10 cursor-grab active:cursor-grabbing p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-opacity"
-        title="Arrastrar para reordenar"
+    <div ref={setNodeRef} style={style} className={isDragging ? "opacity-40 z-10" : ""}>
+      <Link
+        href={mod.href}
+        className={`group relative block bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm
+          transition-all duration-200 hover:shadow-xl hover:-translate-y-1 hover:border-gray-200
+          ${activeId && !isDragging ? "border-dashed border-gray-300" : ""}`}
       >
-        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
-        </svg>
-      </div>
-      {children}
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.preventDefault()}
+          className="absolute top-3 right-3 z-10 cursor-grab active:cursor-grabbing p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-gray-800 transition-opacity"
+          title="Arrastrar para reordenar"
+        >
+          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
+          </svg>
+        </div>
+
+        {/* Icon */}
+        <div className={`w-14 h-14 ${mod.bgColor} rounded-2xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform`}>
+          {mod.icon}
+        </div>
+
+        {/* Text */}
+        <h3 className="text-lg font-bold text-brandit-black dark:text-white tracking-tight">{mod.label}</h3>
+        <p className="text-sm text-gray-400 mt-1">{mod.description}</p>
+      </Link>
     </div>
   );
 }
 
-function DragOverlayContent({ id }: { id: ModuleId }) {
+function DragOverlayCard({ mod }: { mod: ModuleConfig }) {
   return (
-    <div className="bg-white rounded-2xl border-2 border-brandit-orange shadow-xl p-5 opacity-90">
-      <p className="text-sm font-bold text-brandit-black">
-        {MODULE_ICONS[id]} {MODULE_LABELS[id]}
-      </p>
+    <div className="bg-white rounded-2xl border-2 border-brandit-orange shadow-2xl p-6 opacity-95 w-full">
+      <div className={`w-14 h-14 ${mod.bgColor} rounded-2xl flex items-center justify-center text-2xl mb-4`}>
+        {mod.icon}
+      </div>
+      <h3 className="text-lg font-bold text-brandit-black">{mod.label}</h3>
+      <p className="text-sm text-gray-400 mt-1">{mod.description}</p>
     </div>
   );
 }
@@ -157,6 +139,8 @@ function DragOverlayContent({ id }: { id: ModuleId }) {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [nombre, setNombre] = useState("");
+  const [role, setRole] = useState("");
+  const [dark, setDark] = useState(false);
   const [moduleOrder, setModuleOrder] = useState<ModuleId[]>(DEFAULT_ORDER);
   const [activeId, setActiveId] = useState<ModuleId | null>(null);
 
@@ -166,7 +150,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setNombre(localStorage.getItem("brandit_nombre") || "");
+    setRole(localStorage.getItem("brandit_role") || "");
     setModuleOrder(getStoredOrder());
+    setDark(document.documentElement.classList.contains("dark"));
     fetch("/api/dashboard")
       .then((r) => r.json())
       .then(setData)
@@ -190,158 +176,115 @@ export default function DashboardPage() {
     });
   };
 
+  const toggleDark = () => {
+    const next = !dark;
+    setDark(next);
+    if (next) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("brandit_dark_mode", "1");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.removeItem("brandit_dark_mode");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("brandit_role");
+    localStorage.removeItem("brandit_email");
+    localStorage.removeItem("brandit_nombre");
+    localStorage.removeItem("brandit_empresa");
+    document.cookie = "brandit_session=; path=/; max-age=0";
+    window.location.href = "/login";
+  };
+
   const now = new Date();
-  const greeting = now.getHours() < 12 ? "Buenos días" : now.getHours() < 18 ? "Buenas tardes" : "Buenas noches";
+  const greeting = now.getHours() < 12 ? "Buenos d\u00edas" : now.getHours() < 18 ? "Buenas tardes" : "Buenas noches";
   const dateStr = now.toLocaleDateString("es-PA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
-  const fmtDate = (iso: string | null) => {
-    if (!iso) return "-";
-    const d = new Date(iso);
-    return d.toLocaleDateString("es-PA", { day: "2-digit", month: "short", year: "numeric" });
-  };
+  const isAdmin = role === "admin";
 
-  const renderModule = (id: ModuleId) => {
-    if (!data) return null;
+  // Filter modules by role
+  const visibleModules = MODULES.filter((m) => !m.adminOnly || isAdmin);
+  const orderedModules = moduleOrder
+    .map((id) => visibleModules.find((m) => m.id === id))
+    .filter((m): m is ModuleConfig => !!m);
 
-    switch (id) {
-      case "leads":
-        return (
-          <div className="mb-8">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Leads</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="Total leads" value={String(data.leads.total)} />
-              <KpiCard label="Prospectos activos" value={String(data.leads.prospectos_activos)} />
-              <KpiCard label="Convertidos este mes" value={String(data.leads.convertidos_mes)} />
-              <KpiCard
-                label="Seguimientos vencidos"
-                value={String(data.leads.seguimientos_vencidos)}
-                danger={data.leads.seguimientos_vencidos > 0}
-              />
-            </div>
-          </div>
-        );
-      case "cxc":
-        return (
-          <div className="mb-8">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Cuentas por Cobrar</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="Clientes en CxC" value={String(data.cxc.total_clientes)} />
-              <KpiCard
-                label="Deuda 90+ días"
-                value={`$${fmt(data.cxc.deuda_90_plus)}`}
-                danger={data.cxc.deuda_90_plus > 0}
-              />
-              <KpiCard label="Deuda 0-30 días" value={`$${fmt(data.cxc.deuda_0_30)}`} />
-              <KpiCard label="Último upload" value={fmtDate(data.cxc.ultimo_upload)} />
-            </div>
-          </div>
-        );
-      case "operaciones":
-        return (
-          <div className="mb-8">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Operaciones</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="Guías este mes" value={String(data.operaciones.guias_mes)} />
-              <KpiCard label="Gastos caja menuda" value={`$${fmt(data.operaciones.gastos_caja_mes)}`} />
-            </div>
-          </div>
-        );
-      case "leadsPorMes":
-        return (
-          <div className="mb-8">
-            <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm">
-              <p className="text-sm font-bold text-brandit-black mb-4">Leads por mes</p>
-              {data.leadsPorMes.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={data.leadsPorMes}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="count" name="Leads" fill="#F15A29" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-center text-gray-300 text-sm py-12">Sin datos</p>
-              )}
-            </div>
-          </div>
-        );
-      case "conversionPorVendedora":
-        return (
-          <div className="mb-8">
-            <div className="bg-white rounded-2xl border border-gray-50 p-5 shadow-sm">
-              <p className="text-sm font-bold text-brandit-black mb-4">Conversión por vendedora</p>
-              {data.conversionPorVendedora.length > 0 ? (
-                <ResponsiveContainer width="100%" height={Math.max(200, data.conversionPorVendedora.length * 50)}>
-                  <BarChart data={data.conversionPorVendedora} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12 }} unit="%" />
-                    <YAxis dataKey="vendedora" type="category" width={120} tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(value) => [`${value}%`, "Conversión"]} />
-                    <Bar dataKey="porcentaje" name="Conversión" radius={[0, 4, 4, 0]}>
-                      {data.conversionPorVendedora.map((entry, index) => (
-                        <Cell key={index} fill={entry.porcentaje > 50 ? "#22c55e" : "#F15A29"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-center text-gray-300 text-sm py-12">Sin datos</p>
-              )}
-            </div>
-          </div>
-        );
-    }
-  };
+  const activeModule = activeId ? MODULES.find((m) => m.id === activeId) : null;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-extrabold text-brandit-black tracking-tight">
-          {greeting}, {nombre || "usuario"}
-        </h1>
-        <p className="text-sm text-gray-400 mt-1 capitalize">{dateStr}</p>
+      {/* Header — replaces navbar on home */}
+      <div className="flex items-center justify-between mb-10">
+        <div className="flex items-center gap-4">
+          <img src="/brandit-logo.svg" alt="Brand It" className="h-10 w-10 object-contain rounded" />
+          <div>
+            <h1 className="text-2xl font-extrabold text-brandit-black dark:text-white tracking-tight">
+              {greeting}, {nombre || "usuario"}
+            </h1>
+            <p className="text-sm text-gray-400 mt-0.5 capitalize">{dateStr}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleDark}
+            className="p-2 rounded-xl text-gray-400 hover:text-brandit-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Toggle dark mode"
+          >
+            {dark ? "\u2600\uFE0F" : "\uD83C\uDF19"}
+          </button>
+          {nombre && <Avatar nombre={nombre} size="sm" />}
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-brandit-orange transition-colors"
+          >
+            Salir
+          </button>
+        </div>
       </div>
 
-      {!data ? (
-        <>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Leads</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Cuentas por Cobrar</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-            {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Operaciones</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-        </>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={moduleOrder} strategy={verticalListSortingStrategy}>
-            {moduleOrder.map((id) => (
-              <SortableModule key={id} id={id} activeId={activeId}>
-                {renderModule(id)}
-              </SortableModule>
+      {/* KPI row */}
+      <div className="grid grid-cols-3 gap-4 mb-10">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
+          <p className="text-xs font-medium text-gray-400 mb-1">Total Leads</p>
+          <p className="text-3xl font-extrabold tracking-tight text-brandit-black dark:text-white">
+            {data ? String(data.leads.total) : "-"}
+          </p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
+          <p className="text-xs font-medium text-gray-400 mb-1">CxC 90+ d\u00edas</p>
+          <p className={`text-3xl font-extrabold tracking-tight ${data && data.cxc.deuda_90_plus > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
+            {data ? `$${fmt(data.cxc.deuda_90_plus)}` : "-"}
+          </p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
+          <p className="text-xs font-medium text-gray-400 mb-1">Seguimientos vencidos</p>
+          <p className={`text-3xl font-extrabold tracking-tight ${data && data.leads.seguimientos_vencidos > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
+            {data ? String(data.leads.seguimientos_vencidos) : "-"}
+          </p>
+        </div>
+      </div>
+
+      {/* Module cards grid */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={orderedModules.map((m) => m.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {orderedModules.map((mod) => (
+              <SortableCard key={mod.id} mod={mod} activeId={activeId} />
             ))}
-          </SortableContext>
-          <DragOverlay>
-            {activeId ? <DragOverlayContent id={activeId} /> : null}
-          </DragOverlay>
-        </DndContext>
-      )}
+          </div>
+        </SortableContext>
+        <DragOverlay>
+          {activeModule ? <DragOverlayCard mod={activeModule} /> : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }

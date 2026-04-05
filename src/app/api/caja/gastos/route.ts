@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
         responsable: body.responsable || null,
         categoria: body.categoria || null,
         proveedor: body.proveedor || null,
+        estado: body.estado || "completado",
       },
     ])
     .select()
