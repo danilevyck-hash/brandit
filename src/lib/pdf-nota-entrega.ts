@@ -3,6 +3,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatDate } from "@/lib/format";
+import { LOGO_CB } from "@/lib/logo-cb";
 
 type NotaItem = {
   marca: string | null;
@@ -28,22 +29,27 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Header - Company info
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(35, 31, 32); // brandit-black
-  doc.text("CONFECCIONES BOSTON", 14, 20);
+  // Header - Company logo
+  try {
+    doc.addImage(LOGO_CB, "PNG", 14, 10, 35, 35);
+  } catch {
+    // Fallback to text if logo fails
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(35, 31, 32);
+    doc.text("CONFECCIONES", 14, 20);
+    doc.text("BOSTON", 14, 28);
+  }
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(120, 120, 120);
-  doc.text("RUC 655-544-133465 DV13", 14, 26);
+  doc.text("RUC 655-544-133465 DV13", 14, 48);
 
-  // Top right - Date and location
+  // Top right - Date and nota number
   doc.setFontSize(10);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Panama, ${formatDate(nota.fecha)}`, pageWidth - 14, 20, { align: "right" });
+  doc.text(`Panamá, ${formatDate(nota.fecha)}`, pageWidth - 14, 20, { align: "right" });
 
-  // Nota number
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(241, 90, 41); // brandit-orange
@@ -52,10 +58,10 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   // Line separator
   doc.setDrawColor(230, 230, 230);
   doc.setLineWidth(0.5);
-  doc.line(14, 35, pageWidth - 14, 35);
+  doc.line(14, 52, pageWidth - 14, 52);
 
   // Client info
-  let y = 44;
+  let y = 60;
   doc.setFontSize(11);
   doc.setTextColor(35, 31, 32);
   doc.setFont("helvetica", "bold");
