@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState } from "react";
 
 type Props = {
   onSave: (base64: string) => void;
@@ -9,102 +9,87 @@ type Props = {
 
 export default function SignatureCanvas({ onSave, onCancel }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const [hasDrawn, setHasDrawn] = useState(false);
-  const lastPoint = useRef<{ x: number; y: number } | null>(null);
-
-  const getPos = useCallback((e: MouseEvent | TouchEvent): { x: number; y: number } => {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    if ("touches" in e) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top) * scaleY,
-      };
-    }
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
-  }, []);
-
-  const startDraw = useCallback((e: MouseEvent | TouchEvent) => {
-    e.preventDefault();
-    setIsDrawing(true);
-    setHasDrawn(true);
-    lastPoint.current = getPos(e);
-  }, [getPos]);
-
-  const draw = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDrawing || !lastPoint.current) return;
-    e.preventDefault();
-
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext("2d")!;
-    const pos = getPos(e);
-
-    // Smooth bezier curve
-    const midX = (lastPoint.current.x + pos.x) / 2;
-    const midY = (lastPoint.current.y + pos.y) / 2;
-
-    ctx.beginPath();
-    ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
-    ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, midX, midY);
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    lastPoint.current = pos;
-  }, [isDrawing, getPos]);
-
-  const stopDraw = useCallback(() => {
-    setIsDrawing(false);
-    lastPoint.current = null;
-  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Set canvas size
+    // Set canvas size once
     canvas.width = canvas.offsetWidth * 2;
     canvas.height = canvas.offsetHeight * 2;
-
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Event listeners
-    const mouseDown = (e: MouseEvent) => startDraw(e);
-    const mouseMove = (e: MouseEvent) => draw(e);
-    const mouseUp = () => stopDraw();
-    const touchStart = (e: TouchEvent) => startDraw(e);
-    const touchMove = (e: TouchEvent) => draw(e);
-    const touchEnd = () => stopDraw();
+    function getPos(e: MouseEvent | TouchEvent): { x: number; y: number } {
+      const rect = canvas!.getBoundingClientRect();
+      const scaleX = canvas!.width / rect.width;
+      const scaleY = canvas!.height / rect.height;
+      if ("touches" in e) {
+        return {
+          x: (e.touches[0].clientX - rect.left) * scaleX,
+          y: (e.touches[0].clientY - rect.top) * scaleY,
+        };
+      }
+      return {
+        x: ((e as MouseEvent).clientX - rect.left) * scaleX,
+        y: ((e as MouseEvent).clientY - rect.top) * scaleY,
+      };
+    }
 
-    canvas.addEventListener("mousedown", mouseDown);
-    canvas.addEventListener("mousemove", mouseMove);
-    canvas.addEventListener("mouseup", mouseUp);
-    canvas.addEventListener("mouseleave", mouseUp);
-    canvas.addEventListener("touchstart", touchStart, { passive: false });
-    canvas.addEventListener("touchmove", touchMove, { passive: false });
-    canvas.addEventListener("touchend", touchEnd);
+    function startDraw(e: MouseEvent | TouchEvent) {
+      e.preventDefault();
+      isDrawingRef.current = true;
+      lastPointRef.current = getPos(e);
+      setHasDrawn(true);
+    }
+
+    function draw(e: MouseEvent | TouchEvent) {
+      if (!isDrawingRef.current || !lastPointRef.current) return;
+      e.preventDefault();
+      const ctx = canvas!.getContext("2d")!;
+      const pos = getPos(e);
+      const midX = (lastPointRef.current.x + pos.x) / 2;
+      const midY = (lastPointRef.current.y + pos.y) / 2;
+      ctx.beginPath();
+      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+      ctx.quadraticCurveTo(lastPointRef.current.x, lastPointRef.current.y, midX, midY);
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      lastPointRef.current = pos;
+    }
+
+    function stopDraw() {
+      isDrawingRef.current = false;
+      lastPointRef.current = null;
+    }
+
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mousemove", draw);
+    canvas.addEventListener("mouseup", stopDraw);
+    canvas.addEventListener("mouseleave", stopDraw);
+    canvas.addEventListener("touchstart", startDraw, { passive: false });
+    canvas.addEventListener("touchmove", draw, { passive: false });
+    canvas.addEventListener("touchend", stopDraw);
 
     return () => {
-      canvas.removeEventListener("mousedown", mouseDown);
-      canvas.removeEventListener("mousemove", mouseMove);
-      canvas.removeEventListener("mouseup", mouseUp);
-      canvas.removeEventListener("mouseleave", mouseUp);
-      canvas.removeEventListener("touchstart", touchStart);
-      canvas.removeEventListener("touchmove", touchMove);
-      canvas.removeEventListener("touchend", touchEnd);
+      canvas.removeEventListener("mousedown", startDraw);
+      canvas.removeEventListener("mousemove", draw);
+      canvas.removeEventListener("mouseup", stopDraw);
+      canvas.removeEventListener("mouseleave", stopDraw);
+      canvas.removeEventListener("touchstart", startDraw);
+      canvas.removeEventListener("touchmove", draw);
+      canvas.removeEventListener("touchend", stopDraw);
     };
-  }, [startDraw, draw, stopDraw]);
+  // Only run once on mount — no dependencies that change during drawing
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const clear = () => {
     const canvas = canvasRef.current;
