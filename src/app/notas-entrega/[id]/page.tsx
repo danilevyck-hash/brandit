@@ -213,14 +213,19 @@ export default function NotaDetallePage() {
     setApproving(true);
     try {
       // Save signature
-      await fetch("/api/notas-entrega/firma", {
+      const res = await fetch("/api/notas-entrega/firma", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre, firma_base64: base64 }),
       });
+      if (!res.ok) throw new Error("Error guardando firma");
 
-      // Then approve
-      await doApprove();
+      // If nota is still abierta, approve it
+      if (nota?.estado === "abierta") {
+        await doApprove();
+      } else {
+        toast("Firma actualizada");
+      }
     } catch {
       toast("Error al guardar firma", "error");
     }
@@ -357,6 +362,14 @@ export default function NotaDetallePage() {
               >
                 Imprimir PDF
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowSignature(true)}
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-400 hover:text-gray-600 transition-colors min-h-[44px]"
+                >
+                  Cambiar firma
+                </button>
+              )}
               {isAdmin && (
                 <button
                   onClick={() => setShowCerrarModal(true)}
