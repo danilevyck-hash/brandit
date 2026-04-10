@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 type GuiaItem = {
   id: string;
@@ -32,25 +33,36 @@ export default function GuiaDetailPage() {
   const [loading, setLoading] = useState(true);
   const [printMode, setPrintMode] = useState(false);
   const [role, setRole] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => { setRole(localStorage.getItem("brandit_role") || ""); }, []);
   const isAdmin = role === "admin";
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/guias/${params.id}`);
-    const data = await res.json();
-    if (data.error) { router.push("/guias"); return; }
-    setGuia(data);
+    try {
+      const res = await fetch(`/api/guias/${params.id}`);
+      if (!res.ok) { toast("Error al cargar la guía", "error"); setLoading(false); return; }
+      const data = await res.json();
+      if (data.error) { router.push("/guias"); return; }
+      setGuia(data);
+    } catch {
+      toast("Error de conexión al cargar la guía", "error");
+    }
     setLoading(false);
-  }, [params.id, router]);
+  }, [params.id, router, toast]);
 
   useEffect(() => { load(); }, [load]);
 
   const deleteGuia = async () => {
     if (!confirm("¿Eliminar esta guía y todos sus items?")) return;
-    await fetch(`/api/guias/${params.id}`, { method: "DELETE" });
-    router.push("/guias");
+    try {
+      const res = await fetch(`/api/guias/${params.id}`, { method: "DELETE" });
+      if (!res.ok) { toast("Error al eliminar la guía", "error"); return; }
+      router.push("/guias");
+    } catch {
+      toast("Error de conexión al eliminar", "error");
+    }
   };
 
   if (loading) return <div className="text-center py-24 text-gray-300">Cargando...</div>;

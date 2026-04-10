@@ -18,8 +18,9 @@ export default function ClientSelector({ selectedClientId, onSelect }: Props) {
 
   useEffect(() => {
     fetch("/api/clients")
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setClients(d); });
+      .then(r => { if (!r.ok) throw new Error("fetch failed"); return r.json(); })
+      .then(d => { if (Array.isArray(d)) setClients(d); })
+      .catch(() => { /* silently fail — selector will just be empty */ });
   }, []);
 
   async function createClient() {

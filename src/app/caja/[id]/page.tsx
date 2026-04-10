@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 type Gasto = {
   id: string;
@@ -44,6 +45,7 @@ export default function CajaDetailPage() {
   const [showValeModal, setShowValeModal] = useState(false);
   const [vale, setVale] = useState({ beneficiario: "", concepto: "", monto: "", fecha: new Date().toISOString().split("T")[0] });
 
+  const { toast } = useToast();
   const [showHelp, setShowHelp] = useState(false);
   const [showPostGasto, setShowPostGasto] = useState(false);
 
@@ -72,12 +74,17 @@ export default function CajaDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/caja/periodos/${params.id}`);
-    const data = await res.json();
-    if (data.error) { router.push("/caja"); return; }
-    setPeriodo(data);
+    try {
+      const res = await fetch(`/api/caja/periodos/${params.id}`);
+      if (!res.ok) { toast("Error al cargar el período", "error"); setLoading(false); return; }
+      const data = await res.json();
+      if (data.error) { router.push("/caja"); return; }
+      setPeriodo(data);
+    } catch {
+      toast("Error de conexión al cargar el período", "error");
+    }
     setLoading(false);
-  }, [params.id, router]);
+  }, [params.id, router, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -89,26 +96,32 @@ export default function CajaDetailPage() {
     const itbmsRate = Number(form.itbms) || 0;
     const total = subtotal + subtotal * (itbmsRate / 100);
 
-    const res = await fetch("/api/caja/gastos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, periodo_id: params.id }),
-    });
-    const newGasto = await res.json();
+    try {
+      const res = await fetch("/api/caja/gastos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, periodo_id: params.id }),
+      });
+      if (!res.ok) { toast("Error al agregar gasto", "error"); setSaving(false); return; }
+      const newGasto = await res.json();
 
-    // Prepare vale data in case user wants to print
-    setValeEntrega({
-      gastoId: newGasto.id || "",
-      beneficiario: form.proveedor || form.responsable || "",
-      concepto: form.descripcion,
-      montoGasto: total,
-      montoEntregado: String(total),
-    });
+      // Prepare vale data in case user wants to print
+      setValeEntrega({
+        gastoId: newGasto.id || "",
+        beneficiario: form.proveedor || form.responsable || "",
+        concepto: form.descripcion,
+        montoGasto: total,
+        montoEntregado: String(total),
+      });
 
-    setForm({ fecha: new Date().toISOString().split("T")[0], proveedor: "", categoria: "", descripcion: "", responsable: "", empresa: "", subtotal: "", itbms: "0" });
-    setSaving(false);
-    await load();
-    setShowPostGasto(true);
+      setForm({ fecha: new Date().toISOString().split("T")[0], proveedor: "", categoria: "", descripcion: "", responsable: "", empresa: "", subtotal: "", itbms: "0" });
+      setSaving(false);
+      await load();
+      setShowPostGasto(true);
+    } catch {
+      toast("Error de conexión al agregar gasto", "error");
+      setSaving(false);
+    }
   };
 
   const startValeFlow = async () => {
@@ -151,24 +164,39 @@ export default function CajaDetailPage() {
 
   const deleteGasto = async (id: string) => {
     if (!confirm("¿Eliminar este gasto?")) return;
-    await fetch(`/api/caja/gastos/${id}`, { method: "DELETE" });
-    load();
+    try {
+      const res = await fetch(`/api/caja/gastos/${id}`, { method: "DELETE" });
+      if (!res.ok) { toast("Error al eliminar gasto", "error"); return; }
+      load();
+    } catch {
+      toast("Error de conexión al eliminar gasto", "error");
+    }
   };
 
   const cerrarPeriodo = async () => {
     if (!confirm("¿Cerrar este período? No podrá agregar más gastos.")) return;
-    await fetch(`/api/caja/periodos/${params.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado: "cerrado" }),
-    });
-    load();
+    try {
+      const res = await fetch(`/api/caja/periodos/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "cerrado" }),
+      });
+      if (!res.ok) { toast("Error al cerrar período", "error"); return; }
+      load();
+    } catch {
+      toast("Error de conexión al cerrar período", "error");
+    }
   };
 
   const deletePeriodo = async () => {
     if (!confirm("¿Eliminar este período y todos sus gastos?")) return;
-    await fetch(`/api/caja/periodos/${params.id}`, { method: "DELETE" });
-    router.push("/caja");
+    try {
+      const res = await fetch(`/api/caja/periodos/${params.id}`, { method: "DELETE" });
+      if (!res.ok) { toast("Error al eliminar período", "error"); return; }
+      router.push("/caja");
+    } catch {
+      toast("Error de conexión al eliminar período", "error");
+    }
   };
 
   const fmt = (n: number) =>
