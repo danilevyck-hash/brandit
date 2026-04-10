@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const quotationId = request.nextUrl.searchParams.get("quotation_id");
   if (!quotationId) return NextResponse.json({ error: "quotation_id required" }, { status: 400 });

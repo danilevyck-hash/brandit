@@ -12,12 +12,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
   }
 
-  const { data, error } = await getSupabaseAF()
+  const { data: users, error } = await getSupabaseAF()
     .from("user_roles")
     .select("id, email, role, nombre, empresa")
     .eq("password", password)
     .eq("activo", true)
-    .single();
+    .limit(1);
+
+  const data = users?.[0] ?? null;
 
   if (error || !data) {
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
