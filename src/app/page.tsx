@@ -40,7 +40,7 @@ type DashboardData = {
   };
 };
 
-type ModuleId = "cxc" | "guias" | "caja" | "leads" | "cotizaciones" | "usuarios";
+type ModuleId = "cxc" | "guias" | "notas" | "caja" | "leads" | "cotizaciones" | "usuarios";
 
 type ModuleConfig = {
   id: ModuleId;
@@ -56,13 +56,14 @@ type ModuleConfig = {
 const MODULES: ModuleConfig[] = [
   { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50" },
   { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50" },
+  { id: "notas", icon: "\uD83D\uDCE6", label: "Notas de Entrega", description: "Crear y rastrear entregas a clientes", href: "/notas-entrega", color: "text-teal-600", bgColor: "bg-teal-50" },
   { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50" },
   { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Seguimiento de clientes nuevos", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50" },
   { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Crear y ver presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50" },
   { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Administrar personas y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", adminOnly: true },
 ];
 
-const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "caja", "leads", "cotizaciones", "usuarios"];
+const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "notas", "caja", "leads", "cotizaciones", "usuarios"];
 const STORAGE_KEY = "brandit_home_module_order";
 
 function getStoredOrder(): ModuleId[] {
@@ -70,9 +71,14 @@ function getStoredOrder(): ModuleId[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_ORDER;
     const parsed = JSON.parse(raw) as ModuleId[];
-    if (DEFAULT_ORDER.every((m) => parsed.includes(m)) && parsed.length === DEFAULT_ORDER.length) {
-      return parsed;
+    // Add any new modules not in saved order
+    const merged = [...parsed];
+    for (const m of DEFAULT_ORDER) {
+      if (!merged.includes(m)) merged.push(m);
     }
+    // Remove modules that no longer exist
+    const valid = merged.filter((m) => DEFAULT_ORDER.includes(m));
+    if (valid.length > 0) return valid;
   } catch { /* ignore */ }
   return DEFAULT_ORDER;
 }
