@@ -118,7 +118,7 @@ export default function SignatureCanvas({ onSave, onCancel }: Props) {
   const save = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const base64 = canvas.toDataURL("image/png");
+    const base64 = canvas.toDataURL("image/jpeg", 0.95);
     onSave(base64);
   };
 

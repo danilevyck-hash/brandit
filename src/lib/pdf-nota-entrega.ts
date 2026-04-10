@@ -148,9 +148,11 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
     // Draw signature if available
     if (firmaBase64) {
       try {
-        doc.addImage(firmaBase64, "PNG", rightX, y - 5, 50, 20);
+        const format = firmaBase64.includes("image/jpeg") ? "JPEG" : "PNG";
+        doc.addImage(firmaBase64, format, rightX, y - 5, 50, 20);
         y += 18;
-      } catch {
+      } catch (e) {
+        console.error("Error adding signature to PDF:", e);
         y += 2;
       }
     }
