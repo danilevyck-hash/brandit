@@ -10,19 +10,22 @@ type Props = {
 export default function SignatureCanvas({ onSave, onCancel }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
   const [hasDrawn, setHasDrawn] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Set canvas size once
     canvas.width = canvas.offsetWidth * 2;
     canvas.height = canvas.offsetHeight * 2;
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
     function getPos(e: MouseEvent | TouchEvent): { x: number; y: number } {
       const rect = canvas!.getBoundingClientRect();
@@ -43,31 +46,67 @@ export default function SignatureCanvas({ onSave, onCancel }: Props) {
     function startDraw(e: MouseEvent | TouchEvent) {
       e.preventDefault();
       isDrawingRef.current = true;
-      lastPointRef.current = getPos(e);
+      const pos = getPos(e);
+      pointsRef.current = [pos];
       setHasDrawn(true);
     }
 
     function draw(e: MouseEvent | TouchEvent) {
-      if (!isDrawingRef.current || !lastPointRef.current) return;
+      if (!isDrawingRef.current) return;
       e.preventDefault();
-      const ctx = canvas!.getContext("2d")!;
+
       const pos = getPos(e);
-      const midX = (lastPointRef.current.x + pos.x) / 2;
-      const midY = (lastPointRef.current.y + pos.y) / 2;
+      const points = pointsRef.current;
+      points.push(pos);
+
+      const ctx = canvas!.getContext("2d")!;
+
+      if (points.length < 3) {
+        // Just draw a dot for the first point
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
+      // Draw smooth continuous line using quadratic bezier through midpoints
+      // This produces a smooth, connected curve — not individual dots
       ctx.beginPath();
-      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-      ctx.quadraticCurveTo(lastPointRef.current.x, lastPointRef.current.y, midX, midY);
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+
+      const p0 = points[points.length - 3];
+      const p1 = points[points.length - 2];
+      const p2 = points[points.length - 1];
+
+      // Move to midpoint between p0 and p1
+      const mid1x = (p0.x + p1.x) / 2;
+      const mid1y = (p0.y + p1.y) / 2;
+      // Draw curve from mid(p0,p1) through p1 to mid(p1,p2)
+      const mid2x = (p1.x + p2.x) / 2;
+      const mid2y = (p1.y + p2.y) / 2;
+
+      ctx.moveTo(mid1x, mid1y);
+      ctx.quadraticCurveTo(p1.x, p1.y, mid2x, mid2y);
       ctx.stroke();
-      lastPointRef.current = pos;
     }
 
     function stopDraw() {
+      if (!isDrawingRef.current) return;
       isDrawingRef.current = false;
-      lastPointRef.current = null;
+
+      // Draw final segment to last point
+      const points = pointsRef.current;
+      if (points.length >= 2) {
+        const ctx = canvas!.getContext("2d")!;
+        const p1 = points[points.length - 2];
+        const p2 = points[points.length - 1];
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        ctx.beginPath();
+        ctx.moveTo(midX, midY);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      pointsRef.current = [];
     }
 
     canvas.addEventListener("mousedown", startDraw);
@@ -87,7 +126,6 @@ export default function SignatureCanvas({ onSave, onCancel }: Props) {
       canvas.removeEventListener("touchmove", draw);
       canvas.removeEventListener("touchend", stopDraw);
     };
-  // Only run once on mount — no dependencies that change during drawing
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
