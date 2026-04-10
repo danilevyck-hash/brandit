@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     .eq("nombre", nombre)
     .single();
 
-  if (error) return NextResponse.json({ firma: null });
+  if (error) return NextResponse.json({ firma_base64: null });
 
   return NextResponse.json(data);
 }

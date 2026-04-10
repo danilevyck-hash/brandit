@@ -234,8 +234,20 @@ export default function NotaDetallePage() {
     if (nota.aprobado_por) {
       try {
         const res = await fetch(`/api/notas-entrega/firma?nombre=${encodeURIComponent(nota.aprobado_por)}`);
-        const data = await res.json();
-        firmaBase64 = data.firma_base64 || null;
+        if (res.ok) {
+          const data = await res.json();
+          firmaBase64 = data.firma_base64 || null;
+        }
+      } catch { /* ignore */ }
+    }
+    // Also try fetching by current user name as fallback
+    if (!firmaBase64 && nombre) {
+      try {
+        const res = await fetch(`/api/notas-entrega/firma?nombre=${encodeURIComponent(nombre)}`);
+        if (res.ok) {
+          const data = await res.json();
+          firmaBase64 = data.firma_base64 || null;
+        }
       } catch { /* ignore */ }
     }
     generateNotaPDF(nota, firmaBase64);
