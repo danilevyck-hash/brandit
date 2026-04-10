@@ -12,6 +12,7 @@ const ALL_LINKS: NavLink[] = [
   { href: "/cotizaciones", label: "Cotizaciones", match: (p) => p === "/cotizaciones" || p.startsWith("/cotizacion") },
   { href: "/caja", label: "Caja", match: (p) => p.startsWith("/caja") },
   { href: "/guias", label: "Guías", match: (p) => p.startsWith("/guias") },
+  { href: "/notas-entrega", label: "Notas", match: (p) => p.startsWith("/notas-entrega") },
   { href: "/cxc", label: "CxC", match: (p) => p.startsWith("/cxc") },
   { href: "/leads", label: "Leads", match: (p) => p.startsWith("/leads") },
   { href: "/admin/usuarios", label: "Usuarios", match: (p) => p === "/admin/usuarios" },
@@ -19,8 +20,8 @@ const ALL_LINKS: NavLink[] = [
 ];
 
 const ROLE_LINKS: Record<string, string[]> = {
-  admin: ["/", "/cotizaciones", "/caja", "/guias", "/cxc", "/leads", "/admin/usuarios", "/admin/log"],
-  secretaria: ["/", "/caja", "/guias", "/cxc", "/leads"],
+  admin: ["/", "/cotizaciones", "/caja", "/guias", "/notas-entrega", "/cxc", "/leads", "/admin/usuarios", "/admin/log"],
+  secretaria: ["/", "/caja", "/guias", "/notas-entrega", "/cxc", "/leads"],
   vendedora: ["/leads"],
 };
 
