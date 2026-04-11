@@ -40,6 +40,20 @@ Sistema interno de cotizaciones de producción para el negocio de confección de
 - Toasts para feedback (éxito/error)
 - Loading spinners animados
 
+## Changes — April 2026 Session
+
+### New Module: Notas de Entrega
+- Create, approve with digital signature, PDF with logo, close with scan
+- Signature canvas with smooth bezier curves, saved as JPEG
+- Confecciones Boston logo embedded in PDF
+
+### Auth
+- `.single()` fixed to `.limit(1)` for shared passwords (multiple users same password)
+
+### API & Reliability
+- All API routes have `export const dynamic = 'force-dynamic'`
+- All fetch calls have error handling (try/catch with user-friendly messages)
+
 ## Deploy
 ```bash
 git push origin main   # Auto-deploy via Vercel
