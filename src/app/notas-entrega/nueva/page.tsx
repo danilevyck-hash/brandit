@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+export const dynamic = "force-dynamic";
+
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
@@ -17,6 +19,14 @@ const EMPTY_ITEM: Item = { marca: "", descripcion: "", color: "", talla: "", can
 const LS_KEY = "brandit_ne_draft";
 
 export default function NuevaNotaPage() {
+  return (
+    <Suspense fallback={<div className="max-w-5xl mx-auto px-4 py-8 text-gray-300">Cargando...</div>}>
+      <NuevaNotaInner />
+    </Suspense>
+  );
+}
+
+function NuevaNotaInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
