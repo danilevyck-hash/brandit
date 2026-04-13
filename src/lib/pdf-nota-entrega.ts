@@ -53,7 +53,7 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(241, 90, 41); // brandit-orange
-  doc.text(`Nota de Entrega: ${nota.numero}`, pageWidth - 14, 30, { align: "right" });
+  doc.text(nota.numero, pageWidth - 14, 30, { align: "right" });
 
   // Line separator
   doc.setDrawColor(230, 230, 230);
