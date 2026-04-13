@@ -103,12 +103,16 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   // ─────────── RIGHT-SIDE DOCUMENT BLOCK ───────────
   const rightX = pageWidth - margin;
 
-  // "NOTA DE ENTREGA" — tiny uppercase with wide letter-spacing
+  // "NOTA DE ENTREGA" — tiny uppercase with wide letter-spacing.
+  // Positioned manually because jsPDF right-align doesn't count charSpace,
+  // which was cutting off the final "A".
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...SOFT);
   doc.setCharSpace(LETTER_SPACE);
-  doc.text("NOTA DE ENTREGA", rightX, logoY + 4, { align: "right" });
+  const labelText = "NOTA DE ENTREGA";
+  const labelWidth = doc.getTextWidth(labelText) + (labelText.length - 1) * LETTER_SPACE;
+  doc.text(labelText, rightX - labelWidth, logoY + 4);
   doc.setCharSpace(0);
 
   // Number — large Times Roman
@@ -142,17 +146,8 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   doc.setLineWidth(0.3);
   doc.line(margin, headerBottom, pageWidth - margin, headerBottom);
 
-  // ─────────── INTRO (refined serif italic) ───────────
-  const introText = tipo === "muestras" ? INTRO_MUESTRAS : INTRO_PEDIDO;
-  doc.setFont("times", "italic");
-  doc.setFontSize(10);
-  doc.setTextColor(...MUTED);
-  const introLines = doc.splitTextToSize(introText, pageWidth - margin * 2);
-  doc.text(introLines, margin, headerBottom + 7);
-  const introHeight = introLines.length * 5;
-
   // ─────────── CLIENT BLOCK ───────────
-  let y = headerBottom + 7 + introHeight + 9;
+  let y = headerBottom + 9;
 
   // Section label with letter-spacing
   doc.setFont("helvetica", "bold");
@@ -171,7 +166,7 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
 
   const colMidX = pageWidth / 2 + 4;
 
-  const drawField = (label: string, value: string, x: number, yPos: number) => {
+  const drawField = (label: string, value: string, x: number, yPos: number, large = false) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...SOFT);
@@ -179,17 +174,18 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
     doc.text(label.toUpperCase(), x, yPos);
     doc.setCharSpace(0);
     doc.setFont("times", "normal");
-    doc.setFontSize(11);
+    doc.setFontSize(large ? 14 : 11);
     doc.setTextColor(...INK);
-    doc.text(value || "—", x, yPos + 5);
+    doc.text(value || "—", x, yPos + (large ? 6 : 5));
   };
 
-  drawField("Cliente", nota.cliente, margin, y);
+  // Row 1: Cliente (large) + Atención
+  drawField("Cliente", nota.cliente, margin, y, true);
   drawField("Atención", nota.contacto || "—", colMidX, y);
-  y += 12;
+  y += 13;
 
+  // Row 2: Número (no duplicate Fecha — already in header)
   drawField("Número", formatPhone(nota.numero_contacto), margin, y);
-  drawField("Fecha", formatDate(nota.fecha), colMidX, y);
   y += 12;
 
   if (nota.atencion) {
@@ -207,8 +203,16 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
     y += 5 + noteLines.length * 4.5 + 4;
   }
 
-  // ─────────── ITEMS TABLE ───────────
+  // ─────────── INTRO (between cliente and detalle) ───────────
   y += 3;
+  const introText = tipo === "muestras" ? INTRO_MUESTRAS : INTRO_PEDIDO;
+  doc.setFont("times", "italic");
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED);
+  const introLines = doc.splitTextToSize(introText, pageWidth - margin * 2);
+  doc.text(introLines, margin, y);
+  const introHeight = introLines.length * 5;
+  y += introHeight + 5;
 
   // Section label above table
   doc.setFont("helvetica", "bold");
@@ -345,17 +349,17 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   // Bodega & Cliente fillable lines (thin hairlines, serif labels)
   const fillFields = (x: number) => {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
+    doc.setFontSize(7.5);
     doc.setTextColor(...SOFT);
     doc.setCharSpace(LETTER_SPACE);
     doc.setDrawColor(...HAIRLINE);
     doc.setLineWidth(0.15);
 
     const labels = ["NOMBRE", "CÉDULA", "FECHA"];
-    const ys = [lineY + 5, lineY + 10, lineY + 15];
+    const ys = [lineY + 6, lineY + 11.5, lineY + 17];
     for (let i = 0; i < labels.length; i++) {
       doc.text(labels[i], x, ys[i]);
-      doc.line(x + 14, ys[i], x + colWidth, ys[i]);
+      doc.line(x + 16, ys[i], x + colWidth, ys[i]);
     }
     doc.setCharSpace(0);
   };
