@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
 type Item = {
@@ -18,8 +18,10 @@ const LS_KEY = "brandit_ne_draft";
 
 export default function NuevaNotaPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [tipo, setTipo] = useState<"muestras" | "pedido">("pedido");
+  const initialTipo = searchParams.get("tipo") === "muestras" ? "muestras" : "pedido";
+  const [tipo, setTipo] = useState<"muestras" | "pedido">(initialTipo);
   const [cliente, setCliente] = useState("");
   const [contacto, setContacto] = useState("");
   const [numeroContacto, setNumeroContacto] = useState("");

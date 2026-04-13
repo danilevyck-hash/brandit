@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams.get("search") || "";
   const estado = request.nextUrl.searchParams.get("estado") || "";
+  const tipo = request.nextUrl.searchParams.get("tipo") || "";
 
   let query = getSupabaseAF()
     .from("notas_entrega")
@@ -14,6 +15,10 @@ export async function GET(request: NextRequest) {
 
   if (estado && estado !== "todas") {
     query = query.eq("estado", estado);
+  }
+
+  if (tipo && tipo !== "todos") {
+    query = query.eq("tipo", tipo);
   }
 
   if (search) {
@@ -39,20 +44,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
-  // Get next numero
+  const tipoValue = body.tipo === "muestras" ? "muestras" : "pedido";
+  const prefix = tipoValue === "muestras" ? "NM" : "NE";
+
+  // Get next numero for this tipo (independent sequence)
   const { data: last } = await getSupabaseAF()
     .from("notas_entrega")
     .select("numero")
+    .eq("tipo", tipoValue)
     .order("id", { ascending: false })
     .limit(1);
 
   let nextNum = 1;
   if (last && last.length > 0) {
-    const match = last[0].numero.match(/NE-(\d+)/);
+    const match = last[0].numero.match(new RegExp(`${prefix}-(\\d+)`));
     if (match) nextNum = parseInt(match[1], 10) + 1;
   }
 
-  const numero = `NE-${String(nextNum).padStart(3, "0")}`;
+  const numero = `${prefix}-${String(nextNum).padStart(3, "0")}`;
 
   const { data: nota, error } = await getSupabaseAF()
     .from("notas_entrega")
@@ -64,7 +73,7 @@ export async function POST(request: NextRequest) {
         atencion: body.atencion || null,
         contacto: body.contacto || null,
         numero_contacto: body.numero_contacto || null,
-        tipo: body.tipo === "muestras" ? "muestras" : "pedido",
+        tipo: tipoValue,
         estado: "abierta",
         created_by: body.created_by || null,
       },

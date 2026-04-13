@@ -6,12 +6,18 @@ import Link from "next/link";
 type Nota = {
   id: number;
   numero: string;
+  tipo: "muestras" | "pedido" | null;
   fecha: string;
   cliente: string;
   estado: string;
   items_count: number;
   total_cantidad: number;
 };
+
+const TIPO_TABS = [
+  { key: "pedido", label: "Pedido" },
+  { key: "muestras", label: "Muestras" },
+];
 
 const TABS = [
   { key: "todas", label: "Todas" },
@@ -44,17 +50,29 @@ export default function NotasEntregaPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("todas");
+  const [tipoTab, setTipoTab] = useState<"pedido" | "muestras">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("brandit_ne_tipo_tab");
+      if (saved === "muestras" || saved === "pedido") return saved;
+    }
+    return "pedido";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("brandit_ne_tipo_tab", tipoTab);
+  }, [tipoTab]);
 
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (tab !== "todas") params.set("estado", tab);
+    params.set("tipo", tipoTab);
     const res = await fetch(`/api/notas-entrega?${params}`);
     const data = await res.json();
     setNotas(Array.isArray(data) ? data : []);
     setLoading(false);
-  }, [search, tab]);
+  }, [search, tab, tipoTab]);
 
   useEffect(() => {
     load();
@@ -70,7 +88,7 @@ export default function NotasEntregaPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, tab]);
+  }, [debouncedSearch, tab, tipoTab]);
 
   const kpiCounts = {
     total: notas.length,
@@ -89,11 +107,28 @@ export default function NotasEntregaPage() {
           <p className="text-sm text-gray-400 mt-1">Control de entregas a clientes</p>
         </div>
         <Link
-          href="/notas-entrega/nueva"
+          href={`/notas-entrega/nueva?tipo=${tipoTab}`}
           className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90 transition-colors min-h-[44px] flex items-center"
         >
-          + Nueva Nota
+          + Nueva {tipoTab === "muestras" ? "Muestra" : "Nota"}
         </Link>
+      </div>
+
+      {/* Tipo tabs */}
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1">
+        {TIPO_TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTipoTab(t.key as "pedido" | "muestras")}
+            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] ${
+              tipoTab === t.key
+                ? "bg-white text-brandit-black shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* KPI Cards */}
