@@ -31,7 +31,7 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
 
   // Header - Company logo
   try {
-    doc.addImage(LOGO_CB, "PNG", 14, 10, 35, 35);
+    doc.addImage(LOGO_CB, "PNG", 14, 10, 17.5, 35);
   } catch {
     // Fallback to text if logo fails
     doc.setFontSize(18);
