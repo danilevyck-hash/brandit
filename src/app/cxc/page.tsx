@@ -9,6 +9,14 @@ type CxcRow = {
   codigo: string;
   nombre: string;
   nombre_normalized: string;
+  correo: string | null;
+  telefono: string | null;
+  celular: string | null;
+  contacto: string | null;
+  pais: string | null;
+  provincia: string | null;
+  distrito: string | null;
+  corregimiento: string | null;
   d_0_30: number;
   d_31_60: number;
   d_61_90: number;
@@ -86,6 +94,7 @@ export default function CxcPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [showFavs, setShowFavs] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<CxcRow | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (sort === key) {
@@ -100,18 +109,59 @@ export default function CxcPage() {
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
+  }, []);
+
+  const loadFavoritos = useCallback(async () => {
     try {
-      const saved = localStorage.getItem("cxc_favoritos");
-      if (saved) setFavoritos(JSON.parse(saved));
+      const res = await fetch("/api/cxc/favoritos", { cache: "no-store" });
+      const data = await res.json();
+      setFavoritos(data.favoritos || []);
     } catch { /* ignore */ }
   }, []);
 
-  const toggleFav = (nombre: string) => {
-    setFavoritos((prev) => {
-      const next = prev.includes(nombre) ? prev.filter((f) => f !== nombre) : [...prev, nombre];
-      localStorage.setItem("cxc_favoritos", JSON.stringify(next));
-      return next;
-    });
+  // Migrate localStorage favoritos → DB once, then load from API
+  useEffect(() => {
+    const migrated = localStorage.getItem("cxc_favoritos_migrated_v1");
+    if (migrated) {
+      loadFavoritos();
+      return;
+    }
+    (async () => {
+      try {
+        const saved = localStorage.getItem("cxc_favoritos");
+        const localFavs: string[] = saved ? JSON.parse(saved) : [];
+        if (localFavs.length > 0) {
+          const nombres_normalized = localFavs.map(normalizeName);
+          await fetch("/api/cxc/favoritos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nombres_normalized }),
+          });
+        }
+        localStorage.setItem("cxc_favoritos_migrated_v1", "1");
+      } catch { /* ignore */ }
+      loadFavoritos();
+    })();
+  }, [loadFavoritos]);
+
+  const toggleFav = async (row: CxcRow) => {
+    const key = row.nombre_normalized;
+    const isFav = favoritos.includes(key);
+    setFavoritos((prev) => (isFav ? prev.filter((f) => f !== key) : [...prev, key]));
+    try {
+      if (isFav) {
+        await fetch(`/api/cxc/favoritos?nombre_normalized=${encodeURIComponent(key)}`, { method: "DELETE" });
+      } else {
+        await fetch("/api/cxc/favoritos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre_normalized: key }),
+        });
+      }
+    } catch {
+      // revert on failure
+      setFavoritos((prev) => (isFav ? [...prev, key] : prev.filter((f) => f !== key)));
+    }
   };
 
   const loadData = useCallback(async () => {
@@ -251,13 +301,13 @@ export default function CxcPage() {
     !search || (r.nombre || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const favsFiltered = showFavs ? searched.filter((r) => favoritos.includes(r.nombre)) : searched;
+  const favsFiltered = showFavs ? searched.filter((r) => favoritos.includes(r.nombre_normalized)) : searched;
 
   // Sort
   const sorted = [...favsFiltered].sort((a, b) => {
     if (showFavs) {
-      const aFav = favoritos.includes(a.nombre) ? 0 : 1;
-      const bFav = favoritos.includes(b.nombre) ? 0 : 1;
+      const aFav = favoritos.includes(a.nombre_normalized) ? 0 : 1;
+      const bFav = favoritos.includes(b.nombre_normalized) ? 0 : 1;
       if (aFav !== bFav) return aFav - bFav;
     }
     const dir = sortDir === "asc" ? 1 : -1;
@@ -413,12 +463,12 @@ export default function CxcPage() {
               {filtered.map((r) => {
                 const status = getClientStatus(r);
                 const p90 = get90Plus(r);
-                const isFav = favoritos.includes(r.nombre);
+                const isFav = favoritos.includes(r.nombre_normalized);
                 return (
-                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors duration-100">
+                  <tr key={r.id} onClick={() => setSelectedClient(r)} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors duration-100 cursor-pointer">
                     <td className="px-4 py-3 text-gray-900 font-medium">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => toggleFav(r.nombre)} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>
+                        <button onClick={(e) => { e.stopPropagation(); toggleFav(r); }} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>
                         <span className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{ backgroundColor: status === "corriente" ? "#22c55e" : status === "vigilancia" ? "#eab308" : "#ef4444" }}
                         ></span>
@@ -452,12 +502,12 @@ export default function CxcPage() {
             const status = getClientStatus(r);
             const sc = STATUS_COLORS[status];
             const p90 = get90Plus(r);
-            const isFav = favoritos.includes(r.nombre);
+            const isFav = favoritos.includes(r.nombre_normalized);
             return (
-              <div key={r.id} className="bg-white rounded-2xl border border-gray-50 p-5 hover:shadow-md transition-all">
+              <div key={r.id} onClick={() => setSelectedClient(r)} className="bg-white rounded-2xl border border-gray-50 p-5 hover:shadow-md transition-all cursor-pointer">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <button onClick={() => toggleFav(r.nombre)} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>
+                    <button onClick={(e) => { e.stopPropagation(); toggleFav(r); }} className={`text-sm flex-shrink-0 ${isFav ? "text-brandit-orange" : "text-gray-300 hover:text-gray-400"}`}>★</button>
                     <h3 className="font-semibold text-gray-900 text-sm leading-tight">{r.nombre}</h3>
                   </div>
                   <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${sc.bg} ${sc.text} flex-shrink-0 ml-2`}>
@@ -474,6 +524,93 @@ export default function CxcPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Client details modal */}
+      {selectedClient && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setSelectedClient(null)}
+        >
+          <div
+            className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-gray-100 flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="font-bold text-lg text-brandit-black leading-tight">{selectedClient.nombre}</h2>
+                {selectedClient.codigo && <p className="text-xs text-gray-400 mt-0.5">Código: {selectedClient.codigo}</p>}
+              </div>
+              <button onClick={() => setSelectedClient(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Totals */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs text-gray-400 mb-1">Saldo total</p>
+                <p className="text-2xl font-bold text-brandit-black">${fmt(selectedClient.total)}</p>
+                <div className="grid grid-cols-4 gap-2 mt-3 text-[10px]">
+                  <div><p className="text-gray-400">0-30</p><p className="font-semibold text-gray-700">{fmt(selectedClient.d_0_30)}</p></div>
+                  <div><p className="text-gray-400">31-60</p><p className="font-semibold text-gray-700">{fmt(selectedClient.d_31_60)}</p></div>
+                  <div><p className="text-gray-400">61-90</p><p className="font-semibold text-gray-700">{fmt(selectedClient.d_61_90)}</p></div>
+                  <div><p className="text-red-500">90+</p><p className="font-semibold text-red-600">{fmt(get90Plus(selectedClient))}</p></div>
+                </div>
+              </div>
+
+              {/* Contact info */}
+              <div className="space-y-2 text-sm">
+                {selectedClient.contacto && (
+                  <div className="flex justify-between gap-3"><span className="text-gray-400 flex-shrink-0">Contacto</span><span className="text-gray-900 text-right">{selectedClient.contacto}</span></div>
+                )}
+                {selectedClient.celular && (
+                  <div className="flex justify-between gap-3"><span className="text-gray-400 flex-shrink-0">Celular</span><span className="text-gray-900 text-right tabular-nums">{selectedClient.celular}</span></div>
+                )}
+                {selectedClient.telefono && (
+                  <div className="flex justify-between gap-3"><span className="text-gray-400 flex-shrink-0">Teléfono</span><span className="text-gray-900 text-right tabular-nums">{selectedClient.telefono}</span></div>
+                )}
+                {selectedClient.correo && (
+                  <div className="flex justify-between gap-3"><span className="text-gray-400 flex-shrink-0">Correo</span><span className="text-gray-900 text-right break-all">{selectedClient.correo}</span></div>
+                )}
+                {(selectedClient.provincia || selectedClient.distrito || selectedClient.corregimiento) && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-400 flex-shrink-0">Ubicación</span>
+                    <span className="text-gray-900 text-right">{[selectedClient.corregimiento, selectedClient.distrito, selectedClient.provincia].filter(Boolean).join(", ")}</span>
+                  </div>
+                )}
+                {!selectedClient.celular && !selectedClient.telefono && !selectedClient.correo && !selectedClient.contacto && (
+                  <p className="text-xs text-gray-400 italic text-center py-2">Sin datos de contacto en el CSV</p>
+                )}
+              </div>
+
+              {/* Actions */}
+              {(selectedClient.celular || selectedClient.telefono || selectedClient.correo) && (
+                <div className="grid grid-cols-1 gap-2 pt-2">
+                  {(selectedClient.celular || selectedClient.telefono) && (() => {
+                    const raw = (selectedClient.celular || selectedClient.telefono || "").replace(/\D/g, "");
+                    const phone = raw.startsWith("507") ? raw : `507${raw}`;
+                    return (
+                      <a
+                        href={`https://wa.me/${phone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-xl text-sm text-center transition-colors"
+                      >
+                        WhatsApp
+                      </a>
+                    );
+                  })()}
+                  {selectedClient.correo && (
+                    <a
+                      href={`mailto:${selectedClient.correo}`}
+                      className="bg-white border border-gray-200 hover:bg-gray-50 text-brandit-black font-semibold py-3 rounded-xl text-sm text-center transition-colors"
+                    >
+                      Enviar correo
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
