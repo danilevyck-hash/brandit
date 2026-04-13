@@ -19,8 +19,11 @@ type NotaItem = {
 type Nota = {
   id: number;
   numero: string;
+  tipo: "muestras" | "pedido" | null;
   fecha: string;
   cliente: string;
+  contacto: string | null;
+  numero_contacto: string | null;
   atencion: string | null;
   estado: string;
   aprobado_por: string | null;
@@ -70,7 +73,10 @@ export default function NotaDetallePage() {
 
   // Editing state
   const [editing, setEditing] = useState(false);
+  const [editTipo, setEditTipo] = useState<"muestras" | "pedido">("pedido");
   const [editCliente, setEditCliente] = useState("");
+  const [editContacto, setEditContacto] = useState("");
+  const [editNumero, setEditNumero] = useState("");
   const [editAtencion, setEditAtencion] = useState("");
   const [editFecha, setEditFecha] = useState("");
   const [editItems, setEditItems] = useState<{ marca: string; descripcion: string; color: string; talla: string; cantidad: number }[]>([]);
@@ -101,7 +107,10 @@ export default function NotaDetallePage() {
 
   const startEdit = () => {
     if (!nota) return;
+    setEditTipo(nota.tipo === "muestras" ? "muestras" : "pedido");
     setEditCliente(nota.cliente);
+    setEditContacto(nota.contacto || "");
+    setEditNumero(nota.numero_contacto || "");
     setEditAtencion(nota.atencion || "");
     setEditFecha(nota.fecha);
     setEditItems(
@@ -133,7 +142,10 @@ export default function NotaDetallePage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          tipo: editTipo,
           cliente: editCliente.trim(),
+          contacto: editContacto.trim() || null,
+          numero_contacto: editNumero.trim() || null,
           atencion: editAtencion.trim() || null,
           fecha: editFecha,
           items: validItems,
@@ -322,8 +334,18 @@ export default function NotaDetallePage() {
             <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full capitalize ${estadoBadge(nota.estado)}`}>
               {nota.estado}
             </span>
+            <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-brandit-orange/10 text-brandit-orange capitalize">
+              {nota.tipo === "muestras" ? "Muestras" : "Pedido"}
+            </span>
           </div>
           <h1 className="text-3xl font-bold text-brandit-black tracking-tight">{nota.cliente}</h1>
+          {(nota.contacto || nota.numero_contacto) && (
+            <p className="text-sm text-gray-500 mt-1">
+              {nota.contacto && <span>Atn: {nota.contacto}</span>}
+              {nota.contacto && nota.numero_contacto && <span className="text-gray-300 mx-2">·</span>}
+              {nota.numero_contacto && <span>{nota.numero_contacto}</span>}
+            </p>
+          )}
           <p className="text-sm text-gray-400 mt-1">{formatFecha(nota.fecha)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -403,6 +425,32 @@ export default function NotaDetallePage() {
       {editing && (
         <div className="bg-white rounded-2xl border border-brandit-orange/20 p-6 sm:p-8 mb-6">
           <h2 className="text-lg font-bold text-brandit-black mb-6">Editar Nota</h2>
+
+          {/* Tipo toggle */}
+          <div className="mb-6">
+            <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Tipo de nota *</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditTipo("pedido")}
+                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                  editTipo === "pedido" ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                Pedido
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditTipo("muestras")}
+                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                  editTipo === "muestras" ? "bg-brandit-orange text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                Muestras
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Cliente *</label>
@@ -419,6 +467,28 @@ export default function NotaDetallePage() {
                 type="date"
                 value={editFecha}
                 onChange={(e) => setEditFecha(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brandit-orange transition-colors min-h-[44px]"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Atención</label>
+              <input
+                type="text"
+                value={editContacto}
+                onChange={(e) => setEditContacto(e.target.value)}
+                placeholder="Nombre del contacto"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brandit-orange transition-colors min-h-[44px]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Número</label>
+              <input
+                type="tel"
+                value={editNumero}
+                onChange={(e) => setEditNumero(e.target.value)}
+                placeholder="Teléfono de contacto"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brandit-orange transition-colors min-h-[44px]"
               />
             </div>

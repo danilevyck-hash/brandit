@@ -41,6 +41,9 @@ export async function PUT(
     .update({
       cliente: body.cliente,
       atencion: body.atencion || null,
+      contacto: body.contacto || null,
+      numero_contacto: body.numero_contacto || null,
+      tipo: body.tipo === "muestras" ? "muestras" : "pedido",
       fecha: body.fecha,
     })
     .eq("id", params.id);

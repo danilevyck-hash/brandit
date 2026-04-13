@@ -19,7 +19,10 @@ const LS_KEY = "brandit_ne_draft";
 export default function NuevaNotaPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [tipo, setTipo] = useState<"muestras" | "pedido">("pedido");
   const [cliente, setCliente] = useState("");
+  const [contacto, setContacto] = useState("");
+  const [numeroContacto, setNumeroContacto] = useState("");
   const [atencion, setAtencion] = useState("");
   const [fecha, setFecha] = useState(new Date().toISOString().split("T")[0]);
   const [items, setItems] = useState<Item[]>([{ ...EMPTY_ITEM }]);
@@ -32,7 +35,10 @@ export default function NuevaNotaPage() {
       const draft = localStorage.getItem(LS_KEY);
       if (draft) {
         const d = JSON.parse(draft);
+        if (d.tipo) setTipo(d.tipo);
         if (d.cliente) setCliente(d.cliente);
+        if (d.contacto) setContacto(d.contacto);
+        if (d.numeroContacto) setNumeroContacto(d.numeroContacto);
         if (d.atencion) setAtencion(d.atencion);
         if (d.fecha) setFecha(d.fecha);
         if (d.items?.length) setItems(d.items);
@@ -43,11 +49,11 @@ export default function NuevaNotaPage() {
   // Auto-save draft every 5s
   useEffect(() => {
     autoSaveRef.current = setInterval(() => {
-      const draft = { cliente, atencion, fecha, items };
+      const draft = { tipo, cliente, contacto, numeroContacto, atencion, fecha, items };
       localStorage.setItem(LS_KEY, JSON.stringify(draft));
     }, 5000);
     return () => clearInterval(autoSaveRef.current);
-  }, [cliente, atencion, fecha, items]);
+  }, [tipo, cliente, contacto, numeroContacto, atencion, fecha, items]);
 
   const updateItem = (idx: number, field: keyof Item, value: string | number) => {
     setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
@@ -82,7 +88,10 @@ export default function NuevaNotaPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          tipo,
           cliente: cliente.trim(),
+          contacto: contacto.trim() || null,
+          numero_contacto: numeroContacto.trim() || null,
           atencion: atencion.trim() || null,
           fecha,
           items: validItems,
@@ -120,6 +129,35 @@ export default function NuevaNotaPage() {
 
       {/* Form */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 mb-6">
+        {/* Tipo toggle */}
+        <div className="mb-6">
+          <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Tipo de nota *</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setTipo("pedido")}
+              className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                tipo === "pedido"
+                  ? "bg-brandit-orange text-white"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              Pedido
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipo("muestras")}
+              className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                tipo === "muestras"
+                  ? "bg-brandit-orange text-white"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+              }`}
+            >
+              Muestras
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Cliente *</label>
@@ -137,6 +175,28 @@ export default function NuevaNotaPage() {
               type="date"
               value={fecha}
               onChange={(e) => setFecha(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brandit-orange transition-colors min-h-[44px]"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Atención</label>
+            <input
+              type="text"
+              value={contacto}
+              onChange={(e) => setContacto(e.target.value)}
+              placeholder="Nombre del contacto"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brandit-orange transition-colors min-h-[44px]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Número</label>
+            <input
+              type="tel"
+              value={numeroContacto}
+              onChange={(e) => setNumeroContacto(e.target.value)}
+              placeholder="Teléfono de contacto"
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-brandit-orange transition-colors min-h-[44px]"
             />
           </div>

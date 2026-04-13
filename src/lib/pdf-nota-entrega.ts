@@ -16,14 +16,27 @@ type NotaItem = {
 type Nota = {
   id: number;
   numero: string;
+  tipo: "muestras" | "pedido" | null;
   fecha: string;
   cliente: string;
+  contacto: string | null;
+  numero_contacto: string | null;
   atencion: string | null;
   estado: string;
   aprobado_por: string | null;
   aprobado_at: string | null;
   items: NotaItem[];
 };
+
+const INTRO_PEDIDO =
+  "Por medio de la presente se hace entrega al cliente de los siguientes artículos correspondientes a su pedido. Favor revisar el contenido antes de firmar.";
+const INTRO_MUESTRAS =
+  "Por medio de la presente se hace entrega al cliente de las siguientes muestras para evaluación. Las muestras se entregan sin costo y deben ser devueltas o confirmada su recepción conforme a la política de la empresa.";
+
+const POLICY_PEDIDO =
+  "POLÍTICA DE ENTREGA — PEDIDO: Al firmar esta nota el cliente confirma haber recibido los artículos descritos en buen estado y en las cantidades indicadas. Cualquier reclamo por faltantes, defectos o diferencias debe realizarse dentro de las 48 horas posteriores a la recepción; pasado este plazo no se aceptarán reclamos. La mercancía entregada no admite devoluciones sin autorización previa de Confecciones Boston.";
+const POLICY_MUESTRAS =
+  "POLÍTICA DE ENTREGA — MUESTRAS: Las muestras entregadas son propiedad de Confecciones Boston y se facilitan únicamente con fines de evaluación. El cliente se compromete a devolverlas en un plazo máximo de 15 días calendario en las mismas condiciones en que fueron entregadas. De no ser devueltas en ese plazo, Confecciones Boston podrá facturarlas al precio regular sin previo aviso. Las muestras no podrán ser reproducidas, comercializadas ni transferidas a terceros sin autorización escrita.";
 
 export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   const doc = new jsPDF();
@@ -40,11 +53,6 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
     doc.text("CONFECCIONES", 14, 20);
     doc.text("BOSTON", 14, 28);
   }
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(120, 120, 120);
-  doc.text("RUC 655-544-133465 DV13", 14, 48);
-
   // Top right - Date and nota number
   doc.setFontSize(10);
   doc.setTextColor(80, 80, 80);
@@ -55,26 +63,51 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   doc.setTextColor(241, 90, 41); // brandit-orange
   doc.text(nota.numero, pageWidth - 14, 30, { align: "right" });
 
+  // Intro text based on tipo
+  const tipo = nota.tipo === "muestras" ? "muestras" : "pedido";
+  const introText = tipo === "muestras" ? INTRO_MUESTRAS : INTRO_PEDIDO;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  const introLines = doc.splitTextToSize(introText, pageWidth - 68);
+  doc.text(introLines, 52, 48);
+
   // Line separator
+  const introHeight = introLines.length * 4;
   doc.setDrawColor(230, 230, 230);
   doc.setLineWidth(0.5);
-  doc.line(14, 52, pageWidth - 14, 52);
+  doc.line(14, 52 + introHeight, pageWidth - 14, 52 + introHeight);
 
-  // Client info
-  let y = 60;
+  // Client info block
+  let y = 60 + introHeight;
   doc.setFontSize(11);
   doc.setTextColor(35, 31, 32);
   doc.setFont("helvetica", "bold");
   doc.text("Cliente:", 14, y);
   doc.setFont("helvetica", "normal");
-  doc.text(nota.cliente, 40, y);
+  doc.text(nota.cliente, 45, y);
+
+  if (nota.contacto) {
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Atención:", 14, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(nota.contacto, 45, y);
+  }
+
+  if (nota.numero_contacto) {
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Número:", 14, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(nota.numero_contacto, 45, y);
+  }
 
   if (nota.atencion) {
     y += 7;
     doc.setFont("helvetica", "bold");
     doc.text("Nota al cliente:", 14, y);
     doc.setFont("helvetica", "normal");
-    // Handle long text
     const lines = doc.splitTextToSize(nota.atencion, pageWidth - 60);
     doc.text(lines, 55, y);
     y += (lines.length - 1) * 5;
@@ -181,11 +214,21 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   doc.text("Nombre y firma", col3X, signatureLineY + 5);
   doc.text("Fecha: _______________", col3X, signatureLineY + 10);
 
-  // Footer
+  // Policy footer (based on tipo)
   const pageHeight = doc.internal.pageSize.getHeight();
+  const policyText = tipo === "muestras" ? POLICY_MUESTRAS : POLICY_PEDIDO;
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 120);
+  const policyLines = doc.splitTextToSize(policyText, pageWidth - 28);
+  const policyHeight = policyLines.length * 3;
+  const policyY = pageHeight - 16 - policyHeight;
+  doc.text(policyLines, 14, policyY);
+
+  // Bottom brand line
   doc.setFontSize(8);
   doc.setTextColor(200, 200, 200);
-  doc.text("Confecciones Boston", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text("Confecciones Boston", pageWidth / 2, pageHeight - 8, { align: "center" });
 
   doc.save(`Nota_Entrega_${nota.numero}_${nota.cliente.replace(/\s+/g, "_")}.pdf`);
 }
