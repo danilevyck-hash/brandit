@@ -239,6 +239,31 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
     ? [["", "", "", "", "TOTAL UNIDADES", String(totalCantidad)]]
     : undefined;
 
+  // Compact header for pages 2+ (logo + NE-XXX)
+  const drawCompactHeader = () => {
+    try {
+      doc.addImage(LOGO_CB, "PNG", margin, 10, 13, 26);
+    } catch { /* ignore */ }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...SOFT);
+    doc.setCharSpace(LETTER_SPACE);
+    const lbl = "NOTA DE ENTREGA";
+    const lblW = doc.getTextWidth(lbl) + (lbl.length - 1) * LETTER_SPACE;
+    doc.text(lbl, pageWidth - margin - lblW, 14);
+    doc.setCharSpace(0);
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(16);
+    doc.setTextColor(...INK);
+    doc.text(nota.numero, pageWidth - margin, 24, { align: "right" });
+
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 38, pageWidth - margin, 38);
+  };
+
   autoTable(doc, {
     startY: y,
     head: [["Nº", "MARCA", "DESCRIPCIÓN", "COLOR", "TALLA", "CANT."]],
@@ -287,10 +312,23 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
       4: { cellWidth: 16, halign: "center" },
       5: { cellWidth: 16, halign: "right", fontStyle: "bold" },
     },
-    margin: { left: margin, right: margin },
+    margin: { top: 44, left: margin, right: margin, bottom: 30 },
+    // Draw compact header on pages 2+
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) drawCompactHeader();
+    },
   });
 
   y = ((doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY ?? y + 30) + 18;
+
+  // If signature block won't fit on the current page, start a new one
+  const SIG_BLOCK_HEIGHT = 55;
+  const POLICY_RESERVED = 26;
+  if (y + SIG_BLOCK_HEIGHT > pageHeight - POLICY_RESERVED) {
+    doc.addPage();
+    drawCompactHeader();
+    y = 48;
+  }
 
   // ─────────── SIGNATURE BLOCK (3 columns, refined) ───────────
   const usableWidth = pageWidth - margin * 2;
@@ -381,7 +419,7 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   doc.line(pageWidth / 2 - 50, closingY - 1, pageWidth / 2 - 50 + ruleWidth, closingY - 1);
   doc.line(pageWidth / 2 + 50 - ruleWidth, closingY - 1, pageWidth / 2 + 50, closingY - 1);
 
-  // ─────────── POLICY (bottom, fine print) ───────────
+  // ─────────── POLICY (bottom of LAST page only, fine print) ───────────
   const policyText = tipo === "muestras" ? POLICY_MUESTRAS : POLICY_PEDIDO;
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
@@ -396,13 +434,19 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   doc.line(margin, policyY - 4, pageWidth - margin, policyY - 4);
   doc.text(policyLines, margin, policyY);
 
-  // ─────────── PAGE NUMBER ───────────
-  doc.setFontSize(6.5);
-  doc.setTextColor(...SOFT);
-  doc.setFont("helvetica", "normal");
-  doc.setCharSpace(LETTER_SPACE);
-  doc.text("PÁGINA 1 DE 1", pageWidth - margin, pageHeight - 7, { align: "right" });
-  doc.setCharSpace(0);
+  // ─────────── PAGE NUMBERS (applied after everything is drawn) ───────────
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(6.5);
+    doc.setTextColor(...SOFT);
+    doc.setFont("helvetica", "normal");
+    doc.setCharSpace(LETTER_SPACE);
+    const pageText = `PÁGINA ${i} DE ${totalPages}`;
+    const pageTextW = doc.getTextWidth(pageText) + (pageText.length - 1) * LETTER_SPACE;
+    doc.text(pageText, pageWidth - margin - pageTextW, pageHeight - 7);
+    doc.setCharSpace(0);
+  }
 
   doc.save(`Nota_Entrega_${nota.numero}_${nota.cliente.replace(/\s+/g, "_")}.pdf`);
 }
