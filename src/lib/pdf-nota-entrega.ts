@@ -115,62 +115,71 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
     margin: { left: 14, right: 14 },
   });
 
-  y = ((doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY ?? y + 30) + 20;
+  y = ((doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY ?? y + 30) + 25;
 
-  // "Recibido por" section
-  doc.setFontSize(10);
+  // Three signature columns: Admin (digital) | Bodega | Cliente
+  const usableWidth = pageWidth - 28; // 14 margin each side
+  const colWidth = usableWidth / 3;
+  const col1X = 14;
+  const col2X = 14 + colWidth;
+  const col3X = 14 + colWidth * 2;
+  const signatureLineY = y + 22;
+  const lineLength = colWidth - 10;
+
+  // Column 1: Aprobado por (admin — digital signature)
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(35, 31, 32);
-  doc.text("Recibido por:", 14, y);
+  doc.text("APROBADO POR:", col1X, y);
 
-  y += 10;
+  if (nota.aprobado_por && firmaBase64) {
+    try {
+      const format = firmaBase64.includes("image/jpeg") ? "JPEG" : "PNG";
+      doc.addImage(firmaBase64, format, col1X, y + 4, 45, 18);
+    } catch (e) {
+      console.error("Error adding signature to PDF:", e);
+    }
+  }
+
+  doc.setDrawColor(35, 31, 32);
+  doc.setLineWidth(0.3);
+  doc.line(col1X, signatureLineY, col1X + lineLength, signatureLineY);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(35, 31, 32);
+  doc.text(nota.aprobado_por || "", col1X, signatureLineY + 5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(120, 120, 120);
-  doc.text("Nombre: ___________________________", 14, y);
-  y += 10;
-  doc.text("Firma:    ___________________________", 14, y);
-  y += 10;
-  doc.text("Fecha:    ___________________________", 14, y);
+  doc.text("Gerente General", col1X, signatureLineY + 10);
 
-  // "Aprobado por" section on the right
-  const rightX = pageWidth / 2 + 10;
-  y -= 30; // Go back up to align with "Recibido por"
-
+  // Column 2: Bodega (physical signature)
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(35, 31, 32);
-  doc.text("APROBADO POR:", rightX, y);
+  doc.text("BODEGA:", col2X, y);
 
-  y += 10;
-  if (nota.aprobado_por) {
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(35, 31, 32);
+  doc.line(col2X, signatureLineY, col2X + lineLength, signatureLineY);
 
-    // Draw signature if available
-    if (firmaBase64) {
-      try {
-        const format = firmaBase64.includes("image/jpeg") ? "JPEG" : "PNG";
-        doc.addImage(firmaBase64, format, rightX, y - 5, 50, 20);
-        y += 18;
-      } catch (e) {
-        console.error("Error adding signature to PDF:", e);
-        y += 2;
-      }
-    }
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 120);
+  doc.setFontSize(8);
+  doc.text("Nombre y firma", col2X, signatureLineY + 5);
+  doc.text("Fecha: _______________", col2X, signatureLineY + 10);
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(nota.aprobado_por, rightX, y);
-    y += 5;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120, 120, 120);
-    doc.text("Gerente General", rightX, y);
-  } else {
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120, 120, 120);
-    doc.text("___________________________", rightX, y);
-    y += 6;
-    doc.text("Gerente General", rightX, y);
-  }
+  // Column 3: Cliente (physical signature)
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(35, 31, 32);
+  doc.text("CLIENTE:", col3X, y);
+
+  doc.line(col3X, signatureLineY, col3X + lineLength, signatureLineY);
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(120, 120, 120);
+  doc.setFontSize(8);
+  doc.text("Nombre y firma", col3X, signatureLineY + 5);
+  doc.text("Fecha: _______________", col3X, signatureLineY + 10);
 
   // Footer
   const pageHeight = doc.internal.pageSize.getHeight();
