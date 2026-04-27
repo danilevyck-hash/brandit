@@ -15,6 +15,10 @@ const config: Config = {
         "brandit-gray": "#58595B",
         cream: "#FFFFFF",
       },
+      fontFamily: {
+        outfit: ["var(--font-outfit)", "system-ui", "sans-serif"],
+        mono: ["var(--font-space-mono)", "monospace"],
+      },
     },
   },
   plugins: [],
