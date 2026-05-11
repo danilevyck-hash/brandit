@@ -28,11 +28,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/brandit-logo.svg" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('brandit_dark_mode')==='1')document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
       </head>
-      <script dangerouslySetInnerHTML={{__html: `try{if(localStorage.getItem('brandit_dark_mode')==='1')document.documentElement.classList.add('dark')}catch(e){}`}} />
       <body className={`${inter.className} ${outfit.variable} ${spaceMono.variable} bg-cream min-h-screen`}>
         <ToastProvider>
           <NavbarWrapper />
