@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRoles, getSessionPayload } from "@/lib/auth-brandit";
 import { logActivity } from "@/lib/activity-log";
 
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const session = getSessionPayload(req);
 
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
 
   // ── 1. Read multipart ────────────────────────────────────────────────────
   let file: File | null = null;

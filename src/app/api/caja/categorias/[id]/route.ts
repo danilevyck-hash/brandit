@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -6,7 +6,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("caja_categorias")
     .update({ activo: false })
     .eq("id", params.id)

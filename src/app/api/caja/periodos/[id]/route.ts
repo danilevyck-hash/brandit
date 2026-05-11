@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   const { id } = params;
 
-  const { data: periodo, error } = await getSupabaseAF()
+  const { data: periodo, error } = await getSupabaseServer()
     .from("caja_periodos")
     .select("*")
     .eq("id", id)
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: gastos, error: gError } = await getSupabaseAF()
+  const { data: gastos, error: gError } = await getSupabaseServer()
     .from("caja_gastos")
     .select("*")
     .eq("periodo_id", id)
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     body.fecha_cierre = new Date().toISOString().split("T")[0];
   }
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
     .update(body)
     .eq("id", id)
@@ -66,9 +66,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const { id } = params;
 
   // Delete associated gastos first
-  await getSupabaseAF().from("caja_gastos").delete().eq("periodo_id", id);
+  await getSupabaseServer().from("caja_gastos").delete().eq("periodo_id", id);
 
-  const { error } = await getSupabaseAF().from("caja_periodos").delete().eq("id", id);
+  const { error } = await getSupabaseServer().from("caja_periodos").delete().eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

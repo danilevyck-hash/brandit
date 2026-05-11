@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("lead_comentarios")
     .select("*")
     .eq("lead_id", params.id)
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const body = await request.json();
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("lead_comentarios")
     .insert([{
       lead_id: params.id,

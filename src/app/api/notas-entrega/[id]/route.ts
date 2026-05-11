@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest,
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("notas_entrega")
     .select("*, items:notas_entrega_items(*)")
     .eq("id", params.id)
@@ -28,7 +28,7 @@ export async function PUT(request: NextRequest,
   const body = await request.json();
 
   // Check if nota is not cerrada
-  const { data: existing } = await getSupabaseAF()
+  const { data: existing } = await getSupabaseServer()
     .from("notas_entrega")
     .select("estado")
     .eq("id", params.id)
@@ -39,7 +39,7 @@ export async function PUT(request: NextRequest,
   }
 
   // Update nota
-  const { error } = await getSupabaseAF()
+  const { error } = await getSupabaseServer()
     .from("notas_entrega")
     .update({
       cliente: body.cliente,
@@ -54,7 +54,7 @@ export async function PUT(request: NextRequest,
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Delete old items and re-insert
-  await getSupabaseAF().from("notas_entrega_items").delete().eq("nota_id", params.id);
+  await getSupabaseServer().from("notas_entrega_items").delete().eq("nota_id", params.id);
 
   if (body.items && body.items.length > 0) {
     const items = body.items.map((item: Record<string, unknown>, idx: number) => ({
@@ -67,12 +67,12 @@ export async function PUT(request: NextRequest,
       sort_order: idx,
     }));
 
-    const { error: iError } = await getSupabaseAF().from("notas_entrega_items").insert(items);
+    const { error: iError } = await getSupabaseServer().from("notas_entrega_items").insert(items);
     if (iError) return NextResponse.json({ error: iError.message }, { status: 500 });
   }
 
   // Return updated
-  const { data: updated } = await getSupabaseAF()
+  const { data: updated } = await getSupabaseServer()
     .from("notas_entrega")
     .select("*, items:notas_entrega_items(*)")
     .eq("id", params.id)
@@ -106,7 +106,7 @@ export async function PATCH(request: NextRequest,
     updateData.scan_url = body.scan_url;
   }
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("notas_entrega")
     .update(updateData)
     .eq("id", params.id)
@@ -124,7 +124,7 @@ export async function DELETE(request: NextRequest,
   if (auth instanceof NextResponse) return auth;
 
   // Only delete if abierta
-  const { data: existing } = await getSupabaseAF()
+  const { data: existing } = await getSupabaseServer()
     .from("notas_entrega")
     .select("estado")
     .eq("id", params.id)
@@ -134,7 +134,7 @@ export async function DELETE(request: NextRequest,
     return NextResponse.json({ error: "Solo se pueden eliminar notas abiertas" }, { status: 400 });
   }
 
-  const { error } = await getSupabaseAF()
+  const { error } = await getSupabaseServer()
     .from("notas_entrega")
     .delete()
     .eq("id", params.id);

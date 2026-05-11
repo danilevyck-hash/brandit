@@ -1,8 +1,8 @@
-import { getSupabaseAF } from "./supabase-af";
+import { getSupabaseServer } from "./supabase-server";
 
 export async function logActivity(usuario: string, accion: string, detalle?: string) {
   try {
-    await getSupabaseAF()
+    await getSupabaseServer()
       .from("activity_log")
       .insert([{ usuario, accion, detalle: detalle || null }]);
   } catch {

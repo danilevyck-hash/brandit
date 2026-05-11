@@ -1,13 +1,10 @@
-// Cliente Supabase server-side para Apps Familia (Brand It propia,
-// proyecto halqekrjfttpwoqtazjm). Usa service_role para bypass de RLS
-// en operaciones internas (uploads, admin tasks).
+// Cliente Supabase server-side único de Brand It — apunta a Apps Familia
+// (proyecto halqekrjfttpwoqtazjm). Usa service_role para bypass de RLS
+// en operaciones internas (uploads, admin tasks, RPCs).
 //
-// Vive acá: ventas_pipeline_boston, clients, quotations, stickers, leads,
-// notas_entrega, user_roles, etc.
-//
-// Para datos compartidos con fashiongr (ventas_raw, ventas_metas, RPC
-// ventas_dashboard_summary, clientes_master, clientes_empresa_12m_vw)
-// usar supabase-af.ts.
+// Brand It es 100% independiente: cero cross-project. Todo el ERP (ventas_raw,
+// ventas_metas, cxc_*, clientes_master, clientes_empresa_12m_vw, RPCs) y todas
+// las tablas internas (user_roles, clients, leads, etc.) viven en Apps Familia.
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 

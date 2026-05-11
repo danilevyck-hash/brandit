@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
     .select("*, gastos:caja_gastos(total)")
     .order("numero", { ascending: false });
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
 
   // Check no open period exists
-  const { data: open } = await getSupabaseAF()
+  const { data: open } = await getSupabaseServer()
     .from("caja_periodos")
     .select("id")
     .eq("estado", "abierto")
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Get next numero
-  const { data: last } = await getSupabaseAF()
+  const { data: last } = await getSupabaseServer()
     .from("caja_periodos")
     .select("numero")
     .order("numero", { ascending: false })
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const numero = last && last.length > 0 ? last[0].numero + 1 : 1;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
     .insert([
       {

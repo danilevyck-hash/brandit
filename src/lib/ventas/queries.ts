@@ -1,9 +1,9 @@
 // Server-side fetchers para el módulo Ventas — Brand It (Boston).
 //
-// Usa la Supabase compartida con fashiongr (APPS_FAMILIA) via supabase-af.
-// Todas las queries filtran hardcoded por empresa = 'confecciones_boston'.
+// Brand It usa SU PROPIA Supabase (Apps Familia, halqekrjfttpwoqtazjm) via
+// supabase-server. Todas las queries filtran hardcoded por
+// empresa = 'confecciones_boston'.
 
-import { getSupabaseAF } from "@/lib/supabase-af";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { formatDate } from "@/lib/format";
 import type {
@@ -45,7 +45,7 @@ function toNum(v: number | string | null | undefined): number {
  * Plus 2 queries simples para funnel + vendedoras.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
 
   const [curRes, prevRes, metaRes] = await Promise.all([
     db.rpc("ventas_dashboard_summary", { p_anio: year }),
@@ -136,27 +136,25 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
 }
 
 async function fetchFunnel(year: number): Promise<FunnelStats> {
-  // CROSS-PROJECT: ventas_pipeline_boston vive en Apps Familia (Brand It
-  // propia, supabase-server), mientras que ventas_raw vive en fashion-group
-  // (supabase-af). Cero JOINs cross-project — dos queries paralelas y merge
-  // en JS.
-  const local = getSupabaseServer();
-  const af    = getSupabaseAF();
+  // ventas_pipeline_boston y ventas_raw ambas viven en Apps Familia — un solo
+  // cliente. Hasta Fase C ventas_pipeline_boston contiene Cotizaciones+Pedidos
+  // y ventas_raw contiene Facturas; en Fase C todo se consolida a ventas_raw.
+  const db = getSupabaseServer();
 
   const [cotRes, pedRes, facRes] = await Promise.all([
-    local.from("ventas_pipeline_boston")
+    db.from("ventas_pipeline_boston")
       .select("total")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Cotizacion")
       .eq("anio", year),
-    local.from("ventas_pipeline_boston")
+    db.from("ventas_pipeline_boston")
       .select("total")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Pedido")
       .eq("anio", year),
-    // Facturas de ventas_raw (fashion-group) — count distinct n_sistema
-    // en JS porque supabase-js no expone count(distinct) directo.
-    af.from("ventas_raw")
+    // Facturas de ventas_raw — count distinct n_sistema en JS porque
+    // supabase-js no expone count(distinct) directo.
+    db.from("ventas_raw")
       .select("subtotal, n_sistema")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Factura")
@@ -181,7 +179,7 @@ async function fetchFunnel(year: number): Promise<FunnelStats> {
 }
 
 async function fetchVendedoras(year: number, mes: number): Promise<Vendedora[]> {
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
   // Group by vendedor para el mes. Una venta = un n_sistema distinto.
   const { data, error } = await db
     .from("ventas_raw")
@@ -216,7 +214,7 @@ async function fetchVendedoras(year: number, mes: number): Promise<Vendedora[]> 
 // ─── Available years ─────────────────────────────────────────────────────────
 
 export async function fetchAvailableYears(): Promise<number[]> {
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
   const [minRes, maxRes] = await Promise.all([
     db.from("ventas_raw").select("anio").eq("empresa", COMPANY_KEY).order("anio", { ascending: true }).limit(1),
     db.from("ventas_raw").select("anio").eq("empresa", COMPANY_KEY).order("anio", { ascending: false }).limit(1),
@@ -259,7 +257,7 @@ function normalizeWa(raw: string): string {
  */
 export async function fetchClientes({ year: _year }: { year: number }): Promise<Clientes> {
   void _year;
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
 
   const { data, error } = await db
     .from("clientes_empresa_12m_vw")

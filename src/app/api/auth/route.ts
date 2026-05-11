@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
 import { signSession, ALL_ROLES, type Role } from "@/lib/auth-brandit";
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
   }
 
-  const { data: users, error } = await getSupabaseAF()
+  const { data: users, error } = await getSupabaseServer()
     .from("user_roles")
     .select("id, email, role, nombre, empresa")
     .eq("password", password)

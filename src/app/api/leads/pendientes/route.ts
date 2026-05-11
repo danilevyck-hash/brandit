@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextResponse, NextRequest } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const { count, error } = await getSupabaseAF()
+  const { count, error } = await getSupabaseServer()
     .from("leads")
     .select("*", { count: "exact", head: true })
     .lte("fecha_seguimiento", today)

@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
   const { data, error } = await db
     .from("cxc_favoritos")
     .select("nombre_normalized")
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "nombre_normalized requerido" }, { status: 400 });
   }
 
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
   const rows = nombres.map((n) => ({ company_key: COMPANY_KEY, nombre_normalized: n }));
 
   const { error } = await db
@@ -55,7 +55,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "nombre_normalized requerido" }, { status: 400 });
   }
 
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
   const { error } = await db
     .from("cxc_favoritos")
     .delete()

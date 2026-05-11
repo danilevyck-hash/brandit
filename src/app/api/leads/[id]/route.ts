@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
@@ -9,7 +9,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const body = await request.json();
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("leads")
     .update(body)
     .eq("id", params.id)
@@ -29,7 +29,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { error } = await getSupabaseAF().from("leads").delete().eq("id", params.id);
+  const { error } = await getSupabaseServer().from("leads").delete().eq("id", params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
 // Mock supabase before importing the route
-vi.mock("@/lib/supabase-af", () => ({
-  getSupabaseAF: () => ({
+vi.mock("@/lib/supabase-server", () => ({
+  getSupabaseServer: () => ({
     from: () => ({
       select: () => ({
         eq: () => ({

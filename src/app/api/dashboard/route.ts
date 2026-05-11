@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextResponse, NextRequest } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
   const now = new Date();
   const today = now.toISOString().split("T")[0];
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;

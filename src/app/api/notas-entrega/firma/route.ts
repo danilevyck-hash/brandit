@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "nombre requerido" }, { status: 400 });
   }
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("admin_firmas")
     .select("*")
     .eq("nombre", nombre)
@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Upsert: update if exists, insert if not
-  const { data: existing } = await getSupabaseAF()
+  const { data: existing } = await getSupabaseServer()
     .from("admin_firmas")
     .select("id")
     .eq("nombre", body.nombre)
     .single();
 
   if (existing) {
-    const { data, error } = await getSupabaseAF()
+    const { data, error } = await getSupabaseServer()
       .from("admin_firmas")
       .update({
         firma_base64: body.firma_base64,
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
   }
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("admin_firmas")
     .insert([
       {

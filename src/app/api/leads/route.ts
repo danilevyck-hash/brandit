@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const vendedora = request.nextUrl.searchParams.get("vendedora");
   const empresa = request.nextUrl.searchParams.get("empresa");
 
-  let query = getSupabaseAF()
+  let query = getSupabaseServer()
     .from("leads")
     .select("*")
     .order("created_at", { ascending: false });
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("leads")
     .insert([{
       nombre: body.nombre,

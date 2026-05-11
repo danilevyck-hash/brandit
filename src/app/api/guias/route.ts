@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("guia_transporte")
     .select("*, items:guia_items(*)")
     .order("numero", { ascending: false });
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
 
   // Get next numero
-  const { data: last } = await getSupabaseAF()
+  const { data: last } = await getSupabaseServer()
     .from("guia_transporte")
     .select("numero")
     .order("numero", { ascending: false })
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   const numero = last && last.length > 0 ? last[0].numero + 1 : 1;
 
-  const { data: guia, error } = await getSupabaseAF()
+  const { data: guia, error } = await getSupabaseServer()
     .from("guia_transporte")
     .insert([
       {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       numero_guia_transp: item.numero_guia_transp,
     }));
 
-    const { error: iError } = await getSupabaseAF().from("guia_items").insert(items);
+    const { error: iError } = await getSupabaseServer().from("guia_items").insert(items);
     if (iError) return NextResponse.json({ error: iError.message }, { status: 500 });
   }
 

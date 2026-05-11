@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     return NextResponse.json({ error: "codigo requerido" }, { status: 400 });
   }
 
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
 
   // 1. Resolver cliente_id por código (Switch Soft)
   const { data: cliente, error: cErr } = await db

@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 export const dynamic = "force-dynamic";
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 const COMPANY_KEY = "confecciones_boston";
 
 async function buildContext(): Promise<string> {
-  const db = getSupabaseAF();
+  const db = getSupabaseServer();
 
   // Leads summary
   const { data: leads } = await db

@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("guia_transporte")
     .select("*, items:guia_items(*)")
     .eq("id", params.id)
@@ -28,9 +28,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   if (auth instanceof NextResponse) return auth;
 
   // Delete items first
-  await getSupabaseAF().from("guia_items").delete().eq("guia_id", params.id);
+  await getSupabaseServer().from("guia_items").delete().eq("guia_id", params.id);
 
-  const { error } = await getSupabaseAF().from("guia_transporte").delete().eq("id", params.id);
+  const { error } = await getSupabaseServer().from("guia_transporte").delete().eq("id", params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

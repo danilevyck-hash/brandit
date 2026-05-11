@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
 // Mock supabase — POST path: insert -> select -> single
-vi.mock("@/lib/supabase-af", () => ({
-  getSupabaseAF: () => ({
+vi.mock("@/lib/supabase-server", () => ({
+  getSupabaseServer: () => ({
     from: (table: string) => {
       if (table === "notas_entrega") {
         return {

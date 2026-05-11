@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("stickers")
     .select("*")
     .eq("id", params.id)
@@ -33,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (typeof body.estante === "string") updates.estante = body.estante;
   updates.updated_at = new Date().toISOString();
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("stickers")
     .update(updates)
     .eq("id", params.id)
@@ -48,7 +48,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { error } = await getSupabaseAF().from("stickers").delete().eq("id", params.id);
+  const { error } = await getSupabaseServer().from("stickers").delete().eq("id", params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

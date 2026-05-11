@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const body = await request.json();
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("user_roles")
     .update(body)
     .eq("id", params.id)
@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const auth = requireRoles(request, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
-  const { error } = await getSupabaseAF()
+  const { error } = await getSupabaseServer()
     .from("user_roles")
     .delete()
     .eq("id", params.id);

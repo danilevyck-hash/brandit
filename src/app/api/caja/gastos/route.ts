@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   const subtotal = Number(body.subtotal);
   const total = subtotal + subtotal * (itbms / 100);
 
-  const { data, error } = await getSupabaseAF()
+  const { data, error } = await getSupabaseServer()
     .from("caja_gastos")
     .insert([
       {

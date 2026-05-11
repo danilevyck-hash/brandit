@@ -1,4 +1,4 @@
-import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const estado = request.nextUrl.searchParams.get("estado") || "";
   const tipo = request.nextUrl.searchParams.get("tipo") || "";
 
-  let query = getSupabaseAF()
+  let query = getSupabaseServer()
     .from("notas_entrega")
     .select("*, items:notas_entrega_items(*)")
     .order("id", { ascending: false });
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   const prefix = tipoValue === "muestras" ? "NM" : "NE";
 
   // Get next numero for this tipo (independent sequence)
-  const { data: last } = await getSupabaseAF()
+  const { data: last } = await getSupabaseServer()
     .from("notas_entrega")
     .select("numero")
     .eq("tipo", tipoValue)
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
   const numero = `${prefix}-${String(nextNum).padStart(3, "0")}`;
 
-  const { data: nota, error } = await getSupabaseAF()
+  const { data: nota, error } = await getSupabaseServer()
     .from("notas_entrega")
     .insert([
       {
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       sort_order: idx,
     }));
 
-    const { error: iError } = await getSupabaseAF().from("notas_entrega_items").insert(items);
+    const { error: iError } = await getSupabaseServer().from("notas_entrega_items").insert(items);
     if (iError) return NextResponse.json({ error: iError.message }, { status: 500 });
   }
 
