@@ -432,9 +432,14 @@ CREATE INDEX IF NOT EXISTS idx_cxc_rows_dias_vencidos  ON cxc_rows(dias_vencidos
 
 DROP VIEW IF EXISTS cxc_aging CASCADE;
 CREATE VIEW cxc_aging AS
+-- upload_id en GROUP BY: el pattern delete-then-insert del parser garantiza
+-- que hay UN SOLO upload_id activo por company_key en cualquier momento.
+-- Agruparlo no cambia el resultado (cada cliente tiene un solo upload_id),
+-- pero permite exponerlo en la VIEW para que /api/cxc/route.ts filtre por
+-- upload_id. PostgreSQL no tiene MAX(uuid), así que ésta es la forma limpia.
 SELECT
   md5(r.company_key || '|' || COALESCE(r.cliente_codigo, ''))::uuid AS id,
-  MAX(r.upload_id)                    AS upload_id,
+  r.upload_id                         AS upload_id,
   r.company_key,
   r.cliente_codigo                    AS codigo,
   r.cliente_id,
@@ -463,7 +468,7 @@ SELECT
   COALESCE(SUM(r.debito - r.credito), 0)                                                    AS total
 FROM cxc_rows r
 LEFT JOIN clientes_master m ON m.id = r.cliente_id AND m.deleted = false
-GROUP BY r.company_key, r.cliente_codigo, r.cliente_id,
+GROUP BY r.upload_id, r.company_key, r.cliente_codigo, r.cliente_id,
          m.nombre, m.nombre_normalized, m.email, m.telefono, m.celular, m.provincia
 HAVING ABS(COALESCE(SUM(r.debito - r.credito), 0)) >= 0.01;
 
