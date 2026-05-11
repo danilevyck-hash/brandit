@@ -12,10 +12,18 @@ let _client: SupabaseClient | null = null;
 
 export function getSupabaseServer(): SupabaseClient {
   if (!_client) {
-    _client = createClient(
-      process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url) {
+      throw new Error("SUPABASE_URL no configurado (revisar env vars de Vercel)");
+    }
+    if (!key) {
+      // Sin service_role, las escrituras y lecturas con RLS quedan bloqueadas
+      // silenciosamente (data=[] sin error visible). Fallar al boot es mejor
+      // que tener bugs invisibles en producción.
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY no configurado — sin service role no se pueden hacer escrituras ni lecturas con RLS (revisar env vars de Vercel para el proyecto Apps Familia)");
+    }
+    _client = createClient(url, key);
   }
   return _client;
 }

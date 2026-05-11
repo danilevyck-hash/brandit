@@ -28,19 +28,27 @@ export async function GET(req: NextRequest) {
   // ── Determinar el upload activo ──────────────────────────────────────────
   let latestUpload;
   if (uploadId) {
-    const { data } = await db
+    const { data, error: upErr } = await db
       .from("cxc_uploads")
       .select("id, uploaded_at, filename")
       .eq("id", uploadId)
       .single();
+    if (upErr) {
+      console.error("[api/cxc] error cargando upload por id:", upErr);
+      return NextResponse.json({ error: upErr.message }, { status: 500 });
+    }
     latestUpload = data;
   } else {
-    const { data: uploads } = await db
+    const { data: uploads, error: upErr } = await db
       .from("cxc_uploads")
       .select("id, uploaded_at, filename")
       .eq("company_key", COMPANY_KEY)
       .order("uploaded_at", { ascending: false })
       .limit(1);
+    if (upErr) {
+      console.error("[api/cxc] error cargando cxc_uploads:", upErr);
+      return NextResponse.json({ error: upErr.message }, { status: 500 });
+    }
     latestUpload = uploads && uploads.length > 0 ? uploads[0] : null;
   }
 
@@ -58,7 +66,10 @@ export async function GET(req: NextRequest) {
     .eq("company_key", COMPANY_KEY)
     .order("nombre", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("[api/cxc] error leyendo cxc_aging:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // ── Merge con overrides por nombre_normalized ─────────────────────────────
   // cxc_client_overrides NO tiene company_key — se aplica cross-empresa.
