@@ -288,6 +288,19 @@ CREATE TABLE IF NOT EXISTS cxc_client_overrides (
 -- ║ single-empresa Boston a nivel DB.                                         ║
 -- ╚═══════════════════════════════════════════════════════════════════════════╝
 
+-- ── Cleanup defensivo: si Apps Familia tiene versiones pre-existentes de
+-- estas tablas con schema viejo (ej. cxc_rows con columna `codigo` en lugar
+-- de `cliente_codigo`, herencia pre-Fase4 de fashion-group), los DROPs
+-- garantizan estado limpio antes del CREATE. Apps Familia arranca vacía
+-- para ERP per spec, así que cero pérdida de data.
+DROP MATERIALIZED VIEW IF EXISTS clientes_empresa_12m_vw CASCADE;
+DROP VIEW              IF EXISTS cxc_aging              CASCADE;
+DROP TABLE             IF EXISTS cxc_rows               CASCADE;
+DROP TABLE             IF EXISTS cxc_uploads            CASCADE;
+DROP TABLE             IF EXISTS ventas_raw             CASCADE;
+DROP TABLE             IF EXISTS ventas_metas           CASCADE;
+DROP TABLE             IF EXISTS clientes_master        CASCADE;
+
 -- ── clientes_master ─────────────────────────────────────────────────────────
 -- Directorio maestro de clientes. Brand It arranca VACÍO y auto-populate via
 -- uploads (Fase D). Schema clonado de fashion-group con simplificación:
