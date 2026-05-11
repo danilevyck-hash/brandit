@@ -1,3 +1,15 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/cxc
+//
+// Lee de cxc_aging (VIEW) — computa buckets d0_30..mas_365 + total a partir
+// de cxc_rows per-factura (Fase 4 schema fashiongr). Reemplaza la lectura
+// directa de cxc_rows (que esperaba columnas pre-agregadas d_0_30 etc.,
+// formato viejo de antigüedad).
+//
+// Merge con cxc_client_overrides por nombre_normalized (esa tabla NO tiene
+// company_key — sólo por nombre).
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
@@ -6,17 +18,16 @@ export const dynamic = "force-dynamic";
 
 const COMPANY_KEY = "confecciones_boston";
 
-export async function GET(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+export async function GET(req: NextRequest) {
+  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
   const db = getSupabaseAF();
-  const uploadId = request.nextUrl.searchParams.get("upload_id");
+  const uploadId = req.nextUrl.searchParams.get("upload_id");
 
+  // ── Determinar el upload activo ──────────────────────────────────────────
   let latestUpload;
-
   if (uploadId) {
-    // Load specific upload
     const { data } = await db
       .from("cxc_uploads")
       .select("id, uploaded_at, filename")
@@ -24,7 +35,6 @@ export async function GET(request: NextRequest) {
       .single();
     latestUpload = data;
   } else {
-    // Get latest upload
     const { data: uploads } = await db
       .from("cxc_uploads")
       .select("id, uploaded_at, filename")
@@ -38,32 +48,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ rows: [], upload: null });
   }
 
-  // Get rows for the upload
+  // ── Leer cxc_aging (buckets computados) ──────────────────────────────────
+  // Filtramos por upload_id para que coincida con el upload activo. La VIEW
+  // ya filtra `HAVING ABS(total) >= 0.01` para sacar el ruido de redondeo.
   const { data: rows, error } = await db
-    .from("cxc_rows")
+    .from("cxc_aging")
     .select("*")
     .eq("upload_id", latestUpload.id)
+    .eq("company_key", COMPANY_KEY)
     .order("nombre", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Get client overrides
+  // ── Merge con overrides por nombre_normalized ─────────────────────────────
+  // cxc_client_overrides NO tiene company_key — se aplica cross-empresa.
+  // Schema actual: { nombre_normalized, correo, telefono, celular, contacto,
+  //                  resultado_contacto, proximo_seguimiento, updated_at }
   const { data: overrides } = await db
     .from("cxc_client_overrides")
-    .select("*")
-    .eq("company_key", COMPANY_KEY);
+    .select("*");
 
-  const overrideMap = new Map(
-    (overrides || []).map((o) => [o.nombre_normalized, o])
+  type OverrideRow = {
+    nombre_normalized: string;
+    correo?: string | null;
+    telefono?: string | null;
+    celular?: string | null;
+    contacto?: string | null;
+    resultado_contacto?: string | null;
+    proximo_seguimiento?: string | null;
+  };
+
+  const overrideMap = new Map<string, OverrideRow>(
+    (overrides ?? []).map((o: OverrideRow) => [o.nombre_normalized, o])
   );
 
-  // Merge overrides into rows
-  const mergedRows = (rows || []).map((row) => {
+  const mergedRows = (rows ?? []).map(row => {
     const override = overrideMap.get(row.nombre_normalized);
     return {
       ...row,
-      override_notas: override?.notas || null,
-      override_estado: override?.estado || null,
+      override_resultado: override?.resultado_contacto ?? null,
+      override_seguimiento: override?.proximo_seguimiento ?? null,
     };
   });
 
