@@ -43,10 +43,7 @@ type SortDir = "asc" | "desc";
 
 function isValidClientName(nombre: string | undefined | null): boolean {
   if (!nombre) return false;
-  const trimmed = nombre.trim();
-  if (trimmed.length === 0) return false;
-  if (!isNaN(Number(trimmed))) return false;
-  return true;
+  return nombre.trim().length > 0;
 }
 
 function get90Plus(row: CxcRow): number {
