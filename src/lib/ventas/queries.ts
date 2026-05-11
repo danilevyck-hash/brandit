@@ -4,6 +4,7 @@
 // Todas las queries filtran hardcoded por empresa = 'confecciones_boston'.
 
 import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { formatDate } from "@/lib/format";
 import type {
   VentasResumen,
@@ -135,24 +136,27 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
 }
 
 async function fetchFunnel(year: number): Promise<FunnelStats> {
-  const db = getSupabaseAF();
+  // CROSS-PROJECT: ventas_pipeline_boston vive en Apps Familia (Brand It
+  // propia, supabase-server), mientras que ventas_raw vive en fashion-group
+  // (supabase-af). Cero JOINs cross-project — dos queries paralelas y merge
+  // en JS.
+  const local = getSupabaseServer();
+  const af    = getSupabaseAF();
 
-  // Cotizaciones + Pedidos del pipeline custom de Boston
   const [cotRes, pedRes, facRes] = await Promise.all([
-    db.from("ventas_pipeline_boston")
+    local.from("ventas_pipeline_boston")
       .select("total")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Cotizacion")
       .eq("anio", year),
-    db.from("ventas_pipeline_boston")
+    local.from("ventas_pipeline_boston")
       .select("total")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Pedido")
       .eq("anio", year),
-    // Facturas de ventas_raw — count distinct n_sistema sería ideal, pero
-    // la mat view ventas_dashboard_summary ya agrega `filas` por empresa-mes
-    // que sirve como proxy. Para precisión usamos query directa.
-    db.from("ventas_raw")
+    // Facturas de ventas_raw (fashion-group) — count distinct n_sistema
+    // en JS porque supabase-js no expone count(distinct) directo.
+    af.from("ventas_raw")
       .select("subtotal, n_sistema")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Factura")

@@ -22,6 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAF } from "@/lib/supabase-af";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireRoles, getSessionPayload } from "@/lib/auth-brandit";
 import { logActivity } from "@/lib/activity-log";
 
@@ -110,7 +111,11 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const session = getSessionPayload(req);
 
-  const db = getSupabaseAF();
+  // CROSS-PROJECT:
+  //   local (Apps Familia / supabase-server) → ventas_pipeline_boston
+  //   af    (fashion-group / supabase-af)    → clientes_master
+  const local = getSupabaseServer();
+  const af    = getSupabaseAF();
 
   // ── 1. Read multipart ────────────────────────────────────────────────────
   let file: File | null = null;
@@ -168,10 +173,11 @@ export async function POST(req: NextRequest) {
   const iSubtotal  = idx("SUBTOTAL");
   const iTotal     = idx("TOTAL");
 
-  // ── 4. Match cliente_id por codigo (cargar map upfront) ─────────────────
+  // ── 4. Match cliente_id por codigo (cargar map upfront, cross-project) ──
+  //     clientes_master vive en fashion-group (af), no en local.
   const codigoToId = new Map<string, string>();
   {
-    const { data: clientes, error: cErr } = await db
+    const { data: clientes, error: cErr } = await af
       .from("clientes_master")
       .select("id, codigo")
       .eq("deleted", false);
@@ -234,9 +240,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 5. DELETE rows viejas de Boston + INSERT en batches ──────────────────
-  // Una sola foto vigente — el upload reemplaza lo anterior. Mismo patrón
-  // que el upload de CxC y el de ventas en fashiongr.
-  const { error: delErr } = await db
+  // ventas_pipeline_boston vive en Apps Familia (local). Una sola foto
+  // vigente — el upload reemplaza lo anterior.
+  const { error: delErr } = await local
     .from("ventas_pipeline_boston")
     .delete()
     .eq("empresa", COMPANY_KEY);
@@ -249,7 +255,7 @@ export async function POST(req: NextRequest) {
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const slice = rows.slice(i, i + BATCH);
-    const { error: insErr } = await db.from("ventas_pipeline_boston").insert(slice);
+    const { error: insErr } = await local.from("ventas_pipeline_boston").insert(slice);
     if (insErr) {
       console.error("[ventas/upload] insert batch falló:", insErr);
       return NextResponse.json({
