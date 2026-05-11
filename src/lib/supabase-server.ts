@@ -23,7 +23,15 @@ export function getSupabaseServer(): SupabaseClient {
       // que tener bugs invisibles en producción.
       throw new Error("SUPABASE_SERVICE_ROLE_KEY no configurado — sin service role no se pueden hacer escrituras ni lecturas con RLS (revisar env vars de Vercel para el proyecto Apps Familia)");
     }
-    _client = createClient(url, key);
+    // Next.js 13+ cachea por default TODAS las fetch() server-side. Supabase-js
+    // usa fetch internamente, así que sin override el primer response (incluso
+    // si es []) queda cacheado indefinidamente y todas las queries siguientes
+    // devuelven ese cache sin tocar Supabase. cache:'no-store' lo desactiva.
+    _client = createClient(url, key, {
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
+      },
+    });
   }
   return _client;
 }
