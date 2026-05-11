@@ -1,9 +1,13 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { data, error } = await getSupabaseAF()
     .from("guia_transporte")
     .select("*, items:guia_items(*)")
@@ -24,6 +28,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
 
   // Get next numero

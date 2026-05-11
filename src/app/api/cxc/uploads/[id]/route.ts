@@ -1,7 +1,11 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const db = getSupabaseAF();
 
   // Delete rows first (foreign key)

@@ -1,7 +1,11 @@
 // Requiere en Vercel: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NEXT_PUBLIC_GOOGLE_CLIENT_ID
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
   const accessToken = request.headers.get("x-google-token");
 
   if (!accessToken) {

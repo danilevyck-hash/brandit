@@ -1,12 +1,16 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
 const COMPANY_KEY = "confecciones_boston";
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { rows, filename } = body;
 

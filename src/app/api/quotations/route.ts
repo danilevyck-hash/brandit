@@ -1,8 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const id = request.nextUrl.searchParams.get("id");
 
   if (id) {
@@ -45,6 +49,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { data, error } = await supabase
     .from("quotations")
@@ -62,6 +69,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { id, ...updates } = body;
   const { data, error } = await supabase.from("quotations").update(updates).eq("id", id).select().single();
@@ -71,6 +81,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await request.json();
   const { error } = await supabase.from("quotations").delete().eq("id", id);
 

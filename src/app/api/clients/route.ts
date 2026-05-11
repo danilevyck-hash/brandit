@@ -1,8 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { data, error } = await supabase
     .from("clients")
     .select("*")
@@ -13,6 +17,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { data, error } = await supabase
     .from("clients")
@@ -25,6 +32,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { id, ...updates } = body;
   const { data, error } = await supabase.from("clients").update(updates).eq("id", id).select().single();
@@ -34,6 +44,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await request.json();
   const { error } = await supabase.from("clients").delete().eq("id", id);
 

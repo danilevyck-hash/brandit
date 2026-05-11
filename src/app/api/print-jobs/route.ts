@@ -1,8 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const quotationId = request.nextUrl.searchParams.get("quotation_id");
   if (!quotationId) return NextResponse.json({ error: "quotation_id required" }, { status: 400 });
 
@@ -17,6 +21,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const jobs = Array.isArray(body) ? body : [body];
   const { data, error } = await supabase.from("print_jobs").insert(jobs).select();
@@ -26,6 +33,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const { id, ...updates } = body;
   const { data, error } = await supabase.from("print_jobs").update(updates).eq("id", id).select().single();
@@ -35,6 +45,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await request.json();
   const { error } = await supabase.from("print_jobs").delete().eq("id", id);
 

@@ -1,9 +1,13 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRoles(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { data, error } = await getSupabaseAF()
     .from("user_roles")
     .select("*")
@@ -14,6 +18,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
 
   const { data, error } = await getSupabaseAF()

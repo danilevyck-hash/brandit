@@ -1,9 +1,11 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { logActivity } from "@/lib/activity-log";
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
+import { signSession, ALL_ROLES, type Role } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
+
+const SESSION_MAX_AGE_S = 60 * 60 * 24 * 30; // 30 días
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
@@ -25,16 +27,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }
 
-  logActivity(data.nombre || data.email, "LOGIN", "Inicio de sesión");
-
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) {
+  if (!process.env.AUTH_SECRET) {
     return NextResponse.json({ error: "Config error: AUTH_SECRET" }, { status: 500 });
   }
 
-  const token = createHash("sha256")
-    .update(secret + "brandit-valid")
-    .digest("hex");
+  // Validar role contra whitelist conocida — proteger contra valores raros en DB
+  if (!ALL_ROLES.includes(data.role as Role)) {
+    return NextResponse.json({ error: `Role no reconocido: ${data.role}` }, { status: 500 });
+  }
+
+  logActivity(data.nombre || data.email, "LOGIN", "Inicio de sesión");
+
+  // Cookie firmado con payload {role, userId, exp} — reemplaza el hash
+  // estático "brandit-valid" anterior. Sesiones con cookie viejo quedan
+  // inválidas → los 4 usuarios deben loguearse de nuevo una vez tras deploy.
+  const token = signSession({
+    role: data.role as Role,
+    userId: String(data.id),
+    nombre: data.nombre,
+    exp: Date.now() + SESSION_MAX_AGE_S * 1000,
+  });
 
   const isProd = process.env.NODE_ENV === "production";
   const response = NextResponse.json({
@@ -49,7 +61,7 @@ export async function POST(req: NextRequest) {
     secure: isProd,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: SESSION_MAX_AGE_S,
   });
 
   return response;

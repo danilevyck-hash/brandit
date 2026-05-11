@@ -1,12 +1,14 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest,
+  { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { data, error } = await getSupabaseAF()
     .from("notas_entrega")
     .select("*, items:notas_entrega_items(*)")
@@ -18,10 +20,11 @@ export async function GET(
   return NextResponse.json(data);
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest,
+  { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
 
   // Check if nota is not cerrada
@@ -78,10 +81,11 @@ export async function PUT(
   return NextResponse.json(updated);
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest,
+  { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
 
   const updateData: Record<string, unknown> = {};
@@ -114,10 +118,11 @@ export async function PATCH(
   return NextResponse.json(data);
 }
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest,
+  { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   // Only delete if abierta
   const { data: existing } = await getSupabaseAF()
     .from("notas_entrega")

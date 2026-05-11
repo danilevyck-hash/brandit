@@ -1,11 +1,15 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
 const COMPANY_KEY = "confecciones_boston";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const db = getSupabaseAF();
   const { data, error } = await db
     .from("cxc_favoritos")
@@ -17,6 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
   const nombres: string[] = Array.isArray(body.nombres_normalized)
     ? body.nombres_normalized
@@ -40,6 +47,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  if (auth instanceof NextResponse) return auth;
+
   const nombre = request.nextUrl.searchParams.get("nombre_normalized");
   if (!nombre) {
     return NextResponse.json({ error: "nombre_normalized requerido" }, { status: 400 });

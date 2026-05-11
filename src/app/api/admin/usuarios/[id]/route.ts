@@ -1,9 +1,13 @@
 import { getSupabaseAF } from "@/lib/supabase-af";
 import { NextRequest, NextResponse } from "next/server";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
   const body = await request.json();
 
   const { data, error } = await getSupabaseAF()
@@ -17,7 +21,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   return NextResponse.json(data);
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRoles(request, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
   const { error } = await getSupabaseAF()
     .from("user_roles")
     .delete()
