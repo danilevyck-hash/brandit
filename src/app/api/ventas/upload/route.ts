@@ -282,63 +282,44 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4.5. Auto-populate clientes_master (Fase D) ──────────────────────────
-  // Ventas SÍ trae nombre real (columna CLIENTE). Por cada (codigo, nombre)
-  // único: si codigo nuevo → INSERT; si existe → UPDATE (sobrescribe nombre
-  // por si CxC dejó placeholder con nombre = codigo).
+  // UPSERT atómico vía ON CONFLICT — una sola operación, sin pre-check ni
+  // race condition. PostgreSQL infiere el partial unique index
+  // clientes_master_codigo_unique (codigo WHERE deleted=false). El INSERT
+  // deja deleted en el default (false), satisfaciendo el predicate del index.
+  //
+  // Ventas SIEMPRE trae nombre real (columna CLIENTE) — sobrescribe cualquier
+  // placeholder previo de CxC (nombre = codigo). Para mantener la regla
+  // "Ventas gana sobre placeholder", usamos resolution=merge-duplicates
+  // (default de supabase-js .upsert con ignoreDuplicates:false).
   const uniqueClientesCsv = new Map<string, string>(); // codigo -> nombre
   for (const r of rows) {
     if (r.cliente_codigo && r.cliente && !uniqueClientesCsv.has(r.cliente_codigo)) {
       uniqueClientesCsv.set(r.cliente_codigo, r.cliente);
     }
   }
-  const toInsertClientes: { codigo: string; nombre: string; nombre_normalized: string }[] = [];
-  const toUpdateClientes: { codigo: string; nombre: string; nombre_normalized: string }[] = [];
-  for (const [codigo, nombre] of Array.from(uniqueClientesCsv.entries())) {
-    const payload = { codigo, nombre, nombre_normalized: normalizeNombre(nombre) };
-    if (codigoToId.has(codigo)) toUpdateClientes.push(payload);
-    else toInsertClientes.push(payload);
-  }
 
-  let clientesCreados = 0;
-  let clientesActualizados = 0;
-  if (toInsertClientes.length > 0) {
-    const { data: nuevos, error: insErr } = await db
+  let clientesSincronizados = 0;
+  if (uniqueClientesCsv.size > 0) {
+    const payload = Array.from(uniqueClientesCsv.entries()).map(([codigo, nombre]) => ({
+      codigo,
+      nombre,
+      nombre_normalized: normalizeNombre(nombre),
+    }));
+    const { data: synced, error: upsertErr } = await db
       .from("clientes_master")
-      .insert(toInsertClientes)
+      .upsert(payload, { onConflict: "codigo" })
       .select("id, codigo");
-    if (insErr) {
-      console.error("[ventas/upload] insert clientes falló:", insErr);
+    if (upsertErr) {
+      console.error("[ventas/upload] upsert clientes falló:", upsertErr);
       return NextResponse.json({
-        error: `No se pudieron crear clientes nuevos: ${insErr.message}`,
+        error: `No se pudo sincronizar clientes_master: ${upsertErr.message}`,
       }, { status: 500 });
     }
-    for (const c of nuevos ?? []) if (c.codigo) codigoToId.set(c.codigo, c.id);
-    clientesCreados = nuevos?.length ?? 0;
-  }
-  if (toUpdateClientes.length > 0) {
-    const BATCH = 50;
-    const nowIso = new Date().toISOString();
-    for (let i = 0; i < toUpdateClientes.length; i += BATCH) {
-      const slice = toUpdateClientes.slice(i, i + BATCH);
-      const results = await Promise.all(slice.map(u =>
-        db.from("clientes_master")
-          .update({ nombre: u.nombre, nombre_normalized: u.nombre_normalized, updated_at: nowIso })
-          .eq("codigo", u.codigo)
-          .eq("deleted", false)
-      ));
-      for (const res of results) {
-        if (res.error) {
-          console.error("[ventas/upload] update cliente falló:", res.error);
-          return NextResponse.json({
-            error: `No se pudo actualizar clientes_master: ${res.error.message}`,
-          }, { status: 500 });
-        }
-      }
-    }
-    clientesActualizados = toUpdateClientes.length;
+    for (const c of synced ?? []) if (c.codigo) codigoToId.set(c.codigo, c.id);
+    clientesSincronizados = synced?.length ?? 0;
   }
 
-  // Rehidratar cliente_id en rows con los UUIDs nuevos del map.
+  // Rehidratar cliente_id en rows con los UUIDs del map (incluye nuevos).
   for (const r of rows) {
     if (r.cliente_codigo && !r.cliente_id) {
       r.cliente_id = codigoToId.get(r.cliente_codigo) ?? null;
@@ -380,7 +361,7 @@ export async function POST(req: NextRequest) {
     "ventas_upload",
     `Boston · ${stats.facturas} fac · ${stats.notasCredito} ncr · ${stats.notasDebito} ndb · ` +
     `${stats.tiquetes} tiq · ${stats.transacciones} trx · ${stats.cotizaciones} cot · ${stats.pedidos} ped · ` +
-    `${clientesCreados} clientes nuevos · ${clientesActualizados} actualizados (${filename}).`
+    `${clientesSincronizados} clientes sincronizados (${filename}).`
   );
 
   return NextResponse.json({
@@ -388,7 +369,6 @@ export async function POST(req: NextRequest) {
     inserted,
     stats,
     filename,
-    clientes_creados: clientesCreados,
-    clientes_actualizados: clientesActualizados,
+    clientes_sincronizados: clientesSincronizados,
   });
 }

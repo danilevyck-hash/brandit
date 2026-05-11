@@ -21,8 +21,7 @@ type UploadResponse = {
   inserted?: number;
   stats?: UploadStats;
   filename?: string;
-  clientes_creados?: number;
-  clientes_actualizados?: number;
+  clientes_sincronizados?: number;
   error?: string;
 };
 
@@ -108,7 +107,7 @@ export default function VentasPage() {
             </p>
           )}
           <p className="text-green-600 mt-1">
-            {lastResult.clientes_creados ?? 0} clientes nuevos · {lastResult.clientes_actualizados ?? 0} actualizados
+            {lastResult.clientes_sincronizados ?? 0} clientes sincronizados
           </p>
           {((lastResult.stats?.invalidTipo ?? 0) +
             (lastResult.stats?.invalidFecha ?? 0) +

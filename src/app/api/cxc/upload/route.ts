@@ -214,32 +214,34 @@ export async function POST(req: NextRequest) {
     for (const c of clientes ?? []) if (c.codigo) codigoToId.set(c.codigo, c.id);
   }
 
-  // ── 5.5. Auto-populate clientes_master (Fase D) ───────────────────────────
-  // CxC sólo trae CODIGO (sin nombre). Para cada codigo nuevo, INSERT placeholder
-  // con nombre = codigo. Ventas luego sobrescribe con el nombre real (DO UPDATE).
-  // Aquí usamos DO NOTHING vía SELECT-then-INSERT: si Ventas ya creó el cliente
-  // con nombre real, no lo pisamos con el código.
+  // ── 5.5. Auto-populate clientes_master placeholders (Fase D) ─────────────
+  // UPSERT atómico con DO NOTHING (ignoreDuplicates:true) vía partial unique
+  // index clientes_master_codigo_unique. CxC sólo trae CODIGO (sin nombre),
+  // así que crea placeholders con nombre = codigo SOLO para códigos nuevos.
+  // Si Ventas ya creó el cliente con nombre real, ON CONFLICT DO NOTHING
+  // preserva ese nombre — el placeholder nunca pisa data buena.
+  // .select() después de upsert con ignoreDuplicates:true devuelve sólo las
+  // rows realmente insertadas (las omitidas no aparecen).
   const uniqueCodigosCsv = Array.from(new Set(parsed.rows.map(r => r.cliente_codigo)));
-  const nuevosCodigos = uniqueCodigosCsv.filter(c => !codigoToId.has(c));
   let placeholdersCreados = 0;
-  if (nuevosCodigos.length > 0) {
-    const placeholderPayload = nuevosCodigos.map(c => ({
+  if (uniqueCodigosCsv.length > 0) {
+    const payload = uniqueCodigosCsv.map(c => ({
       codigo: c,
       nombre: c,
       nombre_normalized: c.toLowerCase().trim(),
     }));
-    const { data: insertedClientes, error: insClientesErr } = await db
+    const { data: inserted, error: upsertErr } = await db
       .from("clientes_master")
-      .insert(placeholderPayload)
+      .upsert(payload, { onConflict: "codigo", ignoreDuplicates: true })
       .select("id, codigo");
-    if (insClientesErr) {
-      console.error("[cxc/upload] insert placeholders falló:", insClientesErr);
+    if (upsertErr) {
+      console.error("[cxc/upload] upsert placeholders falló:", upsertErr);
       return NextResponse.json({
-        error: `No se pudieron crear clientes placeholders: ${insClientesErr.message}`,
+        error: `No se pudieron sincronizar clientes: ${upsertErr.message}`,
       }, { status: 500 });
     }
-    for (const c of insertedClientes ?? []) if (c.codigo) codigoToId.set(c.codigo, c.id);
-    placeholdersCreados = insertedClientes?.length ?? 0;
+    for (const c of inserted ?? []) if (c.codigo) codigoToId.set(c.codigo, c.id);
+    placeholdersCreados = inserted?.length ?? 0;
   }
 
   let matched = 0;
