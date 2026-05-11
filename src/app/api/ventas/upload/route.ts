@@ -105,6 +105,17 @@ function normalizeTipo(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+// Fase D: matchea con UNIQUE INDEX en clientes_master(nombre_normalized).
+// Strip diacríticos + lowercase + collapse whitespace.
+function normalizeNombre(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export async function POST(req: NextRequest) {
   const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
@@ -235,6 +246,70 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
+  // ── 4.5. Auto-populate clientes_master (Fase D) ──────────────────────────
+  // Ventas SÍ trae nombre real (columna CLIENTE). Por cada (codigo, nombre)
+  // único: si codigo nuevo → INSERT; si existe → UPDATE (sobrescribe nombre
+  // por si CxC dejó placeholder con nombre = codigo).
+  const uniqueClientesCsv = new Map<string, string>(); // codigo -> nombre
+  for (const r of rows) {
+    if (r.cliente_codigo && r.cliente && !uniqueClientesCsv.has(r.cliente_codigo)) {
+      uniqueClientesCsv.set(r.cliente_codigo, r.cliente);
+    }
+  }
+  const toInsertClientes: { codigo: string; nombre: string; nombre_normalized: string }[] = [];
+  const toUpdateClientes: { codigo: string; nombre: string; nombre_normalized: string }[] = [];
+  for (const [codigo, nombre] of Array.from(uniqueClientesCsv.entries())) {
+    const payload = { codigo, nombre, nombre_normalized: normalizeNombre(nombre) };
+    if (codigoToId.has(codigo)) toUpdateClientes.push(payload);
+    else toInsertClientes.push(payload);
+  }
+
+  let clientesCreados = 0;
+  let clientesActualizados = 0;
+  if (toInsertClientes.length > 0) {
+    const { data: nuevos, error: insErr } = await db
+      .from("clientes_master")
+      .insert(toInsertClientes)
+      .select("id, codigo");
+    if (insErr) {
+      console.error("[ventas/upload] insert clientes falló:", insErr);
+      return NextResponse.json({
+        error: `No se pudieron crear clientes nuevos: ${insErr.message}`,
+      }, { status: 500 });
+    }
+    for (const c of nuevos ?? []) if (c.codigo) codigoToId.set(c.codigo, c.id);
+    clientesCreados = nuevos?.length ?? 0;
+  }
+  if (toUpdateClientes.length > 0) {
+    const BATCH = 50;
+    const nowIso = new Date().toISOString();
+    for (let i = 0; i < toUpdateClientes.length; i += BATCH) {
+      const slice = toUpdateClientes.slice(i, i + BATCH);
+      const results = await Promise.all(slice.map(u =>
+        db.from("clientes_master")
+          .update({ nombre: u.nombre, nombre_normalized: u.nombre_normalized, updated_at: nowIso })
+          .eq("codigo", u.codigo)
+          .eq("deleted", false)
+      ));
+      for (const res of results) {
+        if (res.error) {
+          console.error("[ventas/upload] update cliente falló:", res.error);
+          return NextResponse.json({
+            error: `No se pudo actualizar clientes_master: ${res.error.message}`,
+          }, { status: 500 });
+        }
+      }
+    }
+    clientesActualizados = toUpdateClientes.length;
+  }
+
+  // Rehidratar cliente_id en rows con los UUIDs nuevos del map.
+  for (const r of rows) {
+    if (r.cliente_codigo && !r.cliente_id) {
+      r.cliente_id = codigoToId.get(r.cliente_codigo) ?? null;
+    }
+  }
+
   // ── 5. DELETE rows viejas de Boston + INSERT en batches ──────────────────
   // Una sola foto vigente — el upload reemplaza lo anterior.
   const { error: delErr } = await db
@@ -266,7 +341,8 @@ export async function POST(req: NextRequest) {
   await logActivity(
     usuario,
     "ventas_pipeline_upload",
-    `Boston · ${stats.cotizaciones} cotizaciones + ${stats.pedidos} pedidos (${filename}). ` +
+    `Boston · ${stats.cotizaciones} cotizaciones + ${stats.pedidos} pedidos · ` +
+    `${clientesCreados} clientes nuevos · ${clientesActualizados} actualizados (${filename}). ` +
     `Passthrough (manejado por fashiongr): ${stats.passthrough}.`
   );
 
@@ -275,5 +351,7 @@ export async function POST(req: NextRequest) {
     inserted,
     stats,
     filename,
+    clientes_creados: clientesCreados,
+    clientes_actualizados: clientesActualizados,
   });
 }
