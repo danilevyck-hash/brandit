@@ -22,6 +22,14 @@ export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
 
+  console.log("[api/cxc] URL en runtime:",
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log("[api/cxc] SUPABASE_URL set:", !!process.env.SUPABASE_URL);
+  console.log("[api/cxc] NEXT_PUBLIC_SUPABASE_URL set:",
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log("[api/cxc] SERVICE_ROLE_KEY primeros 12:",
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 12));
+
   const db = getSupabaseServer();
   const uploadId = req.nextUrl.searchParams.get("upload_id");
 
