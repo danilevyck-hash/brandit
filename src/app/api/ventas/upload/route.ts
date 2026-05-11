@@ -1,23 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/ventas/upload — Brand It
 //
-// Parser propio para listacomprobantes_boston.csv (Switch ERP) que ingiere
-// SOLO los tipos COTIZACION y PEDIDO a ventas_pipeline_boston. Las facturas
-// y notas las maneja el parser de fashiongr (van a ventas_raw, schema
-// shared). Brand It NO debe duplicar esos comprobantes.
+// Parser propio para listacomprobantes_boston.csv (Switch ERP). Post-Fase C
+// ingiere TODOS los tipos (Cotizacion, Pedido, Factura, Nota credito/debito,
+// Tiquete, Transaccion) a ventas_raw — la tabla unificada de Brand It.
+// La columna `tipo` distingue. Brand It es ya independiente de fashion-group
+// (Fase B), no hay parser externo poblando ventas_raw.
+//
+// Snapshot pattern (CRÍTICO): el DELETE-then-INSERT asume que Switch exporta
+// el HISTÓRICO COMPLETO de Boston (desde 2022) en cada CSV. Cada upload
+// reemplaza toda la data previa. Si algún día Switch cambia a exportar
+// incremental (solo deltas desde fecha X), este pattern destruye historia
+// y hay que cambiarlo a UPSERT por (empresa, tipo, n_sistema, fecha).
 //
 // Flujo:
 //   1. Auth admin only
 //   2. Multipart upload del CSV
 //   3. Decode latin1 con fallback UTF-8
-//   4. Parse CSV ;-delimitado
-//   5. Filtrar TIPO IN ('COTIZACION', 'PEDIDO') — descartar el resto
-//   6. Match cliente_codigo → cliente_id contra clientes_master
-//   7. DELETE rows viejas de Boston en ventas_pipeline_boston
-//      (mismo patrón que el upload de fashiongr: una sola "foto" vigente)
+//   4. Parse CSV ;-delimitado, mapear TIPO a valor canónico (capitalize-first)
+//   5. Match cliente_codigo → cliente_id contra clientes_master
+//   6. Auto-populate clientes_master (Fase D): INSERT nuevos, UPDATE existentes
+//   7. DELETE rows viejas de Boston en ventas_raw
 //   8. INSERT en batches de 2000
-//
-// Migration requerida: 20260511000000_ventas_pipeline_boston.sql aplicada.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -30,21 +34,27 @@ export const maxDuration = 60;
 
 const COMPANY_KEY = "confecciones_boston";
 
-// Tipos que SÍ se ingieren a ventas_pipeline_boston. CSV viene en mayúsculas
-// sin diacríticos (formato listacomprobantes nuevo). Mapeo a los valores
-// canónicos del CHECK constraint de la tabla.
-const TIPO_MAP: Record<string, "Cotizacion" | "Pedido"> = {
-  COTIZACION:  "Cotizacion",
-  COTIZACIÓN:  "Cotizacion",
-  PEDIDO:      "Pedido",
+// Valor canónico = capitalize-first sin tildes. Coincide con lo que
+// queries.ts espera (`tipo = 'Factura'`, etc.).
+type Tipo = "Cotizacion" | "Pedido" | "Factura" | "Nota de credito" | "Nota de debito" | "Tiquete" | "Transaccion";
+
+const TIPO_MAP: Record<string, Tipo> = {
+  COTIZACION:           "Cotizacion",
+  "COTIZACIÓN":         "Cotizacion",
+  PEDIDO:               "Pedido",
+  FACTURA:              "Factura",
+  "NOTA DE CREDITO":    "Nota de credito",
+  "NOTA DE CRÉDITO":    "Nota de credito",
+  "NOTA DE DEBITO":     "Nota de debito",
+  "NOTA DE DÉBITO":     "Nota de debito",
+  TIQUETE:              "Tiquete",
+  TRANSACCION:          "Transaccion",
+  "TRANSACCIÓN":        "Transaccion",
 };
-// Tipos que el parser de fashiongr maneja en ventas_raw — los descartamos
-// aquí silenciosamente para no duplicar data.
-const PASSTHROUGH_TIPOS = new Set(["FACTURA", "TRANSACCION", "TRANSACCIÓN", "TIQUETE", "NOTA DE CREDITO", "NOTA DE CRÉDITO", "NOTA DE DEBITO", "NOTA DE DÉBITO"]);
 
 interface RawRow {
   empresa: string;
-  tipo: "Cotizacion" | "Pedido";
+  tipo: Tipo;
   fecha: string;
   anio: number;
   mes: number;
@@ -57,13 +67,22 @@ interface RawRow {
   cliente_codigo: string | null;
   subtotal: number;
   total: number;
+  costo: null;
+  descuento: null;
+  itbms: null;
+  utilidad: null;
+  pct_utilidad: null;
   uploaded_by: string | null;
 }
 
 interface ParseStats {
   cotizaciones: number;
   pedidos: number;
-  passthrough: number;   // facturas + notas + tiquetes (los maneja fashiongr)
+  facturas: number;
+  notasCredito: number;
+  notasDebito: number;
+  tiquetes: number;
+  transacciones: number;
   invalidTipo: number;
   invalidFecha: number;
   invalidCliente: number;
@@ -105,7 +124,7 @@ function normalizeTipo(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
-// Fase D: matchea con UNIQUE INDEX en clientes_master(nombre_normalized).
+// Fase D: match con clientes_master(nombre_normalized).
 // Strip diacríticos + lowercase + collapse whitespace.
 function normalizeNombre(s: string): string {
   return s
@@ -116,13 +135,23 @@ function normalizeNombre(s: string): string {
     .replace(/\s+/g, " ");
 }
 
+function incTipoStat(stats: ParseStats, tipo: Tipo): void {
+  switch (tipo) {
+    case "Cotizacion":      stats.cotizaciones++; break;
+    case "Pedido":          stats.pedidos++; break;
+    case "Factura":         stats.facturas++; break;
+    case "Nota de credito": stats.notasCredito++; break;
+    case "Nota de debito":  stats.notasDebito++; break;
+    case "Tiquete":         stats.tiquetes++; break;
+    case "Transaccion":     stats.transacciones++; break;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
   const session = getSessionPayload(req);
 
-  // Apps Familia exclusivo: ventas_pipeline_boston, clientes_master, todo
-  // en el mismo proyecto. Cero cross-project.
   const db = getSupabaseServer();
 
   // ── 1. Read multipart ────────────────────────────────────────────────────
@@ -196,7 +225,8 @@ export async function POST(req: NextRequest) {
   }
 
   const stats: ParseStats = {
-    cotizaciones: 0, pedidos: 0, passthrough: 0, invalidTipo: 0, invalidFecha: 0, invalidCliente: 0,
+    cotizaciones: 0, pedidos: 0, facturas: 0, notasCredito: 0, notasDebito: 0,
+    tiquetes: 0, transacciones: 0, invalidTipo: 0, invalidFecha: 0, invalidCliente: 0,
   };
   const rows: RawRow[] = [];
 
@@ -205,7 +235,6 @@ export async function POST(req: NextRequest) {
     const get = (j: number) => (j >= 0 ? cols[j]?.trim() ?? "" : "");
 
     const tipoRaw = normalizeTipo(get(iTipo));
-    if (PASSTHROUGH_TIPOS.has(tipoRaw)) { stats.passthrough++; continue; }
     const tipoCanonical = TIPO_MAP[tipoRaw];
     if (!tipoCanonical) { stats.invalidTipo++; continue; }
 
@@ -231,17 +260,23 @@ export async function POST(req: NextRequest) {
       cliente_id: codigo ? codigoToId.get(codigo) ?? null : null,
       subtotal: toNum(get(iSubtotal)),
       total:    toNum(get(iTotal)),
+      // listacomprobantes no trae breakdown de costos — quedan NULL.
+      // Si Switch agrega columnas (ej. COSTO, DESCUENTO), parsearlas aquí.
+      costo:        null,
+      descuento:    null,
+      itbms:        null,
+      utilidad:     null,
+      pct_utilidad: null,
       uploaded_by: session?.userId ?? null,
     });
 
-    if (tipoCanonical === "Cotizacion") stats.cotizaciones++;
-    else stats.pedidos++;
+    incTipoStat(stats, tipoCanonical);
   }
 
   if (rows.length === 0) {
     return NextResponse.json({
-      error: "No se encontraron cotizaciones ni pedidos en el archivo. " +
-             "Verifica que el reporte tenga filas con TIPO = COTIZACION o PEDIDO.",
+      error: "No se encontraron comprobantes válidos en el archivo. " +
+             "Verifica que descargaste 'listacomprobantes' de Switch.",
       stats,
     }, { status: 400 });
   }
@@ -311,21 +346,23 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 5. DELETE rows viejas de Boston + INSERT en batches ──────────────────
-  // Una sola foto vigente — el upload reemplaza lo anterior.
+  // Snapshot pattern: el CSV de Switch contiene el histórico COMPLETO de
+  // Boston desde 2022. Reemplazamos todo lo previo. Ver header del archivo
+  // para la nota sobre cambio a UPSERT si Switch alguna vez exporta incremental.
   const { error: delErr } = await db
-    .from("ventas_pipeline_boston")
+    .from("ventas_raw")
     .delete()
     .eq("empresa", COMPANY_KEY);
   if (delErr) {
     console.error("[ventas/upload] delete viejo falló:", delErr);
-    return NextResponse.json({ error: `No se pudo limpiar el pipeline previo: ${delErr.message}` }, { status: 500 });
+    return NextResponse.json({ error: `No se pudo limpiar ventas_raw previo: ${delErr.message}` }, { status: 500 });
   }
 
   const BATCH = 2000;
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const slice = rows.slice(i, i + BATCH);
-    const { error: insErr } = await db.from("ventas_pipeline_boston").insert(slice);
+    const { error: insErr } = await db.from("ventas_raw").insert(slice);
     if (insErr) {
       console.error("[ventas/upload] insert batch falló:", insErr);
       return NextResponse.json({
@@ -340,10 +377,10 @@ export async function POST(req: NextRequest) {
   const usuario = session?.nombre ?? session?.role ?? "unknown";
   await logActivity(
     usuario,
-    "ventas_pipeline_upload",
-    `Boston · ${stats.cotizaciones} cotizaciones + ${stats.pedidos} pedidos · ` +
-    `${clientesCreados} clientes nuevos · ${clientesActualizados} actualizados (${filename}). ` +
-    `Passthrough (manejado por fashiongr): ${stats.passthrough}.`
+    "ventas_upload",
+    `Boston · ${stats.facturas} fac · ${stats.notasCredito} ncr · ${stats.notasDebito} ndb · ` +
+    `${stats.tiquetes} tiq · ${stats.transacciones} trx · ${stats.cotizaciones} cot · ${stats.pedidos} ped · ` +
+    `${clientesCreados} clientes nuevos · ${clientesActualizados} actualizados (${filename}).`
   );
 
   return NextResponse.json({

@@ -136,18 +136,18 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
 }
 
 async function fetchFunnel(year: number): Promise<FunnelStats> {
-  // ventas_pipeline_boston y ventas_raw ambas viven en Apps Familia — un solo
-  // cliente. Hasta Fase C ventas_pipeline_boston contiene Cotizaciones+Pedidos
-  // y ventas_raw contiene Facturas; en Fase C todo se consolida a ventas_raw.
+  // Post-Fase C: todos los tipos (Cotizacion, Pedido, Factura, Nota, Tiquete,
+  // Transaccion) viven en ventas_raw distinguidos por la columna `tipo`.
+  // ventas_pipeline_boston dropeada.
   const db = getSupabaseServer();
 
   const [cotRes, pedRes, facRes] = await Promise.all([
-    db.from("ventas_pipeline_boston")
+    db.from("ventas_raw")
       .select("total")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Cotizacion")
       .eq("anio", year),
-    db.from("ventas_pipeline_boston")
+    db.from("ventas_raw")
       .select("total")
       .eq("empresa", COMPANY_KEY)
       .eq("tipo", "Pedido")
