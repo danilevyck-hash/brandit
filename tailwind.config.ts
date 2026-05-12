@@ -5,6 +5,11 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Helpers en lib/ pueden emitir nombres de clase dinámicos (ej.
+    // heatmapClasses en src/lib/ventas/format.ts retorna strings como
+    // "bg-teal-100" según el delta). Tailwind necesita escanear estos
+    // archivos para que las clases sobrevivan el purge.
+    "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
