@@ -135,46 +135,34 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   };
 }
 
+interface FunnelRpcRow {
+  tipo: string;
+  /** bigint puede venir como string en supabase-js, normalizar con toNum. */
+  count: number | string;
+  total: number | string;
+}
+
 async function fetchFunnel(year: number): Promise<FunnelStats> {
   // Post-Fase C: todos los tipos (Cotizacion, Pedido, Factura, Nota, Tiquete,
-  // Transaccion) viven en ventas_raw distinguidos por la columna `tipo`.
-  // ventas_pipeline_boston dropeada.
+  // Transaccion) viven en ventas_raw distinguidos por `tipo`. Antes hacíamos
+  // 3 SELECTs paralelos sin agregar, que topaban en 1000 rows (default
+  // Supabase JS sin paginación) — facturas históricas superaban el límite y
+  // los totales venían incompletos. Ahora delegamos el GROUP BY al RPC, que
+  // devuelve ≤7 filas (una por tipo). Cero límite de transporte aplica.
   const db = getSupabaseServer();
 
-  const [cotRes, pedRes, facRes] = await Promise.all([
-    db.from("ventas_raw")
-      .select("total")
-      .eq("empresa", COMPANY_KEY)
-      .eq("tipo", "Cotizacion")
-      .eq("anio", year),
-    db.from("ventas_raw")
-      .select("total")
-      .eq("empresa", COMPANY_KEY)
-      .eq("tipo", "Pedido")
-      .eq("anio", year),
-    // Facturas de ventas_raw — count distinct n_sistema en JS porque
-    // supabase-js no expone count(distinct) directo.
-    db.from("ventas_raw")
-      .select("subtotal, n_sistema")
-      .eq("empresa", COMPANY_KEY)
-      .eq("tipo", "Factura")
-      .eq("anio", year),
-  ]);
+  const { data, error } = await db.rpc("ventas_funnel_summary", { p_anio: year });
+  if (error) throw new Error(`ventas_funnel_summary(${year}): ${error.message}`);
 
-  const cotTotal = (cotRes.data ?? []).reduce((s, r) => s + toNum(r.total), 0);
-  const pedTotal = (pedRes.data ?? []).reduce((s, r) => s + toNum(r.total), 0);
-
-  // Facturas: distinct n_sistema para count real (una factura puede tener
-  // múltiples filas si tiene items, pero ventas_raw es por documento así
-  // que count(*) ≈ count(distinct n_sistema). Usamos count distinct por seguridad.
-  const facRows = facRes.data ?? [];
-  const facCountDistinct = new Set(facRows.map(r => r.n_sistema).filter(Boolean)).size;
-  const facTotal = facRows.reduce((s, r) => s + toNum(r.subtotal), 0);
+  const byTipo = new Map<string, { count: number; total: number }>();
+  for (const r of (data as FunnelRpcRow[] | null) ?? []) {
+    byTipo.set(r.tipo, { count: toNum(r.count), total: toNum(r.total) });
+  }
 
   return {
-    cotizaciones: { count: cotRes.data?.length ?? 0, total: cotTotal },
-    pedidos:      { count: pedRes.data?.length ?? 0, total: pedTotal },
-    facturas:     { count: facCountDistinct, total: facTotal },
+    cotizaciones: byTipo.get("Cotizacion") ?? { count: 0, total: 0 },
+    pedidos:      byTipo.get("Pedido")     ?? { count: 0, total: 0 },
+    facturas:     byTipo.get("Factura")    ?? { count: 0, total: 0 },
   };
 }
 
