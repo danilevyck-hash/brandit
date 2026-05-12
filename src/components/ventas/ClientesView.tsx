@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Cliente } from "./types";
 import { fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaFormat } from "@/lib/ventas/formatDelta";
+import HoverCard from "./HoverCard";
 
 type ApiResponse = {
   rows: Cliente[];
@@ -24,8 +25,7 @@ const TONE_CLASS: Record<DeltaFormat["tone"], string> = {
 
 export default function ClientesView() {
   const [rows, setRows]       = useState<Cliente[] | null>(null);
-  // monthly se trae upfront para no re-fetchar en Commit E (HoverCard sparkline).
-  const [_monthly, setMonthly] = useState<Record<string, number[]>>({});
+  const [monthly, setMonthly] = useState<Record<string, number[]>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
@@ -33,6 +33,38 @@ export default function ClientesView() {
   const [sortKey, setSortKey] = useState<SortKey>("ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage]       = useState(1);
+
+  // Hover state para HoverCard. Delay 300ms para evitar trigger al pasar el mouse.
+  const [hovered, setHovered] = useState<{ cliente: Cliente; top: number; left: number } | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleRowEnter = (cliente: Cliente, e: React.MouseEvent<HTMLTableRowElement>) => {
+    // Si no hay sparkline data para este codigo (orphan / sin facturas en 12m),
+    // ni siquiera schedule — skip silencioso.
+    if (!monthly[cliente.id]) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cardWidth = 288; // w-72 = 18rem
+    const gap = 16;
+    let left = rect.right + gap;
+    if (left + cardWidth > window.innerWidth) {
+      // Fallback a la izquierda si no cabe a la derecha.
+      left = Math.max(gap, rect.left - cardWidth - gap);
+    }
+    const top = rect.top;
+
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHovered({ cliente, top, left });
+    }, 300);
+  };
+
+  const handleRowLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHovered(null);
+  };
 
   // Fetch on mount. Si vienes del Tab Resumen y volvés acá, no se re-fetcha
   // porque el state persiste (ResumenView/ClientesView mantienen su state
@@ -217,7 +249,12 @@ export default function ClientesView() {
                 const delta = formatDeltaRatio(r.delta || null);
                 const showDelta = !(delta.arrow === null && delta.displayValue === "—");
                 return (
-                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <tr
+                    key={r.id}
+                    onMouseEnter={(e) => handleRowEnter(r, e)}
+                    onMouseLeave={handleRowLeave}
+                    className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                  >
                     <td className="px-4 py-3 text-gray-900 font-medium">{r.nombre}</td>
                     <td className="px-3 py-3 text-right text-gray-700">{fmtMoneyCompact(r.ytd)}</td>
                     <td className={`px-3 py-3 text-right ${showDelta ? TONE_CLASS[delta.tone] : "text-gray-300"}`}>
@@ -275,6 +312,15 @@ export default function ClientesView() {
             Siguiente →
           </button>
         </div>
+      )}
+
+      {/* HoverCard (desktop only) */}
+      {hovered && monthly[hovered.cliente.id] && (
+        <HoverCard
+          cliente={hovered.cliente}
+          monthly={monthly[hovered.cliente.id]}
+          style={{ top: hovered.top, left: hovered.left }}
+        />
       )}
     </div>
   );
