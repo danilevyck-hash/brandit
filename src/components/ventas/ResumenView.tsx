@@ -1,10 +1,23 @@
 "use client";
 
-import type { VentasResumen } from "./types";
-import { fmtMoney, fmtPct } from "@/lib/ventas/format";
+import { useState } from "react";
+import type { VentasResumen, MonthlySeries } from "./types";
+import { fmtMoney, fmtPct, MONTHS, QUARTERS, monthsToQuarters } from "@/lib/ventas/format";
 import { formatDelta, type DeltaFormat } from "@/lib/ventas/formatDelta";
+import HeatmapTable from "./HeatmapTable";
+
+// TODO(naming-cleanup): los campos `ventas2026/ventas2025/utilidad2026/utilidad2025`
+// en VentasResumen son legacy names heredados de fashiongr. En realidad representan
+// {current, prev} del year seleccionado, NO años 2026/2025 literales. Si seleccionás
+// year=2024, `ventas2026` contiene data de 2024 y `ventas2025` de 2023. Refactor a
+// `ventasCur/ventasPrev/utilidadCur/utilidadPrev` en sprint separado.
 
 type Props = { data: VentasResumen };
+
+const METRICS = ["Ventas", "Utilidad"] as const;
+const PERIODS = ["Mensual", "Trimestral"] as const;
+type Metric = typeof METRICS[number];
+type Period = typeof PERIODS[number];
 
 const TONE_CLASS: Record<DeltaFormat["tone"], string> = {
   emerald: "text-emerald-600",
@@ -13,7 +26,10 @@ const TONE_CLASS: Record<DeltaFormat["tone"], string> = {
 };
 
 export default function ResumenView({ data }: Props) {
-  const { kpis } = data;
+  const [metric, setMetric] = useState<Metric>("Ventas");
+  const [period, setPeriod] = useState<Period>("Mensual");
+
+  const { kpis, funnel, year, mesActual } = data;
   const ventasDelta   = formatDelta(kpis.ventasYTD,   kpis.ventasPrevYTD);
   const utilidadDelta = formatDelta(kpis.utilidadYTD, kpis.utilidadPrevYTD);
   const margenDelta   = formatDelta(kpis.margenYTD,   kpis.margenPrevYTD);
@@ -25,7 +41,29 @@ export default function ResumenView({ data }: Props) {
     ? `Meta: ${fmtMoney(kpis.metaAnual)}`
     : "Meta no configurada";
 
-  const { funnel } = data;
+  // Series del heatmap según toggle Metric (Ventas → subtotal, Utilidad → utilidad).
+  // Los nombres `ventas2026/ventas2025` son legacy — ver TODO arriba.
+  const currentMonths: MonthlySeries = metric === "Ventas" ? data.ventas2026 : data.utilidad2026;
+  const prevMonths:    MonthlySeries = metric === "Ventas" ? data.ventas2025 : data.utilidad2025;
+
+  // Si Trimestral, agregamos 12→4. monthsToQuarters: parcial = suma de no-null,
+  // todos null → null. Opción B (parcial visible) la implementa el masking via
+  // maxComparableIndex en HeatmapTable, no acá.
+  const current = period === "Mensual" ? currentMonths : monthsToQuarters(currentMonths);
+  const prev    = period === "Mensual" ? prevMonths    : monthsToQuarters(prevMonths);
+  const labels  = period === "Mensual" ? MONTHS : QUARTERS;
+
+  // Same-period strict: hasta qué index hay comparativo válido.
+  //   Mensual: mesActual=4 → indices 0..3 (Ene..Abr) comparables.
+  //   Trimestral: solo quarters cuyo último mes (q*3+3) <= mesActual.
+  //     mesActual=3 → Q1 sí (último mes 3). Q2 no.
+  //     mesActual=4 → Q1 sí. Q2 no (último mes 6 > 4).
+  //     mesActual=6 → Q1+Q2. Q3 no.
+  //   maxComparableIndex Trimestral = floor(mesActual / 3) - 1.
+  // Si mesActual = 0 (year sin data) → maxComparableIndex = -1 → tabla muestra "—".
+  const maxComparableIndex = period === "Mensual"
+    ? mesActual - 1
+    : Math.floor(mesActual / 3) - 1;
 
   return (
     <>
@@ -63,7 +101,55 @@ export default function ResumenView({ data }: Props) {
           <FunnelCard title="Facturas"     count={funnel.facturas.count}     total={funnel.facturas.total} />
         </div>
       </section>
+
+      <section className="mt-10">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold text-brandit-black tracking-tight">
+            {metric} · {period}
+          </h2>
+          <div className="flex items-center gap-2">
+            <SegmentedPills value={metric} onChange={setMetric} options={METRICS} />
+            <SegmentedPills value={period} onChange={setPeriod} options={PERIODS} />
+          </div>
+        </div>
+        <HeatmapTable
+          labels={labels}
+          currentLabel={String(year)}
+          prevLabel={String(year - 1)}
+          current={current}
+          prev={prev}
+          maxComparableIndex={maxComparableIndex}
+        />
+      </section>
     </>
+  );
+}
+
+function SegmentedPills<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: readonly T[];
+}) {
+  return (
+    <div className="inline-flex bg-gray-100 rounded-full p-1">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          onClick={() => onChange(opt)}
+          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            value === opt
+              ? "bg-white text-brandit-black shadow-sm"
+              : "text-gray-500 hover:text-brandit-black"
+          }`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
   );
 }
 
