@@ -13,6 +13,12 @@
 // incremental (solo deltas desde fecha X), este pattern destruye historia
 // y hay que cambiarlo a UPSERT por (empresa, tipo, n_sistema, fecha).
 //
+// NOTA: ventas_raw guarda costo/utilidad para todos los tipos (Cotizacion,
+// Pedido, Factura, etc.) tal como vienen del CSV. Las queries de KPIs
+// (ventas_dashboard_summary RPC, ventas_topclientes_summary RPC,
+// clientes_empresa_12m_vw matview) filtran tipo='Factura' para que las
+// métricas no se inflen con cotizaciones/pedidos.
+//
 // Flujo:
 //   1. Auth admin only
 //   2. Multipart upload del CSV
@@ -67,11 +73,12 @@ interface RawRow {
   cliente_codigo: string | null;
   subtotal: number;
   total: number;
-  costo: null;
-  descuento: null;
-  itbms: null;
-  utilidad: null;
-  pct_utilidad: null;
+  costo: number | null;
+  descuento: number | null;
+  itbms: number | null;
+  utilidad: number | null;
+  /** Porcentaje de utilidad sobre subtotal (ej. 36.26 = 36.26%), tal cual viene del CSV. */
+  pct_utilidad: number | null;
   uploaded_by: string | null;
 }
 
@@ -209,6 +216,11 @@ export async function POST(req: NextRequest) {
   const iCodigo    = idx("CODIGO");
   const iSubtotal  = idx("SUBTOTAL");
   const iTotal     = idx("TOTAL");
+  const iCosto     = idx("COSTO");
+  const iDescuento = idx("DESCUENTO");
+  const iImpuesto  = idx("IMPUESTO");
+  const iUtilidad  = idx("UTILIDAD");
+  const iPctUtil   = idx("% UTILIDAD");
 
   // ── 4. Match cliente_id por codigo (cargar map upfront) ─────────────────
   const codigoToId = new Map<string, string>();
@@ -260,13 +272,16 @@ export async function POST(req: NextRequest) {
       cliente_id: codigo ? codigoToId.get(codigo) ?? null : null,
       subtotal: toNum(get(iSubtotal)),
       total:    toNum(get(iTotal)),
-      // listacomprobantes no trae breakdown de costos — quedan NULL.
-      // Si Switch agrega columnas (ej. COSTO, DESCUENTO), parsearlas aquí.
-      costo:        null,
-      descuento:    null,
-      itbms:        null,
-      utilidad:     null,
-      pct_utilidad: null,
+      // listacomprobantes SÍ trae breakdown (COSTO, DESCUENTO, IMPUESTO,
+      // UTILIDAD, % UTILIDAD). Si la columna no existe (CSV viejo) → null.
+      // Si existe pero vacía → 0 (vía toNum).
+      // % UTILIDAD se guarda como viene del CSV: porcentaje sobre subtotal
+      // (ej. 36.26 = 36.26%), no ratio. NUMERIC(10,4) lo soporta.
+      costo:        iCosto     >= 0 ? toNum(get(iCosto))     : null,
+      descuento:    iDescuento >= 0 ? toNum(get(iDescuento)) : null,
+      itbms:        iImpuesto  >= 0 ? toNum(get(iImpuesto))  : null,
+      utilidad:     iUtilidad  >= 0 ? toNum(get(iUtilidad))  : null,
+      pct_utilidad: iPctUtil   >= 0 ? toNum(get(iPctUtil))   : null,
       uploaded_by: session?.userId ?? null,
     });
 
