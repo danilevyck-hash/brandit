@@ -237,6 +237,30 @@ function normalizeWa(raw: string): string {
   return "+" + digits;
 }
 
+interface MonthlyRpcRow {
+  cliente_codigo: string;
+  /** 12 numbers, index 0 = mes más viejo (hace 11 meses), index 11 = mes actual. */
+  monthly: number[];
+}
+
+/**
+ * Sparkline mensual 12m rolling por cliente. Vía RPC ventas_clientes_monthly_12m.
+ * Retorna Record<cliente_codigo, number[]> para lookup directo en cliente.
+ * Solo incluye clientes con cliente_codigo NOT NULL y al menos una factura
+ * en los últimos 12 meses (mismo universo que matview clientes_empresa_12m_vw).
+ */
+export async function fetchClientesMonthly(): Promise<Record<string, number[]>> {
+  const db = getSupabaseServer();
+  const { data, error } = await db.rpc("ventas_clientes_monthly_12m");
+  if (error) throw new Error(`ventas_clientes_monthly_12m: ${error.message}`);
+
+  const map: Record<string, number[]> = {};
+  for (const r of (data as MonthlyRpcRow[] | null) ?? []) {
+    map[r.cliente_codigo] = r.monthly.map(v => toNum(v));
+  }
+  return map;
+}
+
 /**
  * Clientes tab — siempre Boston. Lee de clientes_empresa_12m_vw filtrando
  * por empresa = 'confecciones_boston'. Cada cliente Boston aparece una vez
