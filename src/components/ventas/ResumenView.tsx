@@ -1,22 +1,83 @@
 "use client";
 
-import { useEffect } from "react";
 import type { VentasResumen } from "./types";
+import { fmtMoney, fmtPct } from "@/lib/ventas/format";
+import { formatDelta, type DeltaFormat } from "@/lib/ventas/formatDelta";
 
 type Props = { data: VentasResumen };
 
+const TONE_CLASS: Record<DeltaFormat["tone"], string> = {
+  emerald: "text-emerald-600",
+  orange:  "text-orange-600",
+  stone:   "text-gray-400",
+};
+
 export default function ResumenView({ data }: Props) {
-  // Console temporal — limpiar en commit siguiente (Fase 3.2 KPIs).
-  useEffect(() => {
-    console.log("[ResumenView] data:", data);
-  }, [data]);
+  const { kpis } = data;
+  const ventasDelta   = formatDelta(kpis.ventasYTD,   kpis.ventasPrevYTD);
+  const utilidadDelta = formatDelta(kpis.utilidadYTD, kpis.utilidadPrevYTD);
+  const margenDelta   = formatDelta(kpis.margenYTD,   kpis.margenPrevYTD);
+
+  const metaConfigured = kpis.metaAnual > 0;
+  const avancePctRaw   = metaConfigured ? (kpis.ventasYTD / kpis.metaAnual) * 100 : 0;
+  const avanceDisplay  = metaConfigured ? `${Math.round(avancePctRaw)}%` : "—";
+  const avanceSubtitle = metaConfigured
+    ? `Meta: ${fmtMoney(kpis.metaAnual)}`
+    : "Meta no configurada";
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 px-6 py-12 text-center">
-      <p className="text-gray-400 text-lg">Fase 3.2 — KPIs próximamente</p>
-      <p className="text-gray-300 text-sm mt-2">
-        Año {data.year} · mes actual {data.mesActual || "—"}
-      </p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <KpiCard
+        title="Ventas YTD"
+        value={fmtMoney(kpis.ventasYTD)}
+        delta={ventasDelta}
+        subtitle="vs mismo periodo año anterior"
+      />
+      <KpiCard
+        title="Utilidad YTD"
+        value={fmtMoney(kpis.utilidadYTD)}
+        delta={utilidadDelta}
+        subtitle="vs mismo periodo año anterior"
+      />
+      <KpiCard
+        title="Margen %"
+        value={fmtPct(kpis.margenYTD)}
+        delta={margenDelta}
+        subtitle="promedio YTD"
+      />
+      <KpiCard
+        title="Avance vs Meta"
+        value={avanceDisplay}
+        subtitle={avanceSubtitle}
+      />
+    </div>
+  );
+}
+
+type KpiCardProps = {
+  title: string;
+  value: string;
+  subtitle: string;
+  delta?: DeltaFormat;
+};
+
+function KpiCard({ title, value, subtitle, delta }: KpiCardProps) {
+  const showSinComparativo = delta && delta.arrow === null && delta.displayValue === "—";
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <p className="text-sm text-gray-500">{title}</p>
+      <p className="text-2xl font-bold text-brandit-black mt-1 tabular-nums">{value}</p>
+      {delta && !showSinComparativo && (
+        <p className={`text-sm font-medium mt-1 tabular-nums ${TONE_CLASS[delta.tone]}`}>
+          {delta.arrow && <span className="mr-1">{delta.arrow}</span>}
+          {delta.displayValue}
+        </p>
+      )}
+      {showSinComparativo && (
+        <p className="text-xs text-gray-400 mt-1">Sin comparativo</p>
+      )}
+      <p className="text-xs text-gray-400 mt-2">{subtitle}</p>
     </div>
   );
 }
