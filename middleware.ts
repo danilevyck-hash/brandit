@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifySession } from "@/lib/auth-brandit";
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -13,11 +14,20 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = req.cookies.get("brandit_session");
+  const cookie = req.cookies.get("brandit_session")?.value;
 
-  if (!session?.value) {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
+  // Sin cookie → al login.
+  if (!cookie) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // Cookie presente pero inválida/expirada → borrarla y mandar al login.
+  // (Antes el middleware solo chequeaba presencia: una cookie vieja/expirada
+  // pasaba acá pero los API la rechazaban con 401, rompiendo el dashboard.)
+  if (!verifySession(cookie)) {
+    const res = NextResponse.redirect(new URL("/login", req.url));
+    res.cookies.delete("brandit_session");
+    return res;
   }
 
   return NextResponse.next();

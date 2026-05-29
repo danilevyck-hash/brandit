@@ -163,8 +163,11 @@ export default function DashboardPage() {
     setModuleOrder(getStoredOrder());
     setDark(document.documentElement.classList.contains("dark"));
     fetch("/api/dashboard")
-      .then((r) => r.json())
-      .then(setData)
+      .then((r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((d) => { if (d) setData(d); })
       .catch(() => {});
   }, []);
 
@@ -264,19 +267,19 @@ export default function DashboardPage() {
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <p className="text-xs font-medium text-gray-400 mb-1">Leads activos</p>
           <p className="text-3xl font-extrabold tracking-tight text-brandit-black dark:text-white">
-            {data ? String(data.leads.total) : "-"}
+            {data ? String(data?.leads?.total ?? 0) : "-"}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d\u00edas)</p>
-          <p className={`text-3xl font-extrabold tracking-tight ${data && data.cxc.deuda_90_plus > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
-            {data ? `$${fmt(data.cxc.deuda_90_plus)}` : "-"}
+          <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.cxc?.deuda_90_plus ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
+            {data ? `$${fmt(data?.cxc?.deuda_90_plus ?? 0)}` : "-"}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <p className="text-xs font-medium text-gray-400 mb-1">Seguimientos vencidos</p>
-          <p className={`text-3xl font-extrabold tracking-tight ${data && data.leads.seguimientos_vencidos > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
-            {data ? String(data.leads.seguimientos_vencidos) : "-"}
+          <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.leads?.seguimientos_vencidos ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
+            {data ? String(data?.leads?.seguimientos_vencidos ?? 0) : "-"}
           </p>
         </div>
       </div>
