@@ -1,12 +1,16 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextResponse, NextRequest } from "next/server";
-import { requireRoles } from "@/lib/auth-brandit";
+import { requireRoles, getSessionPayload } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
+
+  // Nombre real desde la sesión verificada (httpOnly) — fuente de verdad para
+  // el saludo de la home, en lugar de depender solo de localStorage.
+  const nombre = getSessionPayload(req)?.nombre ?? null;
 
   const db = getSupabaseServer();
   const now = new Date();
@@ -122,6 +126,7 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.porcentaje - a.porcentaje);
 
   return NextResponse.json({
+    nombre,
     leads: {
       total: leadsRes.count || 0,
       prospectos_activos: prospectosRes.count || 0,

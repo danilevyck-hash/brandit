@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Avatar from "@/components/Avatar";
 
 type DashboardData = {
+  nombre?: string | null;
   leads: {
     total: number;
     prospectos_activos: number;
@@ -239,7 +240,7 @@ export default function DashboardPage() {
           <img src="/brandit-logo.svg" alt="Brand It" className="h-10 w-10 object-contain rounded" />
           <div>
             <h1 className="text-2xl font-extrabold text-brandit-black dark:text-white tracking-tight">
-              {greeting}, {nombre || "usuario"}
+              {greeting}, {data?.nombre || nombre || "usuario"}
             </h1>
             <p className="text-sm text-gray-400 mt-0.5 capitalize">{dateStr}</p>
           </div>
@@ -265,21 +266,21 @@ export default function DashboardPage() {
       {/* KPI row */}
       <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 mb-1">Leads activos</p>
+          <p className="text-xs font-medium text-gray-400 mb-1">Gu&iacute;as del mes</p>
           <p className="text-3xl font-extrabold tracking-tight text-brandit-black dark:text-white">
-            {data ? String(data?.leads?.total ?? 0) : "-"}
+            {data ? String(data?.operaciones?.guias_mes ?? 0) : "-"}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d\u00edas)</p>
+          <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d&iacute;as)</p>
           <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.cxc?.deuda_90_plus ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
             {data ? `$${fmt(data?.cxc?.deuda_90_plus ?? 0)}` : "-"}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 mb-1">Seguimientos vencidos</p>
-          <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.leads?.seguimientos_vencidos ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
-            {data ? String(data?.leads?.seguimientos_vencidos ?? 0) : "-"}
+          <p className="text-xs font-medium text-gray-400 mb-1">Gastos caja del mes</p>
+          <p className="text-3xl font-extrabold tracking-tight text-brandit-black dark:text-white">
+            {data ? `$${fmt(data?.operaciones?.gastos_caja_mes ?? 0)}` : "-"}
           </p>
         </div>
       </div>
