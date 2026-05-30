@@ -146,7 +146,7 @@ function parseCsv(text: string): ParseResult {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
   const session = getSessionPayload(req);
 

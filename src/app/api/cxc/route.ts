@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 const COMPANY_KEY = "confecciones_boston";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const db = getSupabaseServer();

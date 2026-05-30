@@ -43,6 +43,9 @@ type DashboardData = {
 
 type ModuleId = "cxc" | "guias" | "notas" | "caja" | "leads" | "cotizaciones" | "ventas" | "stickers" | "usuarios";
 
+type Role = "admin" | "secretaria" | "vendedora1" | "vendedora2";
+const ALL_ROLES: Role[] = ["admin", "secretaria", "vendedora1", "vendedora2"];
+
 type ModuleConfig = {
   id: ModuleId;
   icon: string;
@@ -51,20 +54,20 @@ type ModuleConfig = {
   href: string;
   color: string;
   bgColor: string;
-  adminOnly?: boolean;
-  adminOrSecretaria?: boolean;
+  /** Roles que ven este módulo en la home. Enforcement real = requireRoles en APIs. */
+  allowedRoles: Role[];
 };
 
 const MODULES: ModuleConfig[] = [
-  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50" },
-  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50" },
-  { id: "notas", icon: "\uD83D\uDCE6", label: "Notas de Entrega", description: "Crear y rastrear entregas a clientes", href: "/notas-entrega", color: "text-teal-600", bgColor: "bg-teal-50" },
-  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50" },
-  { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Seguimiento de clientes nuevos", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50" },
-  { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Crear y ver presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50" },
-  { id: "ventas", icon: "📈", label: "Ventas", description: "Cotizaciones, pedidos y facturas", href: "/ventas", color: "text-indigo-600", bgColor: "bg-indigo-50", adminOnly: true },
-  { id: "stickers", icon: "🏷️", label: "Stickers", description: "Etiquetas de bodega", href: "/stickers", color: "text-orange-600", bgColor: "bg-orange-50", adminOrSecretaria: true },
-  { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Administrar personas y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", adminOnly: true },
+  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50", allowedRoles: ["admin"] },
+  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50", allowedRoles: ALL_ROLES },
+  { id: "notas", icon: "\uD83D\uDCE6", label: "Notas de Entrega", description: "Crear y rastrear entregas a clientes", href: "/notas-entrega", color: "text-teal-600", bgColor: "bg-teal-50", allowedRoles: ALL_ROLES },
+  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50", allowedRoles: ALL_ROLES },
+  { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Seguimiento de clientes nuevos", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50", allowedRoles: ALL_ROLES },
+  { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Crear y ver presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50", allowedRoles: ALL_ROLES },
+  { id: "ventas", icon: "📈", label: "Ventas", description: "Cotizaciones, pedidos y facturas", href: "/ventas", color: "text-indigo-600", bgColor: "bg-indigo-50", allowedRoles: ["admin"] },
+  { id: "stickers", icon: "🏷️", label: "Stickers", description: "Etiquetas de bodega", href: "/stickers", color: "text-orange-600", bgColor: "bg-orange-50", allowedRoles: ["admin", "secretaria"] },
+  { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Administrar personas y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", allowedRoles: ["admin"] },
 ];
 
 const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "notas", "caja", "leads", "cotizaciones", "ventas", "stickers", "usuarios"];
@@ -218,14 +221,9 @@ export default function DashboardPage() {
     new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
   const isAdmin = role === "admin";
-  const isSecretaria = role === "secretaria";
 
-  // Filter modules by role
-  const visibleModules = MODULES.filter((m) => {
-    if (m.adminOnly && !isAdmin) return false;
-    if (m.adminOrSecretaria && !(isAdmin || isSecretaria)) return false;
-    return true;
-  });
+  // Filter modules by role — convención unificada allowedRoles.
+  const visibleModules = MODULES.filter((m) => m.allowedRoles.includes(role as Role));
   const orderedModules = moduleOrder
     .map((id) => visibleModules.find((m) => m.id === id))
     .filter((m): m is ModuleConfig => !!m);
@@ -271,12 +269,14 @@ export default function DashboardPage() {
             {data ? String(data?.operaciones?.guias_mes ?? 0) : "-"}
           </p>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
-          <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d&iacute;as)</p>
-          <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.cxc?.deuda_90_plus ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
-            {data ? `$${fmt(data?.cxc?.deuda_90_plus ?? 0)}` : "-"}
-          </p>
-        </div>
+        {isAdmin && (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
+            <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d&iacute;as)</p>
+            <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.cxc?.deuda_90_plus ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>
+              {data ? `$${fmt(data?.cxc?.deuda_90_plus ?? 0)}` : "-"}
+            </p>
+          </div>
+        )}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <p className="text-xs font-medium text-gray-400 mb-1">Gastos caja del mes</p>
           <p className="text-3xl font-extrabold tracking-tight text-brandit-black dark:text-white">

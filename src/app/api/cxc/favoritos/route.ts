@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const COMPANY_KEY = "confecciones_boston";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const db = getSupabaseServer();
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const nombre = request.nextUrl.searchParams.get("nombre_normalized");
