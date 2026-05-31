@@ -60,25 +60,30 @@ export async function GET(req: NextRequest) {
       .gte("created_at", sixMonthsAgoStr),
   ]);
 
-  // CxC rows from latest upload
-  const latestUpload = cxcUploadRes.data?.[0] || null;
+  // CxC desde switch_estadocuenta (data validada del sync Switch), igual que
+  // /api/cxc. "Deuda 90+" = buckets > 90 días (91-120, 121-180, 181-270,
+  // 271-365, +365) — misma definición que la suma vieja de d_91_120..d_mas_365
+  // sobre cxc_rows. Net-zero y bucket ya resueltos por syncEstadocuenta.
+  const latestUpload = cxcUploadRes.data?.[0] || null; // solo para ultimo_upload
   let cxcTotalClientes = 0;
   let cxcDeuda90Plus = 0;
   let cxcDeuda0_30 = 0;
 
-  if (latestUpload) {
-    const { data: cxcRows } = await db
-      .from("cxc_rows")
-      .select("d_0_30, d_91_120, d_121_180, d_181_270, d_271_365, d_mas_365")
-      .eq("upload_id", latestUpload.id);
+  const NOVENTA_PLUS = new Set(["91-120", "121-180", "181-270", "271-365", "+365"]);
+  const { data: cxcDocs } = await db
+    .from("switch_estadocuenta")
+    .select("cliente_codigo, bucket, saldo")
+    .limit(20000);
 
-    if (cxcRows) {
-      cxcTotalClientes = cxcRows.length;
-      for (const r of cxcRows) {
-        cxcDeuda90Plus += Number(r.d_91_120) + Number(r.d_121_180) + Number(r.d_181_270) + Number(r.d_271_365) + Number(r.d_mas_365);
-        cxcDeuda0_30 += Number(r.d_0_30);
-      }
+  if (cxcDocs) {
+    const clientes = new Set<string>();
+    for (const r of cxcDocs as { cliente_codigo: string; bucket: string | null; saldo: number | string }[]) {
+      clientes.add(r.cliente_codigo);
+      const s = typeof r.saldo === "number" ? r.saldo : Number(r.saldo) || 0;
+      if (r.bucket && NOVENTA_PLUS.has(r.bucket)) cxcDeuda90Plus += s;
+      else if (r.bucket === "0-30") cxcDeuda0_30 += s;
     }
+    cxcTotalClientes = clientes.size;
   }
 
   // Caja gastos del período activo
