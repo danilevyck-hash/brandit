@@ -82,6 +82,15 @@ function digEstadoCuentaElements(data: unknown): RawRow[] {
 async function logSync(r: SyncResult): Promise<void> {
   try {
     const db = getSupabaseServer();
+    // Net-zero NO es skip ni fallo: se registra como entrada-resumen en el JSONB
+    // del log (visibilidad) pero NO suma a rows_skipped ni cambia el status.
+    const skipDetailsLog =
+      r.excludedNetZero && r.excludedNetZero > 0
+        ? [
+            ...r.skipDetails,
+            { entidad: "estadocuenta", identificador: "(resumen)", campo: "clientes_net_zero_excluidos", valorCrudo: String(r.excludedNetZero), motivo: "saldo neto ~0 (pagados); no listados en reporte oficial" },
+          ]
+        : r.skipDetails;
     await db.from("switch_sync_log").insert({
       sync_type: r.syncType,
       started_at: r.startedAt,
@@ -89,7 +98,7 @@ async function logSync(r: SyncResult): Promise<void> {
       status: r.status,
       rows_synced: r.rowsSynced,
       rows_skipped: r.rowsSkipped,
-      skip_details: r.skipDetails,
+      skip_details: skipDetailsLog,
       error_message: r.errorMessage ?? null,
     });
   } catch (e) {
@@ -312,6 +321,7 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
     // 2) Estado de cuenta por cliente, en lotes de EC_CONCURRENCY en paralelo.
     const queriedCodigos: string[] = [];   // clientes consultados OK → entran al reconcile
     const buffer: RawRow[] = [];
+    let excludedNetZero = 0;                // clientes con saldo neto ~0 (pagados): no se insertan
 
     const persist = async (batch: RawRow[]) => {
       if (batch.length === 0) return;
@@ -350,18 +360,34 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
           skipDetails.push({ entidad: "estadocuenta", identificador: r.codigo, campo: "getEstadoCuenta", valorCrudo: r.error ?? "", motivo: "fallo al consultar (excluido del reconcile)" });
           continue;
         }
+        // Consulta exitosa → participa del reconcile (incluso si es net-zero).
         queriedCodigos.push(r.codigo);
+
+        // Acumular las filas del cliente y su saldo NETO antes de decidir.
+        const clientRows: RawRow[] = [];
+        let netoCliente = 0;
         for (const el of r.elements) {
           const mapped = mapEstadoCuentaRow(r.codigo, r.nombre, el);
           if (mapped.skip) { skipDetails.push(mapped.skip); continue; }
-          if (mapped.row) buffer.push(mapped.row);
+          if (mapped.row) { clientRows.push(mapped.row); netoCliente += Number(mapped.row["saldo"]) || 0; }
         }
+
+        // Net-zero (pagó todo): el reporte oficial NO lista no-deudores → no
+        // insertamos sus filas. NO es fallo ni skip: ya está en queriedCodigos,
+        // así que el reconcile borra sus filas viejas (queda sin saldo, correcto).
+        if (Math.abs(netoCliente) < 0.01) {
+          excludedNetZero++;
+          continue;
+        }
+
+        buffer.push(...clientRows);
         while (buffer.length >= UPSERT_BATCH) {
           await persist(buffer.splice(0, UPSERT_BATCH));
         }
       }
     }
     await persist(buffer.splice(0, buffer.length));
+    console.error(`[estadocuenta] clientes net-zero excluidos: ${excludedNetZero}`);
 
     // 3) Reconcile: borrar las filas VIEJAS (synced_at < runStamp) SOLO de los
     //    clientes consultados con éxito. Los recién insertados llevan
@@ -383,6 +409,7 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
       rowsSynced,
       rowsSkipped: skipDetails.length,
       skipDetails,
+      excludedNetZero,
       startedAt,
       finishedAt: nowIso(),
     };

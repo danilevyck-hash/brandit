@@ -63,6 +63,8 @@ export interface SyncResult {
   rowsSynced: number;
   rowsSkipped: number;
   skipDetails: SkipDetail[];
+  /** Solo estadocuenta: clientes con saldo neto ~0 (pagados) no insertados. NO son skips ni fallos. */
+  excludedNetZero?: number;
   errorMessage?: string;
   startedAt: string;        // ISO
   finishedAt: string;       // ISO
