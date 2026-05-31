@@ -130,7 +130,7 @@ function extractRows<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
-    for (const k of ["facturas", "notasCredito", "notasDebito", "lista", "items", "resultado", "data"]) {
+    for (const k of ["facturas", "notasCredito", "notasDebito", "clientes", "lista", "items", "resultado", "data"]) {
       if (Array.isArray(o[k])) return o[k] as T[];
     }
     for (const v of Object.values(o)) {

@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncFacturas, syncEstadocuenta, syncCostoDiario } from "@/lib/switch-api/sync";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // Pro — el sync de estado de cuenta itera ~361 clientes
 
 function fmtDate(d: Date): string {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
