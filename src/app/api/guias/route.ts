@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 const ROLES_GUIAS = ["admin", "secretaria", "vendedora1", "vendedora2"] as const;
 
 type TransportistaJoin = { nombre: string | null } | { nombre: string | null }[] | null;
-function transportistaLabel(row: { modo_entrega?: string | null; transportistas?: TransportistaJoin }): string {
+function transportistaLabel(row: { modo_entrega?: string | null; transportista?: string | null; transportistas?: TransportistaJoin }): string {
   if (row.modo_entrega === "entrega_directa") return "Entrega directa";
   const j = Array.isArray(row.transportistas) ? row.transportistas[0] : row.transportistas;
-  return j?.nombre || "";
+  return j?.nombre || row.transportista || ""; // catálogo (join) o texto libre
 }
 
 export async function GET(req: NextRequest) {
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   // SELECT explícito sin firmas base64 (pesan 30-100KB; el detalle las trae).
   const { data, error } = await getSupabaseServer()
     .from("guia_transporte")
-    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, motivo_rechazo, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente)")
+    .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), transportista, placa, observaciones, monto_total, estado, tipo_despacho, motivo_rechazo, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
@@ -42,13 +42,14 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const db = getSupabaseServer();
   const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, entregado_por } = body;
+  const { fecha, modo_entrega, transportista_id, transportista, placa, observaciones, items, monto_total, estado, entregado_por } = body;
 
   if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") {
     return NextResponse.json({ error: "Debes indicar el modo de entrega" }, { status: 400 });
   }
-  if (modo_entrega === "transportista" && !transportista_id) {
-    return NextResponse.json({ error: "Selecciona un transportista" }, { status: 400 });
+  // Texto libre: exige nombre (no transportista_id). El id es opcional (si coincide con el catálogo).
+  if (modo_entrega === "transportista" && !String(transportista || "").trim()) {
+    return NextResponse.json({ error: "Indica el transportista" }, { status: 400 });
   }
   if (!items || !Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "La guía debe tener al menos un item" }, { status: 400 });
@@ -67,7 +68,8 @@ export async function POST(req: NextRequest) {
     const insertData: Record<string, unknown> = {
       numero, fecha,
       modo_entrega,
-      transportista_id: modo_entrega === "transportista" ? transportista_id : null,
+      transportista_id: modo_entrega === "transportista" ? (transportista_id || null) : null,
+      transportista: modo_entrega === "transportista" ? (String(transportista || "").trim() || null) : null,
       placa: placa || null,
       observaciones: observaciones || null,
       monto_total: monto_total || 0,

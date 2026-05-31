@@ -12,7 +12,7 @@ export default function GuiaForm() {
   const hoy = new Date().toISOString().slice(0, 10);
   const [fecha, setFecha] = useState(hoy);
   const [modoEntrega, setModoEntrega] = useState<"transportista" | "entrega_directa">("entrega_directa");
-  const [transportistaId, setTransportistaId] = useState("");
+  const [transportista, setTransportista] = useState(""); // texto libre (autocompleta con catálogo)
   const [placa, setPlaca] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
   const [observaciones, setObservaciones] = useState("");
@@ -31,7 +31,7 @@ export default function GuiaForm() {
         const d = JSON.parse(raw);
         if (d.fecha) setFecha(d.fecha);
         if (d.modoEntrega) setModoEntrega(d.modoEntrega);
-        if (d.transportistaId) setTransportistaId(d.transportistaId);
+        if (d.transportista) setTransportista(d.transportista);
         if (d.placa) setPlaca(d.placa);
         if (d.entregadoPor) setEntregadoPor(d.entregadoPor);
         if (d.observaciones) setObservaciones(d.observaciones);
@@ -45,9 +45,9 @@ export default function GuiaForm() {
   useEffect(() => {
     if (!loaded) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ fecha, modoEntrega, transportistaId, placa, entregadoPor, observaciones, items }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ fecha, modoEntrega, transportista, placa, entregadoPor, observaciones, items }));
     } catch { /* ignore */ }
-  }, [loaded, fecha, modoEntrega, transportistaId, placa, entregadoPor, observaciones, items]);
+  }, [loaded, fecha, modoEntrega, transportista, placa, entregadoPor, observaciones, items]);
 
   const setItem = (i: number, patch: Partial<GuiaItem>) => setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
@@ -57,7 +57,7 @@ export default function GuiaForm() {
 
   const submit = async () => {
     setError(null);
-    if (modoEntrega === "transportista" && !transportistaId) { setError("Selecciona un transportista"); return; }
+    if (modoEntrega === "transportista" && !transportista.trim()) { setError("Indica el transportista"); return; }
     if (totalBultos === 0) { setError("La guía debe tener al menos un item con bultos > 0"); return; }
     setSaving(true);
     try {
@@ -66,7 +66,10 @@ export default function GuiaForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fecha, modo_entrega: modoEntrega,
-          transportista_id: modoEntrega === "transportista" ? transportistaId : null,
+          transportista: modoEntrega === "transportista" ? transportista.trim() : null,
+          transportista_id: modoEntrega === "transportista"
+            ? (transportistas.find((t) => t.nombre.trim().toLowerCase() === transportista.trim().toLowerCase())?.id ?? null)
+            : null,
           placa: placa || null, entregado_por: entregadoPor || null, observaciones: observaciones || null,
           items: items.map((i) => ({ ...i, bultos: Number(i.bultos) || 0 })),
         }),
@@ -111,11 +114,9 @@ export default function GuiaForm() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {modoEntrega === "transportista" && (
             <label className="block"><span className="text-xs font-medium text-gray-500">Transportista</span>
-              <select value={transportistaId} onChange={(e) => setTransportistaId(e.target.value)} className={input}>
-                <option value="">— Seleccionar —</option>
-                {transportistas.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-              </select>
-              {transportistas.length === 0 && <span className="text-[11px] text-orange-500">No hay transportistas cargados.</span>}
+              <input list="transportistas-dl" value={transportista} onChange={(e) => setTransportista(e.target.value)} placeholder="Nombre del transportista" className={input} />
+              <datalist id="transportistas-dl">{transportistas.map((t) => <option key={t.id} value={t.nombre} />)}</datalist>
+              <span className="text-[11px] text-gray-400">Escribí uno nuevo o elegí del autocompletado.</span>
             </label>
           )}
           <label className="block"><span className="text-xs font-medium text-gray-500">Placa / vehículo</span><input value={placa} onChange={(e) => setPlaca(e.target.value)} className={input} /></label>
