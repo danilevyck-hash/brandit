@@ -7,10 +7,7 @@
 //
 // Regla de oro: NUNCA descartar un row en silencio. Si un campo crítico no
 // parsea, se agrega a skip_details y el status del sync pasa a 'partial'.
-//
-// Los nombres de campos crudos del API de Switch son candidatos razonables
-// (firstKey prueba varios); se confirman contra el API real cuando existan las
-// env vars. raw_data guarda el payload completo para reconciliar.
+// Los nombres de campos crudos están confirmados contra el API real de Switch.
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient, parseMonto } from "./client";
@@ -20,15 +17,6 @@ type RawRow = Record<string, unknown>;
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-/** Primer key presente y no-vacío de una lista de candidatos. */
-function firstKey(raw: RawRow, keys: string[]): unknown {
-  for (const k of keys) {
-    const v = raw[k];
-    if (v != null && v !== "") return v;
-  }
-  return null;
 }
 
 function asStr(v: unknown): string | null {
@@ -424,7 +412,17 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
 
 // ─── Costo diario ─────────────────────────────────────────────────────────────
 
+/**
+ * Costo diario del MES EN CURSO. OJO: /apireporte/totalventas?tipo=03 IGNORA el
+ * parámetro `mes` — siempre devuelve el mes actual. No hay backfill histórico por
+ * este endpoint (igual que getReporteMesActual de fashiongr). El arg `mes` se
+ * mantiene por firma/compat pero no filtra nada.
+ *
+ * Shape: data.totales es un OBJETO indexado por día ("1".."31"), no un array.
+ * Cada valor: { total, costo, utilidad, etiqueta, fecha("DD-MM-YYYY") }.
+ */
 export async function syncCostoDiario(mes: string): Promise<SyncResult> {
+  void mes; // ignorado por el endpoint (ver doc arriba)
   const startedAt = nowIso();
   const skipDetails: SkipDetail[] = [];
 
@@ -432,20 +430,23 @@ export async function syncCostoDiario(mes: string): Promise<SyncResult> {
     const client = createSwitchClient();
     const db = getSupabaseServer();
 
-    const data = await client.get<unknown>("/apireporte/totalventas", { tipo: "03", mes });
-    const raw: RawRow[] = Array.isArray(data) ? (data as RawRow[]) : [];
+    const data = await client.get<unknown>("/apireporte/totalventas", { tipo: "03" });
+    // data.totales = objeto { "1": {...}, "2": {...} } → iterar sus valores.
+    const totales = (data as Record<string, unknown> | null)?.["totales"];
+    const dias: RawRow[] = totales && typeof totales === "object"
+      ? (Object.values(totales as Record<string, unknown>).filter((v) => v && typeof v === "object") as RawRow[])
+      : [];
     const rows: RawRow[] = [];
 
-    for (const r of raw) {
-      const fecha = asStr(firstKey(r, ["fecha", "dia"]));
-      const costoRaw = firstKey(r, ["costo", "costoTotal", "total", "monto"]);
-      const costo = parseMontoStrict(costoRaw);
+    for (const r of dias) {
+      const fecha = parseFechaDMY(asStr(r["fecha"]));   // "DD-MM-YYYY" → "YYYY-MM-DD"
+      const costo = parseMontoStrict(r["costo"]);        // string US con coma de miles
       if (!fecha || costo == null) {
         skipDetails.push({
           entidad: "costo_diario",
-          identificador: fecha ?? "(sin fecha)",
-          campo: "fecha/costo_total",
-          valorCrudo: JSON.stringify({ fecha, costo: costoRaw }),
+          identificador: asStr(r["fecha"]) ?? "(sin fecha)",
+          campo: "fecha/costo",
+          valorCrudo: JSON.stringify({ fecha: r["fecha"], costo: r["costo"] }),
           motivo: "campo clave ausente/no parseable",
         });
         continue;
