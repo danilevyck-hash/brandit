@@ -59,7 +59,7 @@ type ModuleConfig = {
 };
 
 const MODULES: ModuleConfig[] = [
-  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50", allowedRoles: ["admin"] },
+  { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50", allowedRoles: ["admin", "secretaria"] },
   { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50", allowedRoles: ALL_ROLES },
   { id: "notas", icon: "\uD83D\uDCE6", label: "Notas de Entrega", description: "Crear y rastrear entregas a clientes", href: "/notas-entrega", color: "text-teal-600", bgColor: "bg-teal-50", allowedRoles: ALL_ROLES },
   { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50", allowedRoles: ALL_ROLES },
@@ -220,7 +220,7 @@ export default function DashboardPage() {
   const fmt = (n: number) =>
     new Intl.NumberFormat("es-PA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
-  const isAdmin = role === "admin";
+  const puedeVerCxc = role === "admin" || role === "secretaria"; // CxC: admin + secretaria (Roxana)
 
   // Filter modules by role — convención unificada allowedRoles.
   const visibleModules = MODULES.filter((m) => m.allowedRoles.includes(role as Role));
@@ -269,7 +269,7 @@ export default function DashboardPage() {
             {data ? String(data?.operaciones?.guias_mes ?? 0) : "-"}
           </p>
         </div>
-        {isAdmin && (
+        {puedeVerCxc && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
             <p className="text-xs font-medium text-gray-400 mb-1">Deuda vencida (90+ d&iacute;as)</p>
             <p className={`text-3xl font-extrabold tracking-tight ${data && (data?.cxc?.deuda_90_plus ?? 0) > 0 ? "text-red-600" : "text-brandit-black dark:text-white"}`}>

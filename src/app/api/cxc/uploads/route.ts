@@ -5,7 +5,7 @@ import { requireRoles } from "@/lib/auth-brandit";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin"]);
+  const auth = requireRoles(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const { data, error } = await getSupabaseServer()

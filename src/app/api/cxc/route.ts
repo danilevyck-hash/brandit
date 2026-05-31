@@ -44,7 +44,7 @@ function normalizeNombre(n: string): string {
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin"]);
+  const auth = requireRoles(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const db = getSupabaseServer();

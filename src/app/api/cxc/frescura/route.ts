@@ -7,7 +7,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin"]);
+  const auth = requireRoles(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const db = getSupabaseServer();

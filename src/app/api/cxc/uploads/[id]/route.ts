@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRoles } from "@/lib/auth-brandit";
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin"]);
+  const auth = requireRoles(request, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const db = getSupabaseServer();
