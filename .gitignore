@@ -1,3 +1,7 @@
 node_modules
 .next
 .env.local
+
+# Data financiera y scripts de debug locales (no subir a git)
+antiguedad.csv
+scripts/test-switch-sync.ts
