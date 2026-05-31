@@ -5,3 +5,4 @@ node_modules
 # Data financiera y scripts de debug locales (no subir a git)
 antiguedad.csv
 scripts/test-switch-sync.ts
+ventas_raw_backup_*.json

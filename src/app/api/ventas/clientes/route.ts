@@ -1,46 +1,42 @@
-// GET /api/ventas/clientes
-//
-// Combina fetchClientes (KPIs por cliente desde matview) + fetchClientesMonthly
-// (sparkline 12m vía RPC) en paralelo. Lazy-cargado desde el Tab Clientes en el
-// browser (no se invoca en el Server Component de /ventas para no penalizar
-// el Tab Resumen, que carga primero el 99% del tiempo).
-//
-// Response shape:
-//   {
-//     rows: Cliente[],                            // ordenado por última_compra desc
-//     monthly: Record<cliente_codigo, number[]>,  // array de 12 numbers por cliente
-//   }
-//
-// Frontend joinéa por `cliente_codigo`. Clientes sin entry en `monthly`
-// (huérfanos sin codigo) usan array de 12 ceros como fallback.
-
+// GET /api/ventas/clientes?fecha_inicio&fecha_fin&limit → RPC ventas_clientes_v1
+// Clientes recurrentes (>=2 tickets, excluye CONTADO/CONSUMIDOR FINAL), un solo stream.
 import { NextRequest, NextResponse } from "next/server";
-import { fetchClientes, fetchClientesMonthly } from "@/lib/ventas/queries";
 import { requireRoles } from "@/lib/auth-brandit";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
-  try {
-    // El `year` se ignora en fetchClientes (matview es 12m rolling absoluto),
-    // pero la firma lo exige por compat con otros tabs.
-    const year = new Date().getFullYear();
-    const [clientes, monthly] = await Promise.all([
-      fetchClientes({ year }),
-      fetchClientesMonthly(),
-    ]);
+  const sp = req.nextUrl.searchParams;
+  const today = new Date().toISOString().slice(0, 10);
+  const ene1 = `${new Date().getFullYear()}-01-01`;
+  const fecha_inicio = sp.get("fecha_inicio") ?? ene1;
+  const fecha_fin = sp.get("fecha_fin") ?? today;
+  const limit = sp.get("limit") ? parseInt(sp.get("limit")!, 10) : 50;
 
-    return NextResponse.json({
-      rows: clientes.rows,
-      monthly,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("[api/ventas/clientes] error:", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (!ISO_DATE.test(fecha_inicio) || !ISO_DATE.test(fecha_fin)) {
+    return NextResponse.json({ error: "fecha_inicio / fecha_fin deben ser YYYY-MM-DD" }, { status: 400 });
   }
+  if (fecha_inicio > fecha_fin) {
+    return NextResponse.json({ error: "fecha_inicio > fecha_fin" }, { status: 400 });
+  }
+  if (!Number.isFinite(limit) || limit < 1 || limit > 500) {
+    return NextResponse.json({ error: "limit inválido (1..500)" }, { status: 400 });
+  }
+
+  const { data, error } = await getSupabaseServer().rpc("ventas_clientes_v1", {
+    p_fecha_inicio: fecha_inicio,
+    p_fecha_fin: fecha_fin,
+    p_limit: limit,
+  });
+  if (error) {
+    console.error("[api/ventas/clientes] rpc error", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json(data);
 }
