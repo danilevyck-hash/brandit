@@ -95,68 +95,75 @@ const COMPROBANTE_ENDPOINTS: { endpoint: string; tipo: TipoComprobante }[] = [
   { endpoint: "/apinotadebito/lista", tipo: "Nota de Debito" },
 ];
 
+// Campos reales del payload de Switch (confirmados contra /apifactura/lista):
+//   id, secuencial, tipoComprobante, fecha ("YYYY-MM-DD HH:mm:ss"), subTotal,
+//   descuento, subTotalDescuento, impuesto, total, cliente, clienteId (num),
+//   vendedor, vendedorId (num), sucursal, sucursalId (num), saldo, condicionVenta.
 function mapComprobante(raw: RawRow, tipo: TipoComprobante): { row?: RawRow; skip?: SkipDetail } {
-  const numero = asStr(firstKey(raw, ["numero", "numeroDocumento", "documento", "nro"]));
-  const facturaId = asStr(firstKey(raw, ["id", "idFactura", "facturaId", "idDocumento"])) ?? numero;
-  const fecha = asStr(firstKey(raw, ["fecha", "fechaDocumento", "fechaEmision"]));
-  const ident = facturaId ?? numero ?? "(desconocido)";
+  const id = raw["id"];
+  const secuencial = asStr(raw["secuencial"]);
+  const fechaRaw = asStr(raw["fecha"]);
+  const facturaId = id != null && id !== "" ? String(id) : null;
+  const ident = facturaId ?? secuencial ?? "(desconocido)";
 
-  if (!facturaId || !numero || !fecha) {
+  if (!facturaId || !secuencial || !fechaRaw) {
     return {
       skip: {
         entidad: tipo,
         identificador: ident,
-        campo: "factura_id/numero/fecha",
-        valorCrudo: JSON.stringify({ facturaId, numero, fecha }),
+        campo: "id/secuencial/fecha",
+        valorCrudo: JSON.stringify({ id, secuencial, fecha: fechaRaw }),
         motivo: "campo clave ausente",
       },
     };
   }
 
-  const subtotalDescRaw = firstKey(raw, ["subtotalDescuento", "subtotalConDescuento", "subTotalDescuento", "baseImponible"]);
-  const subtotalDescuento = parseMontoStrict(subtotalDescRaw);
+  // fecha viene "YYYY-MM-DD HH:mm:ss" → guardar solo la parte fecha (col DATE).
+  const fecha = fechaRaw.split(/[ T]/)[0];
+
+  const subtotalDescuento = parseMontoStrict(raw["subTotalDescuento"]);
   if (subtotalDescuento == null) {
     return {
-      skip: { entidad: tipo, identificador: ident, campo: "subtotal_descuento", valorCrudo: String(subtotalDescRaw ?? ""), motivo: "no parseable" },
+      skip: { entidad: tipo, identificador: ident, campo: "subTotalDescuento", valorCrudo: String(raw["subTotalDescuento"] ?? ""), motivo: "no parseable" },
     };
   }
 
-  const totalRaw = firstKey(raw, ["total", "totalDocumento", "montoTotal"]);
-  const total = parseMontoStrict(totalRaw);
+  const total = parseMontoStrict(raw["total"]);
   if (total == null) {
     return {
-      skip: { entidad: tipo, identificador: ident, campo: "total", valorCrudo: String(totalRaw ?? ""), motivo: "no parseable" },
+      skip: { entidad: tipo, identificador: ident, campo: "total", valorCrudo: String(raw["total"] ?? ""), motivo: "no parseable" },
     };
   }
 
-  const clienteCodigo = asStr(firstKey(raw, ["clienteCodigo", "codigoCliente", "cliente_codigo"]));
-  const vendedorCodigo = asStr(firstKey(raw, ["vendedorCodigo", "codigoVendedor", "vendedor_codigo"]));
-
-  // Heurística is_wholesale (mismo patrón que Multifashion en fashiongr):
-  // cliente identificado + vendedor DEFAULT/ausente ⇒ venta al por mayor.
-  // Pendiente de validar contra data real cuando haya env vars.
-  const isWholesale = !!clienteCodigo && (!vendedorCodigo || vendedorCodigo.toUpperCase() === "DEFAULT");
+  const clienteId = raw["clienteId"];
+  const vendedorId = raw["vendedorId"];
+  const sucursalId = raw["sucursalId"];
+  const idToStr = (v: unknown) => (v != null && v !== "" ? String(v) : null);
 
   return {
     row: {
-      factura_id: facturaId,
-      numero,
-      fecha,
-      cliente_codigo: clienteCodigo,
-      cliente_nombre: asStr(firstKey(raw, ["clienteNombre", "nombreCliente", "cliente_nombre"])),
-      vendedor_codigo: vendedorCodigo,
-      vendedor_nombre: asStr(firstKey(raw, ["vendedorNombre", "nombreVendedor", "vendedor_nombre"])),
-      subtotal: parseMonto(firstKey(raw, ["subtotal", "subTotal"]) as string),
-      subtotal_descuento: subtotalDescuento,
-      itbms: parseMonto(firstKey(raw, ["itbms", "impuesto", "iva"]) as string),
-      total,
+      factura_id: facturaId,                    // ← id
+      numero: secuencial,                       // ← secuencial
+      fecha,                                    // ← fecha (solo parte fecha)
+      cliente_codigo: idToStr(clienteId),       // ← String(clienteId) (numérico, no D-XX)
+      cliente_nombre: asStr(raw["cliente"]),    // ← cliente
+      vendedor_codigo: idToStr(vendedorId),     // ← String(vendedorId)
+      vendedor_nombre: asStr(raw["vendedor"]),  // ← vendedor
+      subtotal: parseMonto(raw["subTotal"] as string),            // ← subTotal
+      subtotal_descuento: subtotalDescuento,    // ← subTotalDescuento (base reportes)
+      itbms: parseMonto(raw["impuesto"] as string),               // ← impuesto
+      total,                                    // ← total
+      // tipo canónico del endpoint (no del payload) → consistencia con
+      // UNIQUE(factura_id, tipo_comprobante) y la vista switch_ventas_netas_vw.
       tipo_comprobante: tipo,
-      is_wholesale: isWholesale,
-      sucursal_codigo: asStr(firstKey(raw, ["sucursalCodigo", "codigoSucursal", "sucursal"])),
+      is_wholesale: false,                      // Boston retail; refinar después
+      sucursal_codigo: idToStr(sucursalId),     // ← String(sucursalId)
       raw_data: raw,
     },
   };
 }
+
+const UPSERT_BATCH = 100;
 
 export async function syncFacturas(opts: { desde: string; hasta: string }): Promise<SyncResult> {
   const startedAt = nowIso();
@@ -167,25 +174,33 @@ export async function syncFacturas(opts: { desde: string; hasta: string }): Prom
     const client = createSwitchClient();
     const db = getSupabaseServer();
 
+    // Buffer + persistencia en batches de 100 para no reventar por statement timeout.
+    const buffer: RawRow[] = [];
+    const persist = async (batch: RawRow[]) => {
+      if (batch.length === 0) return;
+      const { error } = await db
+        .from("switch_facturas")
+        .upsert(batch, { onConflict: "factura_id,tipo_comprobante" });
+      if (error) throw new Error(`upsert switch_facturas: ${error.message}`);
+      rowsSynced += batch.length;
+    };
+
     for (const { endpoint, tipo } of COMPROBANTE_ENDPOINTS) {
       const raw = await client.getPaginated<RawRow>(endpoint, { desde: opts.desde, hasta: opts.hasta }, 50);
-      const rows: RawRow[] = [];
       for (const r of raw) {
         const mapped = mapComprobante(r, tipo);
         if (mapped.skip) {
           skipDetails.push(mapped.skip);
           continue;
         }
-        if (mapped.row) rows.push(mapped.row);
-      }
-      if (rows.length > 0) {
-        const { error } = await db
-          .from("switch_facturas")
-          .upsert(rows, { onConflict: "factura_id,tipo_comprobante" });
-        if (error) throw new Error(`upsert switch_facturas (${tipo}): ${error.message}`);
-        rowsSynced += rows.length;
+        if (mapped.row) buffer.push(mapped.row);
+        if (buffer.length >= UPSERT_BATCH) {
+          await persist(buffer.splice(0, UPSERT_BATCH));
+        }
       }
     }
+    // Persistir el remanente del buffer.
+    await persist(buffer.splice(0, buffer.length));
 
     const result: SyncResult = {
       syncType: "facturas",

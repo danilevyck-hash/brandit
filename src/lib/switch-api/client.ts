@@ -32,11 +32,12 @@ interface SwitchEnv {
   password: string;
 }
 
-/** Envelope estándar de respuestas Switch: { codigo, mensaje, data }. */
+/** Envelope estándar de respuestas Switch: { codigo, mensaje, data, paginacion }. */
 interface SwitchEnvelope<T> {
   codigo?: string;
   mensaje?: string;
   data: T;
+  paginacion?: { porPagina?: number; paginaActual?: number; total?: number };
 }
 
 export interface SwitchClient {
@@ -120,21 +121,51 @@ async function request<T>(
   return json;
 }
 
+/**
+ * Extrae el array de filas del `data` del envelope. Los list endpoints de Switch
+ * anidan el array dentro de un objeto: `{ data: { facturas: [...] } }`. Buscamos
+ * por claves conocidas y, si no, la primera propiedad array.
+ */
+function extractRows<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    for (const k of ["facturas", "notasCredito", "notasDebito", "lista", "items", "resultado", "data"]) {
+      if (Array.isArray(o[k])) return o[k] as T[];
+    }
+    for (const v of Object.values(o)) {
+      if (Array.isArray(v)) return v as T[];
+    }
+  }
+  return [];
+}
+
+const MAX_PAGES = 1000; // backstop anti-loop-infinito
+
 async function getPaginated<T>(
   env: SwitchEnv,
   endpoint: string,
   params: Record<string, string | number> = {},
   pageSize = DEFAULT_PAGE_SIZE
 ): Promise<T[]> {
+  // Switch pagina con porPagina (tamaño) + paginaActual (1-indexed). Corta por
+  // acumulado real vs paginacion.total — NO por page*size: el API capa porPagina
+  // en silencio, así que asumir "cada página trajo pageSize" truncaría.
   const all: T[] = [];
-  let pagina = 1;
-  // Backstop anti-loop-infinito si el API no avanza de página.
-  for (let guard = 0; guard < 1000; guard++) {
-    const resp = await request<T[]>(env, endpoint, { ...params, pagina, cantidad: pageSize });
-    const rows = Array.isArray(resp.data) ? resp.data : [];
+  let total = 0;
+  let traidos = 0;
+
+  for (let paginaActual = 1; paginaActual <= MAX_PAGES; paginaActual++) {
+    const resp = await request<unknown>(env, endpoint, { ...params, porPagina: pageSize, paginaActual });
+    if (paginaActual === 1) total = Number(resp.paginacion?.total ?? 0);
+
+    const rows = extractRows<T>(resp.data);
+    if (rows.length === 0) break; // página vacía → fin
+
     all.push(...rows);
-    if (rows.length < pageSize) break; // última página
-    pagina++;
+    traidos += rows.length;
+
+    if (total > 0 && traidos >= total) break; // ya trajimos todo lo reportado
   }
   return all;
 }
