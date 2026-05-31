@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import FrescuraBadge from "@/components/FrescuraBadge";
 import OverviewSubtab from "./OverviewSubtab";
 import DetalleMensualSubtab from "./DetalleMensualSubtab";
 import VendedorasSubtab from "./VendedorasSubtab";
@@ -26,7 +27,8 @@ export default function VentasShell({ years, currentYear, currentMes }: { years:
       <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
         <div>
           <h1 className="text-4xl font-extrabold text-brandit-black dark:text-white tracking-tight">Ventas</h1>
-          <p className="text-sm text-gray-400 mt-1">Confecciones Boston · historia + Switch (venta neta, sin costo histórico en mayo+)</p>
+          <p className="text-sm text-gray-400 mt-1">Confecciones Boston · historia + Switch (venta neta)</p>
+          <div className="mt-1.5"><FrescuraBadge endpoint="/api/ventas/frescura" /></div>
         </div>
         <select value={year} onChange={(e) => setYear(parseInt(e.target.value, 10))}
           className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer">

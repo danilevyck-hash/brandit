@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
+import FrescuraBadge from "@/components/FrescuraBadge";
 
 // cxc_aging VIEW del Supabase compartido (Fase 4 fashiongr). Schema actual:
 // buckets dX_Y sin underscore extra, total = SUM agregado. La server-side
@@ -259,16 +260,6 @@ export default function CxcPage() {
     { d0_30: 0, d31_60: 0, d61_90: 0, plus90: 0, total: 0 }
   );
 
-  const getFreshness = () => {
-    if (!upload) return null;
-    const days = Math.floor((Date.now() - new Date(upload.uploaded_at).getTime()) / (1000 * 60 * 60 * 24));
-    if (days <= 7) return { color: "bg-green-500", label: `Actualizado hace ${days}d` };
-    if (days <= 15) return { color: "bg-yellow-500", label: `Hace ${days} días` };
-    return { color: "bg-red-500", label: `Hace ${days} días` };
-  };
-
-  const freshness = getFreshness();
-
   const formatUploadDate = (d: string) =>
     new Date(d).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" });
 
@@ -279,12 +270,7 @@ export default function CxcPage() {
           <h1 className="text-4xl font-extrabold text-brandit-black tracking-tight">Cuentas por cobrar</h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-gray-400">Antigüedad de saldos por cliente</p>
-            {freshness && (
-              <span className="flex items-center gap-1.5 text-xs text-gray-500">
-                <span className={`w-2 h-2 rounded-full ${freshness.color}`}></span>
-                {freshness.label}
-              </span>
-            )}
+            <FrescuraBadge endpoint="/api/cxc/frescura" />
           </div>
         </div>
         <div className="flex items-center gap-2">
