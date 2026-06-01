@@ -90,12 +90,7 @@ export async function PATCH(request: NextRequest,
 
   const updateData: Record<string, unknown> = {};
 
-  if (body.estado === "aprobada") {
-    updateData.estado = "aprobada";
-    updateData.aprobado_por = body.aprobado_por;
-    updateData.aprobado_at = new Date().toISOString();
-  }
-
+  // Workflow simple: solo cierre (sube scan firmado). Sin aprobación.
   if (body.estado === "cerrada") {
     updateData.estado = "cerrada";
     updateData.cerrada_at = new Date().toISOString();

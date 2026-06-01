@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useToast } from "@/components/Toast";
-import SignatureCanvas from "@/components/SignatureCanvas";
 import { generateNotaPDF } from "@/lib/pdf-nota-entrega";
 
 type NotaItem = {
@@ -45,8 +44,6 @@ function estadoBadge(estado: string) {
   switch (estado) {
     case "abierta":
       return "bg-gray-100 text-gray-600";
-    case "aprobada":
-      return "bg-brandit-orange/10 text-brandit-orange";
     case "cerrada":
       return "bg-green-100 text-green-700";
     default:
@@ -62,13 +59,9 @@ export default function NotaDetallePage() {
 
   const [nota, setNota] = useState<Nota | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [showSignature, setShowSignature] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCerrarModal, setShowCerrarModal] = useState(false);
   const [scanFile, setScanFile] = useState<File | null>(null);
-  const [approving, setApproving] = useState(false);
   const [closing, setClosing] = useState(false);
 
   // Editing state
@@ -81,11 +74,6 @@ export default function NotaDetallePage() {
   const [editFecha, setEditFecha] = useState("");
   const [editItems, setEditItems] = useState<{ marca: string; descripcion: string; color: string; talla: string; cantidad: number }[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
-
-  useEffect(() => {
-    setRole(localStorage.getItem("brandit_role") || "");
-    setNombre(localStorage.getItem("brandit_nombre") || "");
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,96 +177,9 @@ export default function NotaDetallePage() {
     setShowDeleteModal(false);
   };
 
-  const handleApprove = async () => {
-    setApproving(true);
-    try {
-      // Check if admin has a saved signature
-      const sigRes = await fetch(`/api/notas-entrega/firma?nombre=${encodeURIComponent(nombre)}`);
-      const sigData = await sigRes.json();
-
-      if (!sigData.firma_base64) {
-        // No signature saved - show signature canvas
-        setShowSignature(true);
-        setApproving(false);
-        return;
-      }
-
-      // Signature exists - approve directly
-      await doApprove();
-    } catch {
-      toast("Error al aprobar", "error");
-    }
-    setApproving(false);
-  };
-
-  const doApprove = async () => {
-    try {
-      const res = await fetch(`/api/notas-entrega/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          estado: "aprobada",
-          aprobado_por: nombre,
-        }),
-      });
-      if (!res.ok) throw new Error("Error al aprobar");
-      const updated = await res.json();
-      updated.items = (updated.items || []).sort((a: NotaItem, b: NotaItem) => a.sort_order - b.sort_order);
-      setNota(updated);
-      toast("Nota aprobada");
-    } catch {
-      toast("Error al aprobar", "error");
-    }
-  };
-
-  const handleSaveSignature = async (base64: string) => {
-    setShowSignature(false);
-    setApproving(true);
-    try {
-      // Save signature
-      const res = await fetch("/api/notas-entrega/firma", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, firma_base64: base64 }),
-      });
-      if (!res.ok) throw new Error("Error guardando firma");
-
-      // If nota is still abierta, approve it
-      if (nota?.estado === "abierta") {
-        await doApprove();
-      } else {
-        toast("Firma actualizada");
-      }
-    } catch {
-      toast("Error al guardar firma", "error");
-    }
-    setApproving(false);
-  };
-
-  const handlePDF = async () => {
+  const handlePDF = () => {
     if (!nota) return;
-    // Fetch signature for PDF
-    let firmaBase64: string | null = null;
-    if (nota.aprobado_por) {
-      try {
-        const res = await fetch(`/api/notas-entrega/firma?nombre=${encodeURIComponent(nota.aprobado_por)}`);
-        if (res.ok) {
-          const data = await res.json();
-          firmaBase64 = data.firma_base64 || null;
-        }
-      } catch { /* ignore */ }
-    }
-    // Also try fetching by current user name as fallback
-    if (!firmaBase64 && nombre) {
-      try {
-        const res = await fetch(`/api/notas-entrega/firma?nombre=${encodeURIComponent(nombre)}`);
-        if (res.ok) {
-          const data = await res.json();
-          firmaBase64 = data.firma_base64 || null;
-        }
-      } catch { /* ignore */ }
-    }
-    generateNotaPDF(nota, firmaBase64);
+    generateNotaPDF(nota);
   };
 
   const handleCerrar = async () => {
@@ -325,7 +226,6 @@ export default function NotaDetallePage() {
   if (!nota) return null;
 
   const totalCantidad = nota.items.reduce((sum, i) => sum + Number(i.cantidad), 0);
-  const isAdmin = role === "admin";
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -376,41 +276,18 @@ export default function NotaDetallePage() {
               >
                 Eliminar
               </button>
-              {isAdmin && (
-                <button
-                  onClick={handleApprove}
-                  disabled={approving}
-                  className="bg-brandit-orange text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-brandit-orange/90 transition-colors disabled:opacity-50 min-h-[44px]"
-                >
-                  {approving ? "Aprobando..." : "Aprobar"}
-                </button>
-              )}
-            </>
-          )}
-          {nota.estado === "aprobada" && (
-            <>
               <button
                 onClick={handlePDF}
                 className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:border-brandit-orange hover:text-brandit-orange transition-colors min-h-[44px]"
               >
                 Imprimir PDF
               </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setShowSignature(true)}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-400 hover:text-gray-600 transition-colors min-h-[44px]"
-                >
-                  Cambiar firma
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={() => setShowCerrarModal(true)}
-                  className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700 transition-colors min-h-[44px]"
-                >
-                  Cerrar nota
-                </button>
-              )}
+              <button
+                onClick={() => setShowCerrarModal(true)}
+                className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700 transition-colors min-h-[44px]"
+              >
+                Cerrar nota
+              </button>
             </>
           )}
           {nota.estado === "cerrada" && (
@@ -681,19 +558,6 @@ export default function NotaDetallePage() {
         </div>
       )}
 
-      {/* Approval info */}
-      {nota.aprobado_por && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Aprobado por</p>
-          <p className="text-sm font-medium text-gray-900">{nota.aprobado_por}</p>
-          {nota.aprobado_at && (
-            <p className="text-xs text-gray-400 mt-1">
-              {new Date(nota.aprobado_at).toLocaleString("es-PA")}
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Scan image for cerrada notas */}
       {nota.estado === "cerrada" && nota.scan_url && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
@@ -714,14 +578,6 @@ export default function NotaDetallePage() {
       <div className="text-xs text-gray-300 text-center mt-8">
         Creada por {nota.created_by || "Sistema"} el {new Date(nota.created_at).toLocaleString("es-PA")}
       </div>
-
-      {/* Signature canvas modal */}
-      {showSignature && (
-        <SignatureCanvas
-          onSave={handleSaveSignature}
-          onCancel={() => setShowSignature(false)}
-        />
-      )}
 
       {/* Delete confirmation modal */}
       {showDeleteModal && (

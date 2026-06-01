@@ -50,7 +50,7 @@ const IVORY: [number, number, number] = [250, 249, 246];    // warm off-white (t
 // Wide letter-spacing for uppercase labels (luxury fashion feel)
 const LETTER_SPACE = 1.2;
 
-export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
+export function generateNotaPDF(nota: Nota) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -357,16 +357,7 @@ export function generateNotaPDF(nota: Nota, firmaBase64?: string | null) {
   const boxTop = y + 4;
   const lineY = boxTop + sigBoxH;
 
-  // Admin signature inside box (above line)
-  if (nota.aprobado_por && firmaBase64) {
-    try {
-      const fmt = firmaBase64.includes("image/jpeg") ? "JPEG" : "PNG";
-      doc.addImage(firmaBase64, fmt, col1X + 4, boxTop + 2, colWidth - 8, sigBoxH - 4);
-    } catch (e) {
-      console.error("Error adding signature to PDF:", e);
-    }
-  }
-
+  // Firma física: las 3 columnas (Aprobado por / Bodega / Cliente) se firman a mano.
   // Fine signature lines (hairline)
   doc.setDrawColor(...INK);
   doc.setLineWidth(0.3);

@@ -22,7 +22,6 @@ const TIPO_TABS = [
 const TABS = [
   { key: "todas", label: "Todas" },
   { key: "abierta", label: "Abiertas" },
-  { key: "aprobada", label: "Aprobadas" },
   { key: "cerrada", label: "Cerradas" },
 ];
 
@@ -30,8 +29,6 @@ function estadoBadge(estado: string) {
   switch (estado) {
     case "abierta":
       return "bg-gray-100 text-gray-600";
-    case "aprobada":
-      return "bg-brandit-orange/10 text-brandit-orange";
     case "cerrada":
       return "bg-green-100 text-green-700";
     default:
@@ -93,7 +90,6 @@ export default function NotasEntregaPage() {
   const kpiCounts = {
     total: notas.length,
     abiertas: notas.filter((n) => n.estado === "abierta").length,
-    aprobadas: notas.filter((n) => n.estado === "aprobada").length,
     cerradas: notas.filter((n) => n.estado === "cerrada").length,
   };
 
@@ -132,7 +128,7 @@ export default function NotasEntregaPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
           <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Total</p>
           <p className="text-2xl font-bold text-brandit-black">{kpiCounts.total}</p>
@@ -140,10 +136,6 @@ export default function NotasEntregaPage() {
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
           <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Abiertas</p>
           <p className="text-2xl font-bold text-gray-500">{kpiCounts.abiertas}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-5 border border-gray-100">
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Aprobadas</p>
-          <p className="text-2xl font-bold text-brandit-orange">{kpiCounts.aprobadas}</p>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-gray-100">
           <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Cerradas</p>
