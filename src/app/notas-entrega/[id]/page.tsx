@@ -125,6 +125,17 @@ export default function NotaDetallePage() {
     setEditing(true);
   };
 
+  // Duplica la línea en edición: copia marca/descripcion/color, talla vacía y cantidad 1, justo debajo.
+  const duplicateEditItem = (idx: number) => {
+    setEditItems((prev) => {
+      const orig = prev[idx];
+      const copy = { marca: orig.marca, descripcion: orig.descripcion, color: orig.color, talla: "", cantidad: 1 };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+  };
+
   const saveEdit = async () => {
     if (!editCliente.trim()) {
       toast("Cliente es requerido", "error");
@@ -572,6 +583,15 @@ export default function NotaDetallePage() {
                     }}
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-brandit-orange text-center"
                   />
+                  <button
+                    onClick={() => duplicateEditItem(idx)}
+                    title="Duplicar"
+                    className="text-gray-300 hover:text-brandit-orange transition-colors p-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
                   {editItems.length > 1 && (
                     <button
                       onClick={() => setEditItems((prev) => prev.filter((_, i) => i !== idx))}
