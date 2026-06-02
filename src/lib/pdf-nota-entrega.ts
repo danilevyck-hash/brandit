@@ -32,12 +32,12 @@ type Nota = {
 const INTRO_PEDIDO =
   "Por medio de la presente, se hace entrega al cliente de los siguientes artículos correspondientes a su pedido. Favor revisar el contenido antes de firmar.";
 const INTRO_MUESTRAS =
-  "Por medio de la presente, se hace entrega al cliente de las siguientes muestras para evaluación. Las muestras se entregan sin costo y deben ser devueltas o confirmada su recepción conforme a la política de la empresa.";
+  "Por medio de la presente, se hace entrega al cliente de las siguientes muestras para evaluación. Las muestras se entregan sin costo y deben ser devueltas o confirmada su recepción conforme a la política de la empresa. Las muestras deben ser devueltas junto con esta hoja (copia del cliente) firmada, para poder escanearla y cerrar la nota.";
 
 const POLICY_PEDIDO =
   "POLÍTICA DE ENTREGA — PEDIDO: Al firmar esta nota el cliente confirma haber recibido los artículos descritos en buen estado y en las cantidades indicadas. Cualquier reclamo por faltantes, defectos o diferencias debe realizarse dentro de las 48 horas posteriores a la recepción; pasado este plazo no se aceptarán reclamos. La mercancía entregada no admite devoluciones sin autorización previa de Confecciones Boston.";
 const POLICY_MUESTRAS =
-  "POLÍTICA DE ENTREGA — MUESTRAS: Las muestras entregadas son propiedad de Confecciones Boston y se facilitan únicamente con fines de evaluación. El cliente se compromete a devolverlas en un plazo máximo de 15 días calendario en las mismas condiciones en que fueron entregadas. De no ser devueltas en ese plazo, Confecciones Boston podrá facturarlas al precio regular sin previo aviso. Las muestras no podrán ser reproducidas, comercializadas ni transferidas a terceros sin autorización escrita.";
+  "POLÍTICA DE ENTREGA — MUESTRAS: Las muestras entregadas son propiedad de Confecciones Boston y se facilitan únicamente con fines de evaluación. El cliente se compromete a devolverlas en un plazo máximo de 7 días hábiles en las mismas condiciones en que fueron entregadas. De no ser devueltas en ese plazo, Confecciones Boston podrá facturarlas al precio regular sin previo aviso. Las muestras no podrán ser reproducidas, comercializadas ni transferidas a terceros sin autorización escrita.";
 
 // ─────────── LUXURY COLOR PALETTE ───────────
 const INK: [number, number, number] = [28, 28, 32];         // primary text — near-black charcoal
@@ -57,373 +57,402 @@ export function generateNotaPDF(nota: Nota) {
   const margin = 16;
   const tipo = nota.tipo === "muestras" ? "muestras" : "pedido";
 
-  // ─────────── HEADER ───────────
-  // Logo left — 26×52 to preserve source PNG aspect (1:2)
-  const LOGO_W = 26;
-  const LOGO_H = 52;
-  const logoY = 14;
-  try {
-    doc.addImage(LOGO_CB, "PNG", margin, logoY, LOGO_W, LOGO_H);
-  } catch {
-    doc.setFontSize(18);
-    doc.setFont("times", "bold");
-    doc.setTextColor(...INK);
-    doc.text("CONFECCIONES", margin, logoY + 10);
-    doc.text("BOSTON", margin, logoY + 18);
-  }
+  // Renderiza una copia completa (header, tabla, firmas, política) empezando en
+  // la página actual. Se llama dos veces — COPIA INTERNA (banda roja) y COPIA
+  // CLIENTE (banda azul) — separadas por un addPage(). El addPage() condicional
+  // de las firmas sigue funcionando dentro de cada copia gracias a copiaStartPage.
+  const renderCopia = (copiaLabel: string, bandColor: [number, number, number]) => {
+    const copiaStartPage = doc.getNumberOfPages();
 
-  // Company block right of logo — refined serif + fine print
-  const infoX = margin + LOGO_W + 8;
+    // Banda de color a todo el ancho arriba con la etiqueta de la copia (texto blanco).
+    const drawBand = () => {
+      doc.setFillColor(...bandColor);
+      doc.rect(0, 0, pageWidth, 6, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(255, 255, 255);
+      doc.setCharSpace(LETTER_SPACE);
+      doc.text(copiaLabel, margin, 4);
+      doc.setCharSpace(0);
+    };
 
-  // Company name in elegant serif
-  doc.setFont("times", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...INK);
-  doc.text(COMPANY.legal_name.toUpperCase(), infoX, logoY + 6);
+    // ─────────── HEADER ───────────
+    drawBand();
 
-  // Thin hairline under company name
-  doc.setDrawColor(...HAIRLINE);
-  doc.setLineWidth(0.2);
-  const nameLineY = logoY + 8.5;
-  doc.line(infoX, nameLineY, infoX + 80, nameLineY);
-
-  // Contact details in small helvetica
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...MUTED);
-  let infoY = logoY + 13;
-  doc.text(`RUC  ${COMPANY.ruc}`, infoX, infoY);
-  infoY += 4;
-  doc.text(COMPANY.address, infoX, infoY);
-  infoY += 4;
-  doc.text(`T.  ${COMPANY.phone}`, infoX, infoY);
-  infoY += 4;
-  doc.text(COMPANY.email, infoX, infoY);
-
-  // ─────────── RIGHT-SIDE DOCUMENT BLOCK ───────────
-  const rightX = pageWidth - margin;
-
-  // "NOTA DE ENTREGA" — tiny uppercase with wide letter-spacing.
-  // Positioned manually because jsPDF right-align doesn't count charSpace,
-  // which was cutting off the final "A".
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...SOFT);
-  doc.setCharSpace(LETTER_SPACE);
-  const labelText = "NOTA DE ENTREGA";
-  const labelWidth = doc.getTextWidth(labelText) + (labelText.length - 1) * LETTER_SPACE;
-  doc.text(labelText, rightX - labelWidth, logoY + 4);
-  doc.setCharSpace(0);
-
-  // Number — large Times Roman
-  doc.setFont("times", "normal");
-  doc.setFontSize(26);
-  doc.setTextColor(...INK);
-  doc.text(nota.numero, rightX, logoY + 16, { align: "right" });
-
-  // Thin underline below number (accent)
-  doc.setDrawColor(...ACCENT);
-  doc.setLineWidth(0.6);
-  const numWidth = doc.getTextWidth(nota.numero);
-  doc.line(rightX - numWidth, logoY + 18, rightX, logoY + 18);
-
-  // Tipo badge — italic serif small
-  doc.setFont("times", "italic");
-  doc.setFontSize(9);
-  doc.setTextColor(...MUTED);
-  const tipoLabel = tipo === "muestras" ? "Entrega de muestras" : "Entrega de pedido";
-  doc.text(tipoLabel, rightX, logoY + 24, { align: "right" });
-
-  // Date — fine print below badge
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...SOFT);
-  doc.text(`Panamá, ${formatDate(nota.fecha)}`, rightX, logoY + 30, { align: "right" });
-
-  // ─────────── HEADER BOTTOM RULE ───────────
-  const headerBottom = logoY + LOGO_H + 4;
-  doc.setDrawColor(...INK);
-  doc.setLineWidth(0.3);
-  doc.line(margin, headerBottom, pageWidth - margin, headerBottom);
-
-  // ─────────── CLIENT BLOCK ───────────
-  let y = headerBottom + 9;
-
-  // Section label with letter-spacing
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...SOFT);
-  doc.setCharSpace(LETTER_SPACE);
-  doc.text("DATOS DEL CLIENTE", margin, y);
-  doc.setCharSpace(0);
-
-  // Thin hairline under section label
-  doc.setDrawColor(...HAIRLINE);
-  doc.setLineWidth(0.2);
-  doc.line(margin, y + 1.5, pageWidth - margin, y + 1.5);
-
-  y += 7;
-
-  const colMidX = pageWidth / 2 + 4;
-
-  const drawField = (label: string, value: string, x: number, yPos: number, large = false) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...SOFT);
-    doc.setCharSpace(LETTER_SPACE);
-    doc.text(label.toUpperCase(), x, yPos);
-    doc.setCharSpace(0);
-    doc.setFont("times", "normal");
-    doc.setFontSize(large ? 14 : 11);
-    doc.setTextColor(...INK);
-    doc.text(value || "—", x, yPos + (large ? 6 : 5));
-  };
-
-  // Row 1: Cliente (large) + Atención
-  drawField("Cliente", nota.cliente, margin, y, true);
-  drawField("Atención", nota.contacto || "—", colMidX, y);
-  y += 13;
-
-  // Row 2: Número (no duplicate Fecha — already in header)
-  drawField("Número", formatPhone(nota.numero_contacto), margin, y);
-  y += 12;
-
-  if (nota.atencion) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...SOFT);
-    doc.setCharSpace(LETTER_SPACE);
-    doc.text("NOTA AL CLIENTE", margin, y);
-    doc.setCharSpace(0);
-    doc.setFont("times", "italic");
-    doc.setFontSize(10);
-    doc.setTextColor(...INK);
-    const noteLines = doc.splitTextToSize(nota.atencion, pageWidth - margin * 2);
-    doc.text(noteLines, margin, y + 5);
-    y += 5 + noteLines.length * 4.5 + 4;
-  }
-
-  // ─────────── INTRO (between cliente and detalle) ───────────
-  y += 3;
-  const introText = tipo === "muestras" ? INTRO_MUESTRAS : INTRO_PEDIDO;
-  doc.setFont("times", "italic");
-  doc.setFontSize(10);
-  doc.setTextColor(...MUTED);
-  const introLines = doc.splitTextToSize(introText, pageWidth - margin * 2);
-  doc.text(introLines, margin, y);
-  const introHeight = introLines.length * 5;
-  y += introHeight + 5;
-
-  // Section label above table
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...SOFT);
-  doc.setCharSpace(LETTER_SPACE);
-  doc.text("DETALLE DE ARTÍCULOS", margin, y);
-  doc.setCharSpace(0);
-  y += 4;
-
-  const totalCantidad = nota.items.reduce((sum, i) => sum + Number(i.cantidad), 0);
-
-  const rows = nota.items.map((item, idx) => [
-    String(idx + 1).padStart(2, "0"),
-    item.marca || "—",
-    item.descripcion,
-    item.color || "—",
-    item.talla || "—",
-    String(item.cantidad),
-  ]);
-
-  const showTotal = nota.items.length > 1;
-  const footRow = showTotal
-    ? [["", "", "", "", "TOTAL UNIDADES", String(totalCantidad)]]
-    : undefined;
-
-  // Compact header for pages 2+ (logo + NE-XXX)
-  const drawCompactHeader = () => {
+    // Logo left — 26×52 to preserve source PNG aspect (1:2)
+    const LOGO_W = 26;
+    const LOGO_H = 52;
+    const logoY = 14;
     try {
-      doc.addImage(LOGO_CB, "PNG", margin, 10, 13, 26);
-    } catch { /* ignore */ }
+      doc.addImage(LOGO_CB, "PNG", margin, logoY, LOGO_W, LOGO_H);
+    } catch {
+      doc.setFontSize(18);
+      doc.setFont("times", "bold");
+      doc.setTextColor(...INK);
+      doc.text("CONFECCIONES", margin, logoY + 10);
+      doc.text("BOSTON", margin, logoY + 18);
+    }
 
+    // Company block right of logo — refined serif + fine print
+    const infoX = margin + LOGO_W + 8;
+
+    // Company name in elegant serif
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(...INK);
+    doc.text(COMPANY.legal_name.toUpperCase(), infoX, logoY + 6);
+
+    // Thin hairline under company name
+    doc.setDrawColor(...HAIRLINE);
+    doc.setLineWidth(0.2);
+    const nameLineY = logoY + 8.5;
+    doc.line(infoX, nameLineY, infoX + 80, nameLineY);
+
+    // Contact details in small helvetica
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED);
+    let infoY = logoY + 13;
+    doc.text(`RUC  ${COMPANY.ruc}`, infoX, infoY);
+    infoY += 4;
+    doc.text(COMPANY.address, infoX, infoY);
+    infoY += 4;
+    doc.text(`T.  ${COMPANY.phone}`, infoX, infoY);
+    infoY += 4;
+    doc.text(COMPANY.email, infoX, infoY);
+
+    // ─────────── RIGHT-SIDE DOCUMENT BLOCK ───────────
+    const rightX = pageWidth - margin;
+
+    // "NOTA DE ENTREGA" — tiny uppercase with wide letter-spacing.
+    // Positioned manually because jsPDF right-align doesn't count charSpace,
+    // which was cutting off the final "A".
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...SOFT);
     doc.setCharSpace(LETTER_SPACE);
-    const lbl = "NOTA DE ENTREGA";
-    const lblW = doc.getTextWidth(lbl) + (lbl.length - 1) * LETTER_SPACE;
-    doc.text(lbl, pageWidth - margin - lblW, 14);
+    const labelText = "NOTA DE ENTREGA";
+    const labelWidth = doc.getTextWidth(labelText) + (labelText.length - 1) * LETTER_SPACE;
+    doc.text(labelText, rightX - labelWidth, logoY + 4);
     doc.setCharSpace(0);
 
+    // Number — large Times Roman
     doc.setFont("times", "normal");
-    doc.setFontSize(16);
+    doc.setFontSize(26);
     doc.setTextColor(...INK);
-    doc.text(nota.numero, pageWidth - margin, 24, { align: "right" });
+    doc.text(nota.numero, rightX, logoY + 16, { align: "right" });
 
-    doc.setDrawColor(...INK);
-    doc.setLineWidth(0.3);
-    doc.line(margin, 38, pageWidth - margin, 38);
-  };
+    // Thin underline below number (accent)
+    doc.setDrawColor(...ACCENT);
+    doc.setLineWidth(0.6);
+    const numWidth = doc.getTextWidth(nota.numero);
+    doc.line(rightX - numWidth, logoY + 18, rightX, logoY + 18);
 
-  autoTable(doc, {
-    startY: y,
-    head: [["Nº", "MARCA", "DESCRIPCIÓN", "COLOR", "TALLA", "CANT."]],
-    body: rows,
-    foot: footRow,
-    theme: "plain",
-    styles: {
-      font: "helvetica",
-      lineColor: HAIRLINE,
-      lineWidth: 0.2,
-    },
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: SOFT,
-      fontSize: 7,
-      fontStyle: "bold",
-      halign: "left",
-      cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
-      lineWidth: { bottom: 0.4 },
-      lineColor: INK,
-    },
-    bodyStyles: {
-      font: "times",
-      fontSize: 11,
-      textColor: INK,
-      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
-      lineWidth: { bottom: 0.15 },
-      lineColor: HAIRLINE,
-    },
-    alternateRowStyles: {
-      fillColor: IVORY,
-    },
-    footStyles: {
-      fillColor: [255, 255, 255],
-      textColor: INK,
-      fontSize: 8,
-      fontStyle: "bold",
-      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
-      lineWidth: { top: 0.4 },
-      lineColor: INK,
-    },
-    columnStyles: {
-      0: { cellWidth: 10, halign: "center", fontStyle: "normal" },
-      1: { cellWidth: 26 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 16, halign: "center" },
-      5: { cellWidth: 16, halign: "right", fontStyle: "bold" },
-    },
-    margin: { top: 44, left: margin, right: margin, bottom: 30 },
-    // Draw compact header on pages 2+
-    didDrawPage: (data) => {
-      if (data.pageNumber > 1) drawCompactHeader();
-    },
-  });
+    // Tipo badge — italic serif small
+    doc.setFont("times", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    const tipoLabel = tipo === "muestras" ? "Entrega de muestras" : "Entrega de pedido parcial";
+    doc.text(tipoLabel, rightX, logoY + 24, { align: "right" });
 
-  y = ((doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY ?? y + 30) + 18;
-
-  // If signature block won't fit on the current page, start a new one
-  const SIG_BLOCK_HEIGHT = 55;
-  const POLICY_RESERVED = 26;
-  if (y + SIG_BLOCK_HEIGHT > pageHeight - POLICY_RESERVED) {
-    doc.addPage();
-    drawCompactHeader();
-    y = 48;
-  }
-
-  // ─────────── SIGNATURE BLOCK (3 columns, refined) ───────────
-  const usableWidth = pageWidth - margin * 2;
-  const sigGap = 8;
-  const colWidth = (usableWidth - sigGap * 2) / 3;
-  const col1X = margin;
-  const col2X = margin + colWidth + sigGap;
-  const col3X = margin + (colWidth + sigGap) * 2;
-  const sigBoxH = 20;
-
-  // Column labels (uppercase with letter-spacing)
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...SOFT);
-  doc.setCharSpace(LETTER_SPACE);
-  doc.text("APROBADO POR", col1X, y);
-  doc.text("BODEGA", col2X, y);
-  doc.text("CLIENTE", col3X, y);
-  doc.setCharSpace(0);
-
-  // Hairline under section labels
-  doc.setDrawColor(...HAIRLINE);
-  doc.setLineWidth(0.2);
-  doc.line(margin, y + 1.5, pageWidth - margin, y + 1.5);
-
-  const boxTop = y + 4;
-  const lineY = boxTop + sigBoxH;
-
-  // Firma física: las 3 columnas (Aprobado por / Bodega / Cliente) se firman a mano.
-  // Fine signature lines (hairline)
-  doc.setDrawColor(...INK);
-  doc.setLineWidth(0.3);
-  doc.line(col1X, lineY, col1X + colWidth, lineY);
-  doc.line(col2X, lineY, col2X + colWidth, lineY);
-  doc.line(col3X, lineY, col3X + colWidth, lineY);
-
-  // Admin name + title under line (serif)
-  doc.setFont("times", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...INK);
-  doc.text(nota.aprobado_por || "", col1X, lineY + 5);
-  doc.setFont("times", "italic");
-  doc.setFontSize(8);
-  doc.setTextColor(...MUTED);
-  doc.text("Gerente General", col1X, lineY + 10);
-
-  // Bodega & Cliente fillable lines (thin hairlines, serif labels)
-  const fillFields = (x: number) => {
+    // Date — fine print below badge
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...SOFT);
-    doc.setCharSpace(LETTER_SPACE);
-    doc.setDrawColor(...HAIRLINE);
-    doc.setLineWidth(0.15);
+    doc.text(`Panamá, ${formatDate(nota.fecha)}`, rightX, logoY + 30, { align: "right" });
 
-    const labels = ["NOMBRE", "CÉDULA", "FECHA"];
-    const ys = [lineY + 6, lineY + 11.5, lineY + 17];
-    for (let i = 0; i < labels.length; i++) {
-      doc.text(labels[i], x, ys[i]);
-      doc.line(x + 16, ys[i], x + colWidth, ys[i]);
-    }
+    // ─────────── HEADER BOTTOM RULE ───────────
+    const headerBottom = logoY + LOGO_H + 4;
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.line(margin, headerBottom, pageWidth - margin, headerBottom);
+
+    // ─────────── CLIENT BLOCK ───────────
+    let y = headerBottom + 9;
+
+    // Section label with letter-spacing
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...SOFT);
+    doc.setCharSpace(LETTER_SPACE);
+    doc.text("DATOS DEL CLIENTE", margin, y);
     doc.setCharSpace(0);
+
+    // Thin hairline under section label
+    doc.setDrawColor(...HAIRLINE);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + 1.5, pageWidth - margin, y + 1.5);
+
+    y += 7;
+
+    const colMidX = pageWidth / 2 + 4;
+
+    const drawField = (label: string, value: string, x: number, yPos: number, large = false) => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...SOFT);
+      doc.setCharSpace(LETTER_SPACE);
+      doc.text(label.toUpperCase(), x, yPos);
+      doc.setCharSpace(0);
+      doc.setFont("times", "normal");
+      doc.setFontSize(large ? 14 : 11);
+      doc.setTextColor(...INK);
+      doc.text(value || "—", x, yPos + (large ? 6 : 5));
+    };
+
+    // Row 1: Cliente (large) + Atención
+    drawField("Cliente", nota.cliente, margin, y, true);
+    drawField("Atención", nota.contacto || "—", colMidX, y);
+    y += 13;
+
+    // Row 2: Número (no duplicate Fecha — already in header)
+    drawField("Número", formatPhone(nota.numero_contacto), margin, y);
+    y += 12;
+
+    if (nota.atencion) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...SOFT);
+      doc.setCharSpace(LETTER_SPACE);
+      doc.text("NOTA AL CLIENTE", margin, y);
+      doc.setCharSpace(0);
+      doc.setFont("times", "italic");
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      const noteLines = doc.splitTextToSize(nota.atencion, pageWidth - margin * 2);
+      doc.text(noteLines, margin, y + 5);
+      y += 5 + noteLines.length * 4.5 + 4;
+    }
+
+    // ─────────── INTRO (between cliente and detalle) ───────────
+    y += 3;
+    const introText = tipo === "muestras" ? INTRO_MUESTRAS : INTRO_PEDIDO;
+    doc.setFont("times", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(...MUTED);
+    const introLines = doc.splitTextToSize(introText, pageWidth - margin * 2);
+    doc.text(introLines, margin, y);
+    const introHeight = introLines.length * 5;
+    y += introHeight + 5;
+
+    // Section label above table
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...SOFT);
+    doc.setCharSpace(LETTER_SPACE);
+    doc.text("DETALLE DE ARTÍCULOS", margin, y);
+    doc.setCharSpace(0);
+    y += 4;
+
+    const totalCantidad = nota.items.reduce((sum, i) => sum + Number(i.cantidad), 0);
+
+    const rows = nota.items.map((item, idx) => [
+      String(idx + 1).padStart(2, "0"),
+      item.marca || "—",
+      item.descripcion,
+      item.color || "—",
+      item.talla || "—",
+      String(item.cantidad),
+    ]);
+
+    const showTotal = nota.items.length > 1;
+    const footRow = showTotal
+      ? [["", "", "", "", "TOTAL UNIDADES", String(totalCantidad)]]
+      : undefined;
+
+    // Compact header for continuation pages (logo + NE-XXX), con la misma banda de copia
+    const drawCompactHeader = () => {
+      drawBand();
+
+      try {
+        doc.addImage(LOGO_CB, "PNG", margin, 10, 13, 26);
+      } catch { /* ignore */ }
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...SOFT);
+      doc.setCharSpace(LETTER_SPACE);
+      const lbl = "NOTA DE ENTREGA";
+      const lblW = doc.getTextWidth(lbl) + (lbl.length - 1) * LETTER_SPACE;
+      doc.text(lbl, pageWidth - margin - lblW, 14);
+      doc.setCharSpace(0);
+
+      doc.setFont("times", "normal");
+      doc.setFontSize(16);
+      doc.setTextColor(...INK);
+      doc.text(nota.numero, pageWidth - margin, 24, { align: "right" });
+
+      doc.setDrawColor(...INK);
+      doc.setLineWidth(0.3);
+      doc.line(margin, 38, pageWidth - margin, 38);
+    };
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Nº", "MARCA", "DESCRIPCIÓN", "COLOR", "TALLA", "CANT."]],
+      body: rows,
+      foot: footRow,
+      theme: "plain",
+      styles: {
+        font: "helvetica",
+        lineColor: HAIRLINE,
+        lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: SOFT,
+        fontSize: 7,
+        fontStyle: "bold",
+        halign: "left",
+        cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
+        lineWidth: { bottom: 0.4 },
+        lineColor: INK,
+      },
+      bodyStyles: {
+        font: "times",
+        fontSize: 11,
+        textColor: INK,
+        cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
+        lineWidth: { bottom: 0.15 },
+        lineColor: HAIRLINE,
+      },
+      alternateRowStyles: {
+        fillColor: IVORY,
+      },
+      footStyles: {
+        fillColor: [255, 255, 255],
+        textColor: INK,
+        fontSize: 8,
+        fontStyle: "bold",
+        cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
+        lineWidth: { top: 0.4 },
+        lineColor: INK,
+      },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center", fontStyle: "normal" },
+        1: { cellWidth: 26 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 16, halign: "center" },
+        5: { cellWidth: 16, halign: "right", fontStyle: "bold" },
+      },
+      margin: { top: 44, left: margin, right: margin, bottom: 30 },
+      // Draw compact header on continuation pages of this copia
+      didDrawPage: (data) => {
+        if (data.pageNumber > copiaStartPage) drawCompactHeader();
+      },
+    });
+
+    y = ((doc as unknown as Record<string, Record<string, number>>).lastAutoTable?.finalY ?? y + 30) + 18;
+
+    // If signature block won't fit on the current page, start a new one
+    const SIG_BLOCK_HEIGHT = 55;
+    const POLICY_RESERVED = 26;
+    if (y + SIG_BLOCK_HEIGHT > pageHeight - POLICY_RESERVED) {
+      doc.addPage();
+      drawCompactHeader();
+      y = 48;
+    }
+
+    // ─────────── SIGNATURE BLOCK (3 columns, refined) ───────────
+    const usableWidth = pageWidth - margin * 2;
+    const sigGap = 8;
+    const colWidth = (usableWidth - sigGap * 2) / 3;
+    const col1X = margin;
+    const col2X = margin + colWidth + sigGap;
+    const col3X = margin + (colWidth + sigGap) * 2;
+    const sigBoxH = 20;
+
+    // Column labels (uppercase with letter-spacing)
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...SOFT);
+    doc.setCharSpace(LETTER_SPACE);
+    doc.text("APROBADO POR", col1X, y);
+    doc.text("BODEGA", col2X, y);
+    doc.text("CLIENTE", col3X, y);
+    doc.setCharSpace(0);
+
+    // Hairline under section labels
+    doc.setDrawColor(...HAIRLINE);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + 1.5, pageWidth - margin, y + 1.5);
+
+    const boxTop = y + 4;
+    const lineY = boxTop + sigBoxH;
+
+    // Firma física: las 3 columnas (Aprobado por / Bodega / Cliente) se firman a mano.
+    // Fine signature lines (hairline)
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(0.3);
+    doc.line(col1X, lineY, col1X + colWidth, lineY);
+    doc.line(col2X, lineY, col2X + colWidth, lineY);
+    doc.line(col3X, lineY, col3X + colWidth, lineY);
+
+    // Admin name + title under line (serif)
+    doc.setFont("times", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...INK);
+    doc.text(nota.aprobado_por || "", col1X, lineY + 5);
+    doc.setFont("times", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text("Gerente General", col1X, lineY + 10);
+
+    // Bodega & Cliente fillable lines (thin hairlines, serif labels)
+    const fillFields = (x: number) => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...SOFT);
+      doc.setCharSpace(LETTER_SPACE);
+      doc.setDrawColor(...HAIRLINE);
+      doc.setLineWidth(0.15);
+
+      const labels = ["NOMBRE", "CÉDULA", "FECHA"];
+      const ys = [lineY + 6, lineY + 11.5, lineY + 17];
+      for (let i = 0; i < labels.length; i++) {
+        doc.text(labels[i], x, ys[i]);
+        doc.line(x + 16, ys[i], x + colWidth, ys[i]);
+      }
+      doc.setCharSpace(0);
+    };
+
+    fillFields(col2X);
+    fillFields(col3X);
+
+    // ─────────── CLOSING LINE (centered, serif italic) ───────────
+    const closingY = lineY + 22;
+    doc.setFont("times", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(...MUTED);
+    doc.text("Gracias por su preferencia", pageWidth / 2, closingY, { align: "center" });
+
+    // Decorative hairline around closing
+    const ruleWidth = 30;
+    doc.setDrawColor(...HAIRLINE);
+    doc.setLineWidth(0.2);
+    doc.line(pageWidth / 2 - 50, closingY - 1, pageWidth / 2 - 50 + ruleWidth, closingY - 1);
+    doc.line(pageWidth / 2 + 50 - ruleWidth, closingY - 1, pageWidth / 2 + 50, closingY - 1);
+
+    // ─────────── POLICY (bottom of LAST page only, fine print) ───────────
+    const policyText = tipo === "muestras" ? POLICY_MUESTRAS : POLICY_PEDIDO;
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...MUTED);
+    const policyLines = doc.splitTextToSize(policyText, pageWidth - margin * 2);
+    const policyHeight = policyLines.length * 3.2;
+    const policyY = pageHeight - 14 - policyHeight;
+
+    // Thin separator above policy
+    doc.setDrawColor(...HAIRLINE);
+    doc.setLineWidth(0.2);
+    doc.line(margin, policyY - 4, pageWidth - margin, policyY - 4);
+    doc.text(policyLines, margin, policyY);
   };
 
-  fillFields(col2X);
-  fillFields(col3X);
-
-  // ─────────── CLOSING LINE (centered, serif italic) ───────────
-  const closingY = lineY + 22;
-  doc.setFont("times", "italic");
-  doc.setFontSize(10);
-  doc.setTextColor(...MUTED);
-  doc.text("Gracias por su preferencia", pageWidth / 2, closingY, { align: "center" });
-
-  // Decorative hairline around closing
-  const ruleWidth = 30;
-  doc.setDrawColor(...HAIRLINE);
-  doc.setLineWidth(0.2);
-  doc.line(pageWidth / 2 - 50, closingY - 1, pageWidth / 2 - 50 + ruleWidth, closingY - 1);
-  doc.line(pageWidth / 2 + 50 - ruleWidth, closingY - 1, pageWidth / 2 + 50, closingY - 1);
-
-  // ─────────── POLICY (bottom of LAST page only, fine print) ───────────
-  const policyText = tipo === "muestras" ? POLICY_MUESTRAS : POLICY_PEDIDO;
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...MUTED);
-  const policyLines = doc.splitTextToSize(policyText, pageWidth - margin * 2);
-  const policyHeight = policyLines.length * 3.2;
-  const policyY = pageHeight - 14 - policyHeight;
-
-  // Thin separator above policy
-  doc.setDrawColor(...HAIRLINE);
-  doc.setLineWidth(0.2);
-  doc.line(margin, policyY - 4, pageWidth - margin, policyY - 4);
-  doc.text(policyLines, margin, policyY);
+  // ─────────── DOS COPIAS: una por página (interna roja / cliente azul) ───────────
+  renderCopia("COPIA INTERNA", [200, 40, 40]);
+  doc.addPage();
+  renderCopia("COPIA CLIENTE", [40, 90, 200]);
 
   // ─────────── PAGE NUMBERS (applied after everything is drawn) ───────────
   const totalPages = doc.getNumberOfPages();
