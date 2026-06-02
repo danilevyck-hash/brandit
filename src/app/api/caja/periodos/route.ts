@@ -1,78 +1,62 @@
-import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRoles } from "@/lib/auth-brandit";
+import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireRoles, getSessionPayload, type Role } from "@/lib/auth-brandit";
+
+const CAJA_ROLES: readonly Role[] = ["admin", "secretaria"];
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
-
   const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
-    .select("*, gastos:caja_gastos(total)")
+    .select("*, caja_gastos(total, deleted)")
+    .eq("deleted", false)
     .order("numero", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
-  const result = (data || []).map((p) => {
-    const totalGastado = (p.gastos || []).reduce(
-      (sum: number, g: { total: number }) => sum + Number(g.total),
-      0
-    );
-    return {
-      ...p,
-      total_gastado: totalGastado,
-      saldo: Number(p.fondo_inicial) - totalGastado,
-      gastos: undefined,
-    };
-  });
+  const result = (data || []).map((p) => ({
+    ...p,
+    total_gastado: (p.caja_gastos || [])
+      .filter((g: { deleted?: boolean }) => !g.deleted)
+      .reduce((s: number, g: { total: number }) => s + (g.total || 0), 0),
+  }));
 
   return NextResponse.json(result);
 }
 
-export async function POST(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+export async function POST(req: NextRequest) {
+  const auth = requireRoles(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
+  const session = getSessionPayload(req);
+  if (!session?.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
 
-  const body = await request.json();
+  let fondo = 200;
+  try {
+    const body = await req.json();
+    if (body.fondo_inicial && !isNaN(Number(body.fondo_inicial))) {
+      fondo = Number(body.fondo_inicial);
+    }
+  } catch { /* empty body = default fondo */ }
 
-  // Check no open period exists
-  const { data: open } = await getSupabaseServer()
-    .from("caja_periodos")
-    .select("id")
-    .eq("estado", "abierto")
-    .limit(1);
-
-  if (open && open.length > 0) {
-    return NextResponse.json(
-      { error: "Ya existe un período abierto. Ciérrelo antes de crear uno nuevo." },
-      { status: 400 }
-    );
-  }
-
-  // Get next numero
   const { data: last } = await getSupabaseServer()
     .from("caja_periodos")
     .select("numero")
     .order("numero", { ascending: false })
-    .limit(1);
+    .limit(1)
+    .single();
 
-  const numero = last && last.length > 0 ? last[0].numero + 1 : 1;
+  const numero = (last?.numero || 0) + 1;
+  const today = new Date().toISOString().slice(0, 10);
 
   const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
-    .insert([
-      {
-        numero,
-        fecha_apertura: new Date().toISOString().split("T")[0],
-        fondo_inicial: body.fondo_inicial || 200,
-        estado: "abierto",
-      },
-    ])
+    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto", created_by: session?.nombre ?? session?.userId ?? null })
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }

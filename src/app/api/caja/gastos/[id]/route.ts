@@ -1,32 +1,134 @@
-import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRoles } from "@/lib/auth-brandit";
+import { getSupabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/activity-log";
+import { requireRoles, getSessionPayload, type Role } from "@/lib/auth-brandit";
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
-  if (auth instanceof NextResponse) return auth;
+const CAJA_ROLES: readonly Role[] = ["admin", "secretaria"];
 
-  const { error } = await getSupabaseServer().from("caja_gastos").delete().eq("id", params.id);
+export const dynamic = "force-dynamic";
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "responsable_id", "metodo_pago", "numero_factura"];
+
+function normalizeStr(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+function pick(body: Record<string, unknown>, fields: string[]) {
+  const result: Record<string, unknown> = {};
+  for (const f of fields) { if (f in body) result[f] = body[f]; }
+  return result;
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRoles(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
+  const session = getSessionPayload(req);
+  const body = await req.json();
 
-  const body = await request.json();
-  const updates: Record<string, string> = {};
-  if (body.estado) updates.estado = body.estado;
+  // ── Restore branch ──
+  if (body.action === "restore") {
+    const { data: existing } = await getSupabaseServer()
+      .from("caja_gastos")
+      .select("id, deleted, descripcion, total, categoria, responsable, fecha, proveedor, caja_periodos(estado, deleted)")
+      .eq("id", params.id)
+      .maybeSingle();
+    if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
 
-  const { data, error } = await getSupabaseServer()
+    const owningPeriodo = Array.isArray(existing.caja_periodos) ? existing.caja_periodos[0] : existing.caja_periodos;
+    if (!owningPeriodo || owningPeriodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+    if (owningPeriodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden restaurar gastos de un período cerrado." }, { status: 400 });
+    if (!existing.deleted) return NextResponse.json({ error: "Este gasto no está eliminado." }, { status: 400 });
+
+    const { error: restoreError } = await getSupabaseServer()
+      .from("caja_gastos")
+      .update({ deleted: false, deleted_by: null, deleted_at: null })
+      .eq("id", params.id);
+    if (restoreError) return NextResponse.json({ error: "Error al restaurar gasto" }, { status: 500 });
+
+    await logActivity(session?.nombre || "sistema", "caja_gasto_restore", `gasto ${params.id}`);
+
+    return NextResponse.json({ ok: true });
+  }
+
+  const fields = pick(body, ALLOWED_FIELDS);
+
+  // Validate the gasto belongs to an open, non-deleted period before touching it.
+  const { data: owning } = await getSupabaseServer()
     .from("caja_gastos")
-    .update(updates)
+    .select("id, caja_periodos(estado, deleted)")
     .eq("id", params.id)
-    .select()
-    .single();
+    .maybeSingle();
+  if (!owning) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
+  const periodo = Array.isArray(owning.caja_periodos) ? owning.caja_periodos[0] : owning.caja_periodos;
+  if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+  if (periodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden editar gastos de un período cerrado." }, { status: 400 });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (typeof fields.fecha === "string" && fields.fecha) {
+    const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+    if (fields.fecha > hoyPanama) return NextResponse.json({ error: "La fecha no puede ser futura. Usa hoy o una fecha anterior." }, { status: 400 });
+  }
+
+  if (typeof fields.categoria === "string") fields.categoria = normalizeStr(fields.categoria) || "Varios";
+
+  if ("responsable_id" in fields) {
+    const rid = typeof fields.responsable_id === "string" ? fields.responsable_id : "";
+    if (!rid) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+    const { data: responsableRow } = await getSupabaseServer()
+      .from("caja_responsables")
+      .select("id, nombre, activo")
+      .eq("id", rid)
+      .maybeSingle();
+    if (!responsableRow || !responsableRow.activo) {
+      return NextResponse.json({ error: "Responsable inválido o inactivo." }, { status: 400 });
+    }
+    fields.responsable_id = rid;
+    // Keep the text column in sync for display paths (PrintView, mobile card, Excel).
+    fields.responsable = responsableRow.nombre;
+  } else if ("responsable" in fields) {
+    // Legacy inline-edit path: text-only update. Backward compat for GastoTable.
+    const normalized = typeof fields.responsable === "string" ? normalizeStr(fields.responsable) : "";
+    if (!normalized) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+    fields.responsable = normalized;
+  }
+
+  if ("proveedor" in fields) {
+    const raw = typeof fields.proveedor === "string" ? fields.proveedor.trim() : "";
+    if (!raw || raw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
+    fields.proveedor = raw;
+  }
+
+  if (fields.itbms !== undefined) fields.itbms = Math.round((Number(fields.itbms) || 0) * 100) / 100;
+  if (fields.total !== undefined) fields.total = Math.round((Number(fields.total) || 0) * 100) / 100;
+  const { data, error } = await getSupabaseServer().from("caja_gastos").update(fields).eq("id", params.id).select().single();
+  if (error) return NextResponse.json({ error: "Error al actualizar gasto" }, { status: 500 });
+
+  await logActivity(session?.nombre || "sistema", "caja_gasto_update", `gasto ${params.id}`);
+
   return NextResponse.json(data);
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRoles(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
+  const session = getSessionPayload(req);
+  if (!session?.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
+
+  const { data: existing } = await getSupabaseServer()
+    .from("caja_gastos")
+    .select("id, descripcion, total, categoria, responsable, fecha, proveedor")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
+
+  const { error } = await getSupabaseServer()
+    .from("caja_gastos")
+    .update({ deleted: true, deleted_by: session?.nombre ?? session?.userId ?? null, deleted_at: new Date().toISOString() })
+    .eq("id", params.id);
+  if (error) return NextResponse.json({ error: "Error al eliminar gasto" }, { status: 500 });
+
+  await logActivity(session?.nombre || "sistema", "caja_gasto_delete", `gasto ${params.id}`);
+
+  return NextResponse.json({ ok: true });
 }

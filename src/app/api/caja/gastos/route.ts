@@ -1,39 +1,81 @@
-import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRoles } from "@/lib/auth-brandit";
+import { getSupabaseServer } from "@/lib/supabase-server";
+import { requireRoles, getSessionPayload, type Role } from "@/lib/auth-brandit";
+
+const CAJA_ROLES: readonly Role[] = ["admin", "secretaria"];
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+function normalizeStr(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+export async function POST(req: NextRequest) {
+  const auth = requireRoles(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
+  const session = getSessionPayload(req);
+  if (!session?.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
 
-  const body = await request.json();
+  const body = await req.json();
+  const { periodo_id, fecha, descripcion, proveedor, nro_factura, subtotal, itbms, total } = body;
+  const categoria = normalizeStr(body.categoria || "") || "Varios";
+  const responsableId = typeof body.responsable_id === "string" ? body.responsable_id : "";
 
-  const itbms = body.itbms || 0;
-  const subtotal = Number(body.subtotal);
-  const total = subtotal + subtotal * (itbms / 100);
+  if (!subtotal || Number(subtotal) <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
+
+  if (!periodo_id) return NextResponse.json({ error: "Falta el período" }, { status: 400 });
+  if (!fecha || typeof fecha !== "string") return NextResponse.json({ error: "La fecha es obligatoria." }, { status: 400 });
+
+  const proveedorRaw = typeof proveedor === "string" ? proveedor.trim() : "";
+  if (!proveedorRaw || proveedorRaw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
+
+  if (!responsableId) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+
+  const { data: responsableRow } = await getSupabaseServer()
+    .from("caja_responsables")
+    .select("id, nombre, activo")
+    .eq("id", responsableId)
+    .maybeSingle();
+  if (!responsableRow || !responsableRow.activo) {
+    return NextResponse.json({ error: "Responsable inválido o inactivo." }, { status: 400 });
+  }
+  const responsable = responsableRow.nombre;
+
+  // Panama is UTC-5 year-round (no DST). "Today" in Panama as YYYY-MM-DD.
+  const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  if (fecha > hoyPanama) return NextResponse.json({ error: "La fecha no puede ser futura. Usa hoy o una fecha anterior." }, { status: 400 });
+
+  const { data: periodo } = await getSupabaseServer()
+    .from("caja_periodos")
+    .select("estado, deleted")
+    .eq("id", periodo_id)
+    .maybeSingle();
+  if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+  if (periodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden agregar gastos a un período cerrado." }, { status: 400 });
+
+  const roundedItbms = Math.round((Number(itbms) || 0) * 100) / 100;
+  const roundedTotal = Math.round((Number(total) || 0) * 100) / 100;
 
   const { data, error } = await getSupabaseServer()
     .from("caja_gastos")
-    .insert([
-      {
-        periodo_id: body.periodo_id,
-        fecha: body.fecha,
-        empresa: body.empresa,
-        descripcion: body.descripcion,
-        subtotal,
-        itbms: subtotal * (itbms / 100),
-        total,
-        responsable: body.responsable || null,
-        categoria: body.categoria || null,
-        proveedor: body.proveedor || null,
-        estado: body.estado || "completado",
-      },
-    ])
+    .insert({
+      periodo_id, fecha,
+      descripcion: descripcion || "",
+      proveedor: proveedorRaw,
+      nro_factura: nro_factura || "",
+      responsable,
+      responsable_id: responsableId,
+      categoria,
+      subtotal, itbms: roundedItbms, total: roundedTotal,
+      // Keep old fields populated for backwards compat
+      nombre: descripcion || "",
+      created_by: session?.nombre ?? session?.userId ?? null,
+    })
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
