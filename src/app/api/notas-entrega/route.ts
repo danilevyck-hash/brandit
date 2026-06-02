@@ -22,7 +22,7 @@ function maxNumeroForPrefix(rows: { numero: string | null }[] | null, prefix: st
 }
 
 export async function GET(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   const search = request.nextUrl.searchParams.get("search") || "";
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();

@@ -5,7 +5,7 @@ import { requireRoles, getSessionPayload } from "@/lib/auth-brandit";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   // Nombre real desde la sesión verificada (httpOnly) — fuente de verdad para

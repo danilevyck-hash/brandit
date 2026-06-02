@@ -43,8 +43,8 @@ type DashboardData = {
 
 type ModuleId = "cxc" | "guias" | "notas" | "caja" | "leads" | "cotizaciones" | "ventas" | "stickers" | "usuarios";
 
-type Role = "admin" | "secretaria" | "vendedora1" | "vendedora2";
-const ALL_ROLES: Role[] = ["admin", "secretaria", "vendedora1", "vendedora2"];
+type Role = "admin" | "secretaria" | "vendedora";
+const ALL_ROLES: Role[] = ["admin", "secretaria", "vendedora"];
 
 type ModuleConfig = {
   id: ModuleId;
@@ -60,13 +60,13 @@ type ModuleConfig = {
 
 const MODULES: ModuleConfig[] = [
   { id: "cxc", icon: "\uD83D\uDCCA", label: "CxC", description: "Ver saldos y cobros pendientes", href: "/cxc", color: "text-blue-600", bgColor: "bg-blue-50", allowedRoles: ["admin", "secretaria"] },
-  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50", allowedRoles: ALL_ROLES },
+  { id: "guias", icon: "\uD83D\uDE9A", label: "Gu\u00edas", description: "Registrar env\u00edos y entregas", href: "/guias", color: "text-emerald-600", bgColor: "bg-emerald-50", allowedRoles: ["admin", "secretaria"] },
   { id: "notas", icon: "\uD83D\uDCE6", label: "Notas de Entrega", description: "Crear y rastrear entregas a clientes", href: "/notas-entrega", color: "text-teal-600", bgColor: "bg-teal-50", allowedRoles: ALL_ROLES },
-  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50", allowedRoles: ALL_ROLES },
+  { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50", allowedRoles: ["admin", "secretaria"] },
   { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Seguimiento de clientes nuevos", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50", allowedRoles: ALL_ROLES },
   { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Crear y ver presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50", allowedRoles: ALL_ROLES },
   { id: "ventas", icon: "📈", label: "Ventas", description: "Cotizaciones, pedidos y facturas", href: "/ventas", color: "text-indigo-600", bgColor: "bg-indigo-50", allowedRoles: ["admin"] },
-  { id: "stickers", icon: "🏷️", label: "Stickers", description: "Etiquetas de bodega", href: "/stickers", color: "text-orange-600", bgColor: "bg-orange-50", allowedRoles: ["admin", "secretaria"] },
+  { id: "stickers", icon: "🏷️", label: "Stickers", description: "Etiquetas de bodega", href: "/stickers", color: "text-orange-600", bgColor: "bg-orange-50", allowedRoles: ["admin"] },
   { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Administrar personas y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", allowedRoles: ["admin"] },
 ];
 

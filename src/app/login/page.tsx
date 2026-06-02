@@ -31,11 +31,7 @@ export default function LoginPage() {
     localStorage.setItem("brandit_nombre", data.nombre);
     localStorage.setItem("brandit_empresa", data.empresa || "");
 
-    if (data.role === "vendedora") {
-      window.location.href = "/leads";
-    } else {
-      window.location.href = "/";
-    }
+    window.location.href = "/";
   };
 
   return (

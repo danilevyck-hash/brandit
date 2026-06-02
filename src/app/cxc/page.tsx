@@ -168,8 +168,8 @@ export default function CxcPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Server enforces: admin, secretaria, vendedora1, vendedora2. UI mirror.
-  const canUpload = ["admin", "secretaria", "vendedora1", "vendedora2"].includes(role);
+  // Server enforces: admin, secretaria. UI mirror.
+  const canUpload = ["admin", "secretaria"].includes(role);
 
   const handleExportExcel = () => {
     const cleanRows = filtered.filter(r => isValidClientName(r.nombre));

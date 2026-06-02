@@ -15,9 +15,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
-export type Role = "admin" | "secretaria" | "vendedora1" | "vendedora2";
+export type Role = "admin" | "secretaria" | "vendedora";
 
-export const ALL_ROLES: readonly Role[] = ["admin", "secretaria", "vendedora1", "vendedora2"];
+export const ALL_ROLES: readonly Role[] = ["admin", "secretaria", "vendedora"];
 const ROLE_SET = new Set<string>(ALL_ROLES);
 
 export interface SessionPayload {

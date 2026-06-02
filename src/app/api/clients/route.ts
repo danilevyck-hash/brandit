@@ -4,7 +4,7 @@ import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   const { data, error } = await supabase
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
@@ -44,7 +44,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
 
   const { id } = await request.json();

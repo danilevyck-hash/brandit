@@ -17,8 +17,8 @@ const ALL_LINKS: NavLink[] = [
 
 const ROLE_LINKS: Record<string, string[]> = {
   admin: ["/", "/stickers", "/ventas", "/admin/usuarios", "/configuracion"],
-  secretaria: ["/", "/stickers", "/configuracion"],
-  vendedora: ["/leads"],
+  secretaria: ["/", "/configuracion"],
+  vendedora: ["/"],
 };
 
 type SearchResultLead = { id: string; nombre: string; empresa: string; estado: string; estado_venta: string };

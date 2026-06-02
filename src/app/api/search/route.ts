@@ -5,7 +5,7 @@ import { requireRoles } from "@/lib/auth-brandit";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const q = request.nextUrl.searchParams.get("q")?.trim();

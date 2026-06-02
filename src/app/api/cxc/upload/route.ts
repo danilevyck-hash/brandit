@@ -7,7 +7,7 @@
 // Fase 4 de fashiongr).
 //
 // Flujo:
-//   1. Auth (admin, secretaria, vendedora1, vendedora2)
+//   1. Auth (admin, secretaria)
 //   2. Multipart form: file (CSV) — company_key hardcoded a Boston
 //   3. Decode latin1 con fallback UTF-8
 //   4. Parse CSV ;-delimitado, headers: FECHA, CODIGO, COMPROBANTE,

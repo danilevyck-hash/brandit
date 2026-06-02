@@ -5,7 +5,7 @@ import { requireRoles } from "@/lib/auth-brandit";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const { data, error } = await getSupabaseServer()
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(request, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const { error } = await getSupabaseServer().from("stickers").delete().eq("id", params.id);
