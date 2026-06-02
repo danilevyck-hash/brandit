@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/switch-sync",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/guias-summary",
+      "schedule": "0 23 * * *"
     }
   ]
 }

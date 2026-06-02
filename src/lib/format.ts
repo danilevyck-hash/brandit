@@ -31,3 +31,7 @@ export function fmtDate(d: string): string {
     return d;
   }
 }
+
+export function fmtGuia(n: number): string {
+  return `GT-${String(n).padStart(3, "0")}`;
+}

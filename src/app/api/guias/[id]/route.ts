@@ -1,58 +1,63 @@
-// Detalle (GET), despacho/edición (PUT), update parcial (PATCH), soft-delete (DELETE).
-// Portado del molde fashiongr. Auth Brand It. Mono-empresa (items sin empresa).
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { requireRoles } from "@/lib/auth-brandit";
+import { logActivity } from "@/lib/activity-log";
+import { requireRoles, getSessionPayload, type Role } from "@/lib/auth-brandit";
+import { transportistaLabel } from "@/lib/transportistaLabel";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const GUIAS_ROLES: readonly Role[] = ["admin", "secretaria"];
+
+// ── GET ──
 
 export const dynamic = "force-dynamic";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ROLES_GUIAS = ["admin", "secretaria", "vendedora1", "vendedora2"] as const;
-
-type TransportistaJoin = { nombre: string | null } | { nombre: string | null }[] | null;
-function transportistaLabel(row: { modo_entrega?: string | null; transportista?: string | null; transportistas?: TransportistaJoin }): string {
-  if (row.modo_entrega === "entrega_directa") return "Entrega directa";
-  const j = Array.isArray(row.transportistas) ? row.transportistas[0] : row.transportistas;
-  return j?.nombre || row.transportista || ""; // catálogo (join) o texto libre
-}
-
-type ItemRow = { id?: string; orden: number; deleted?: boolean };
-async function reFetch(db: ReturnType<typeof getSupabaseServer>, id: string) {
-  const { data } = await db.from("guia_transporte").select("*, transportistas(nombre), guia_items(*)").eq("id", id).single();
-  if (data) {
-    (data as Record<string, unknown>).transportista = transportistaLabel(data);
-    const items = (data as { guia_items?: ItemRow[] }).guia_items;
-    if (items) (data as { guia_items: ItemRow[] }).guia_items = items.filter((i) => !i.deleted).sort((a, b) => a.orden - b.orden);
-  }
-  return data;
-}
-
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(req, [...ROLES_GUIAS]);
+  const auth = requireRoles(req, GUIAS_ROLES);
   if (auth instanceof NextResponse) return auth;
-  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  const data = await reFetch(getSupabaseServer(), params.id);
-  if (!data) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+  const { id } = params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+
+  // Sprint 2: JOIN a transportistas para resolver el label canónico.
+  const { data, error } = await getSupabaseServer()
+    .from("guia_transporte")
+    .select("*, transportistas(nombre), guia_items(*)")
+    .eq("id", id)
+    .eq("deleted", false)
+    .single();
+  if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  if (data) {
+    data.transportista = transportistaLabel(data);
+  }
+  if (data?.guia_items) {
+    data.guia_items = data.guia_items.filter((i: { deleted?: boolean }) => !i.deleted);
+    data.guia_items.sort((a: { orden: number }, b: { orden: number }) => a.orden - b.orden);
+  }
   return NextResponse.json(data);
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(req, [...ROLES_GUIAS]);
-  if (auth instanceof NextResponse) return auth;
-  const id = params.id;
-  if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  const db = getSupabaseServer();
-  const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, transportista, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer, motivo_rechazo } = body;
+// ── PUT (despacho completo con items/firmas) ──
 
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRoles(req, GUIAS_ROLES);
+  if (auth instanceof NextResponse) return auth;
+  const { id } = params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  const body = await req.json();
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer } = body;
+
+  // Sprint 2: validar modo_entrega cuando el cliente lo manda (edición de
+  // cabecera). En el flujo de despacho de bodega no viene y eso es OK.
   if (modo_entrega !== undefined) {
-    if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") return NextResponse.json({ error: "Modo de entrega inválido" }, { status: 400 });
-    if (modo_entrega === "transportista" && !String(transportista || "").trim()) return NextResponse.json({ error: "Indica el transportista" }, { status: 400 });
+    if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") {
+      return NextResponse.json({ error: "Modo de entrega inválido" }, { status: 400 });
+    }
+    if (modo_entrega === "transportista" && !transportista_id) {
+      return NextResponse.json({ error: "Selecciona un transportista" }, { status: 400 });
+    }
   }
 
-  // Guard de despacho: validar receptor/cédula/placa/chofer.
-  if (estado === "Completada" || estado === "Despachada") {
-    const { data: currentItems } = await db.from("guia_items").select("bultos").eq("guia_id", id).eq("deleted", false);
+  if (estado && (estado === "Completada" || estado === "Despachada")) {
+    const { data: currentItems } = await getSupabaseServer().from("guia_items").select("bultos").eq("guia_id", id).eq("deleted", false);
     const itemCount = items !== undefined ? (items?.length || 0) : (currentItems?.length || 0);
     const totalBultos = items !== undefined
       ? (items || []).reduce((s: number, i: { bultos?: number }) => s + (i.bultos || 0), 0)
@@ -61,101 +66,170 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (totalBultos === 0) return NextResponse.json({ error: "No se puede despachar una guía con 0 bultos" }, { status: 400 });
     if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
     if (!cedula) return NextResponse.json({ error: "Cédula del receptor requerida" }, { status: 400 });
-    if (tipo_despacho === "externo" && !placa) return NextResponse.json({ error: "Placa requerida para transporte externo" }, { status: 400 });
+    if (tipo_despacho === "externo" && !placa) return NextResponse.json({ error: "Placa del vehículo requerida para transporte externo" }, { status: 400 });
     if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
   }
 
-  const { data: previous } = await db.from("guia_transporte").select("estado").eq("id", id).single();
+  const { data: previous } = await getSupabaseServer().from("guia_transporte").select("estado, placa, modo_entrega, transportista_id").eq("id", id).single();
+
+  // Block edits on dispatched guías (only dispatch flow itself can update)
   if (previous?.estado === "Completada" && estado !== "Completada") {
     return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
   }
 
-  const u: Record<string, unknown> = {};
-  if (fecha !== undefined) u.fecha = fecha;
+  const updateData: Record<string, unknown> = {};
+  if (fecha !== undefined) updateData.fecha = fecha;
+  // Sprint 2: transportista TEXT ya no se escribe en UPDATEs. Las ediciones
+  // de cabecera mandan modo_entrega + transportista_id; el TEXT histórico
+  // queda intacto como respaldo hasta Sprint 3.
   if (modo_entrega !== undefined) {
-    u.modo_entrega = modo_entrega;
-    u.transportista_id = modo_entrega === "transportista" ? (transportista_id || null) : null;
-    u.transportista = modo_entrega === "transportista" ? (String(transportista || "").trim() || null) : null;
+    updateData.modo_entrega = modo_entrega;
+    updateData.transportista_id = modo_entrega === "transportista" ? transportista_id : null;
   }
-  if (placa !== undefined) u.placa = placa;
-  if (observaciones !== undefined) u.observaciones = observaciones;
-  if (monto_total !== undefined) u.monto_total = monto_total || 0;
-  if (estado !== undefined) u.estado = estado;
-  if (motivo_rechazo !== undefined) u.motivo_rechazo = motivo_rechazo;
-  if (receptor_nombre !== undefined) u.receptor_nombre = receptor_nombre;
-  if (cedula !== undefined) u.cedula = cedula;
-  if (firma_base64 !== undefined) u.firma_base64 = firma_base64;
-  if (firma_entregador_base64 !== undefined) u.firma_entregador_base64 = firma_entregador_base64;
-  if (entregado_por !== undefined) u.entregado_por = entregado_por;
-  if (numero_guia_transp !== undefined) u.numero_guia_transp = numero_guia_transp;
-  if (tipo_despacho !== undefined) u.tipo_despacho = tipo_despacho;
-  if (nombre_chofer !== undefined) u.nombre_chofer = nombre_chofer;
+  if (placa !== undefined) updateData.placa = placa;
+  if (observaciones !== undefined) updateData.observaciones = observaciones;
+  if (monto_total !== undefined) updateData.monto_total = monto_total || 0;
+  if (estado !== undefined) updateData.estado = estado;
+  if (receptor_nombre !== undefined) updateData.receptor_nombre = receptor_nombre;
+  if (cedula !== undefined) updateData.cedula = cedula;
+  if (firma_base64 !== undefined) updateData.firma_base64 = firma_base64;
+  if (entregado_por !== undefined) updateData.entregado_por = entregado_por;
+  if (numero_guia_transp !== undefined) updateData.numero_guia_transp = numero_guia_transp;
+  if (firma_entregador_base64 !== undefined) updateData.firma_entregador_base64 = firma_entregador_base64;
+  if (tipo_despacho !== undefined) updateData.tipo_despacho = tipo_despacho;
+  if (nombre_chofer !== undefined) updateData.nombre_chofer = nombre_chofer;
 
-  const { error: guiaErr } = await db.from("guia_transporte").update(u).eq("id", id);
+  const { error: guiaErr } = await getSupabaseServer().from("guia_transporte").update(updateData).eq("id", id);
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
 
-  // Reemplazo seguro de items: insertar nuevos (orden negativo) → borrar viejos → flip a positivo.
   if (items !== undefined) {
+    // Safe replace: insert new items first, then delete old ones
     if (items && items.length > 0) {
       const rows = items.map((item: Record<string, unknown>, i: number) => ({
-        guia_id: id, orden: -(i + 1),
+        guia_id: id, orden: -(i + 1), // negative orden = new batch (temp marker)
         cliente: item.cliente || "", direccion: item.direccion || "",
-        facturas: item.facturas || "", bultos: item.bultos || 0,
-        numero_guia_transp: item.numero_guia_transp || "",
+        facturas: item.facturas || "",
+        bultos: item.bultos || 0, numero_guia_transp: item.numero_guia_transp || "",
       }));
-      const { error: insErr } = await db.from("guia_items").insert(rows);
-      if (insErr) {
-        await db.from("guia_items").delete().eq("guia_id", id).lt("orden", 0);
-        return NextResponse.json({ error: insErr.message }, { status: 500 });
+      const { error: itemsErr } = await getSupabaseServer().from("guia_items").insert(rows);
+      if (itemsErr) {
+        // Cleanup: remove any partially inserted new items
+        await getSupabaseServer().from("guia_items").delete().eq("guia_id", id).lt("orden", 0);
+        return NextResponse.json({ error: itemsErr.message }, { status: 500 });
       }
-      await db.from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
-      const { data: nuevos } = await db.from("guia_items").select("id, orden").eq("guia_id", id).lt("orden", 0);
-      if (nuevos && nuevos.length > 0) {
-        const res = await Promise.allSettled(nuevos.map((n) => db.from("guia_items").update({ orden: -n.orden }).eq("id", n.id)));
-        const failed = res.filter((r) => r.status === "rejected");
-        if (failed.length > 0) return NextResponse.json({ error: `Items parcialmente actualizados (${failed.length}/${nuevos.length})` }, { status: 500 });
+      // New items inserted successfully — delete old items (positive orden)
+      await getSupabaseServer().from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
+      // Fix orden: flip negative to positive en paralelo (vs loop secuencial N+1)
+      const { data: newItems } = await getSupabaseServer()
+        .from("guia_items")
+        .select("id, orden")
+        .eq("guia_id", id)
+        .lt("orden", 0);
+      if (newItems && newItems.length > 0) {
+        const results = await Promise.allSettled(
+          newItems.map((ni) =>
+            getSupabaseServer()
+              .from("guia_items")
+              .update({ orden: -ni.orden })
+              .eq("id", ni.id)
+          )
+        );
+        const failed = results.filter((r) => r.status === "rejected");
+        if (failed.length > 0) {
+          console.error("[guias/PUT] flip parcial fallido:", failed);
+          return NextResponse.json(
+            { error: `Algunos items no se pudieron actualizar (${failed.length}/${newItems.length})` },
+            { status: 500 }
+          );
+        }
       }
     } else {
-      await db.from("guia_items").delete().eq("guia_id", id);
+      // Empty items array = delete all
+      await getSupabaseServer().from("guia_items").delete().eq("guia_id", id);
     }
   }
 
-  const data = await reFetch(db, id);
+  const { data } = await getSupabaseServer().from("guia_transporte").select("*, transportistas(nombre), guia_items(*)").eq("id", id).single();
+  if (data) {
+    data.transportista = transportistaLabel(data);
+  }
+  if (data?.guia_items) {
+    data.guia_items = data.guia_items.filter((i: { deleted?: boolean }) => !i.deleted);
+    data.guia_items.sort((a: { orden: number }, b: { orden: number }) => a.orden - b.orden);
+  }
+
+  const session = getSessionPayload(req);
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  if (estado && previous?.estado !== estado) changes.estado = { from: previous?.estado, to: estado };
+  if (placa && previous?.placa !== placa) changes.placa = { from: previous?.placa, to: placa };
+  if (modo_entrega !== undefined && previous?.modo_entrega !== modo_entrega) {
+    changes.modo_entrega = { from: previous?.modo_entrega, to: modo_entrega };
+  }
+  if (modo_entrega === "transportista" && previous?.transportista_id !== transportista_id) {
+    changes.transportista_id = { from: previous?.transportista_id, to: transportista_id };
+  }
+  if (items !== undefined) changes.items = { from: "replaced", to: `${(items || []).length} items` };
+  if (Object.keys(changes).length > 0) {
+    await logActivity(session?.nombre || "sistema", estado ? "guia_dispatch" : "guia_edit", `Guía ${id}`);
+  }
+
+  // Dispatch email removed — now handled by daily summary cron at 6pm
+
   return NextResponse.json(data);
 }
 
+// ── PATCH (despacho rápido desde lista / actualización parcial) ──
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRoles(req, [...ROLES_GUIAS]);
+  const auth = requireRoles(req, GUIAS_ROLES);
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  const db = getSupabaseServer();
   const body = await req.json();
-  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "tipo_despacho", "nombre_chofer", "motivo_rechazo"];
+  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista", "tipo_despacho", "nombre_chofer", "motivo_rechazo"];
   const update: Record<string, unknown> = {};
-  for (const k of allowed) if (body[k] !== undefined) update[k] = body[k];
-  if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+  for (const key of allowed) {
+    if (body[key] !== undefined) update[key] = body[key];
+  }
+  if (Object.keys(update).length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 });
 
+  // Block double-dispatch: if guia is already Completada, reject state changes
   if (body.estado) {
-    const { data: current } = await db.from("guia_transporte").select("estado").eq("id", params.id).single();
-    if (current?.estado === "Completada" && body.estado === "Completada") return NextResponse.json({ error: "Esta guía ya fue despachada" }, { status: 400 });
-    if (current?.estado === "Completada" && body.estado !== "Completada") return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
+    const { data: current } = await getSupabaseServer().from("guia_transporte").select("estado").eq("id", params.id).single();
+    if (current?.estado === "Completada" && body.estado === "Completada") {
+      return NextResponse.json({ error: "Esta guía ya fue despachada" }, { status: 400 });
+    }
+    if (current?.estado === "Completada" && body.estado !== "Completada") {
+      return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
+    }
   }
 
-  // Anti-carrera: al completar, solo actualiza si NO está ya Completada.
-  let query = db.from("guia_transporte").update(update).eq("id", params.id);
-  if (body.estado === "Completada") query = query.neq("estado", "Completada");
+  const session = getSessionPayload(req);
+  await logActivity(session?.nombre || "sistema", "guia_patch", `Guía ${params.id}`);
+
+  // If setting to Completada, add condition to prevent race: only update if NOT already Completada
+  let query = getSupabaseServer().from("guia_transporte").update(update).eq("id", params.id);
+  if (body.estado === "Completada") {
+    query = query.neq("estado", "Completada");
+  }
   const { data: updated, error } = await query.select("id").maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!updated) return NextResponse.json({ error: "Guía no encontrada o ya despachada" }, { status: 404 });
+  if (!updated) return NextResponse.json({ error: "Guía no encontrada o ya fue despachada" }, { status: 404 });
+
+  // Dispatch email removed — now handled by daily summary cron at 6pm
+
   return NextResponse.json({ ok: true });
 }
 
+// ── DELETE (soft delete) ──
+
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  // Soft-delete acotado a admin/secretaria.
-  const auth = requireRoles(req, ["admin", "secretaria"]);
+  const auth = requireRoles(req, GUIAS_ROLES);
   if (auth instanceof NextResponse) return auth;
-  if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
-  const { error } = await getSupabaseServer().from("guia_transporte").update({ deleted: true }).eq("id", params.id);
+  const { id } = params;
+  if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  const { error } = await getSupabaseServer().from("guia_transporte").update({ deleted: true }).eq("id", id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  const session = getSessionPayload(req);
+  await logActivity(session?.nombre || "sistema", "guia_delete", `Guía ${id} eliminada`);
   return NextResponse.json({ ok: true });
 }

@@ -1,41 +1,36 @@
-// POST notify — envío de email via Resend. TRAS FLAG: Brand It aún NO tiene
-// Resend configurado (sin RESEND_API_KEY ni dominio propio). Si no hay key,
-// es no-op (devuelve skipped:true) para no romper el flujo del frontend.
-// TODO(brandit): configurar RESEND_API_KEY + dominio/correos de Brand It
-// (NO usar los de fashiongr) y completar `from`/`to`.
+import { requireRoles, type Role } from "@/lib/auth-brandit";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRoles } from "@/lib/auth-brandit";
+
+const GUIAS_ROLES: readonly Role[] = ["admin", "secretaria"];
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const auth = requireRoles(req, ["admin", "secretaria", "vendedora1", "vendedora2"]);
+  const auth = requireRoles(req, GUIAS_ROLES);
   if (auth instanceof NextResponse) return auth;
 
-  const RESEND_KEY = process.env.RESEND_API_KEY;
-  if (!RESEND_KEY) {
-    // Flag no-op: email deshabilitado hasta configurar Resend en Brand It.
-    return NextResponse.json({ ok: true, skipped: true, reason: "Email no configurado en Brand It" });
+  // Email apagado en Brand It: sin RESEND_API_KEY el envío es no-op.
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json({ ok: true, skipped: "email-off" });
   }
 
   const { subject, body } = await req.json();
-  // TODO(brandit): reemplazar from/to por el dominio/correos reales de Brand It.
-  const FROM = process.env.GUIAS_EMAIL_FROM;
-  const TO = process.env.GUIAS_EMAIL_TO;
-  if (!FROM || !TO) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "GUIAS_EMAIL_FROM/TO no configurados" });
-  }
+  const RESEND_KEY = process.env.RESEND_API_KEY;
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_KEY}` },
-      body: JSON.stringify({ from: FROM, to: [TO], subject, html: `<div style="font-family:Arial,sans-serif;max-width:600px">${body}</div>` }),
+      body: JSON.stringify({
+        from: "Confecciones Boston <pedidos@example.com>",
+        to: ["info@example.com"],
+        subject,
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px">${body}</div>`,
+      }),
     });
-    if (!res.ok) { const e = await res.json(); return NextResponse.json({ error: e.message }, { status: 500 }); }
+    if (!res.ok) { const err = await res.json(); return NextResponse.json({ error: err.message }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[api/guias/notify]", err);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    console.error(err); return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
