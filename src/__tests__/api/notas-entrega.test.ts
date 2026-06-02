@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 
+// Mock auth — requireRoles devuelve el role string en éxito (sin cookie en tests)
+vi.mock("@/lib/auth-brandit", () => ({
+  requireRoles: () => "admin",
+}));
+
 // Mock supabase — POST path: insert -> select -> single
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseServer: () => ({
@@ -7,9 +12,8 @@ vi.mock("@/lib/supabase-server", () => ({
       if (table === "notas_entrega") {
         return {
           select: () => ({
-            order: () => ({
-              limit: () => Promise.resolve({ data: [], error: null }),
-            }),
+            // Numbering now reads all rows for the prefix via .ilike()
+            ilike: () => Promise.resolve({ data: [], error: null }),
           }),
           insert: () => ({
             select: () => ({

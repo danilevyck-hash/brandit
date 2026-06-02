@@ -4,6 +4,23 @@ import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
+// Máximo numérico real de los números con este prefijo (NE-### / NM-###).
+// La constraint `notas_entrega_numero_key` es GLOBAL sobre la columna `numero`,
+// así que el namespace lo define el PREFIJO, no el tipo: hay que mirar todas las
+// filas del prefijo (incluida cualquier NE- legacy que quedó bajo otro tipo).
+function maxNumeroForPrefix(rows: { numero: string | null }[] | null, prefix: string): number {
+  const re = new RegExp(`^${prefix}-(\\d+)$`);
+  let max = 0;
+  for (const row of rows || []) {
+    const match = (row.numero || "").match(re);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > max) max = n;
+    }
+  }
+  return max;
+}
+
 export async function GET(request: NextRequest) {
   const auth = requireRoles(request, ["admin", "secretaria", "vendedora1", "vendedora2"]);
   if (auth instanceof NextResponse) return auth;
@@ -54,41 +71,62 @@ export async function POST(request: NextRequest) {
   const tipoValue = body.tipo === "muestras" ? "muestras" : "pedido";
   const prefix = tipoValue === "muestras" ? "NM" : "NE";
 
-  // Get next numero for this tipo (independent sequence)
-  const { data: last } = await getSupabaseServer()
-    .from("notas_entrega")
-    .select("numero")
-    .eq("tipo", tipoValue)
-    .order("id", { ascending: false })
-    .limit(1);
+  // Genera el número desde el MÁXIMO NUMÉRICO real del prefijo + reintenta ante
+  // colisión de unique (23505). El recálculo dentro del loop cubre carreras:
+  // si dos notas se crean a la vez, la que pierde recalcula y toma el siguiente.
+  const MAX_RETRIES = 3;
+  let nota: { id: number; numero: string; [key: string]: unknown } | null = null;
+  let lastError: { message: string } | null = null;
 
-  let nextNum = 1;
-  if (last && last.length > 0) {
-    const match = last[0].numero.match(new RegExp(`${prefix}-(\\d+)`));
-    if (match) nextNum = parseInt(match[1], 10) + 1;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const { data: existing } = await getSupabaseServer()
+      .from("notas_entrega")
+      .select("numero")
+      .ilike("numero", `${prefix}-%`);
+
+    const nextNum = maxNumeroForPrefix(existing, prefix) + 1;
+    const numero = `${prefix}-${String(nextNum).padStart(3, "0")}`;
+
+    const { data, error } = await getSupabaseServer()
+      .from("notas_entrega")
+      .insert([
+        {
+          numero,
+          fecha: body.fecha,
+          cliente: body.cliente,
+          atencion: body.atencion || null,
+          contacto: body.contacto || null,
+          numero_contacto: body.numero_contacto || null,
+          tipo: tipoValue,
+          estado: "abierta",
+          created_by: body.created_by || null,
+        },
+      ])
+      .select()
+      .single();
+
+    if (!error) {
+      nota = data;
+      break;
+    }
+
+    // 23505 = unique_violation → número tomado (carrera o legacy): recalcular y reintentar.
+    const isDuplicate =
+      (error as { code?: string }).code === "23505" || /duplicate key/i.test(error.message || "");
+    if (isDuplicate) {
+      lastError = error;
+      continue;
+    }
+
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const numero = `${prefix}-${String(nextNum).padStart(3, "0")}`;
-
-  const { data: nota, error } = await getSupabaseServer()
-    .from("notas_entrega")
-    .insert([
-      {
-        numero,
-        fecha: body.fecha,
-        cliente: body.cliente,
-        atencion: body.atencion || null,
-        contacto: body.contacto || null,
-        numero_contacto: body.numero_contacto || null,
-        tipo: tipoValue,
-        estado: "abierta",
-        created_by: body.created_by || null,
-      },
-    ])
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!nota) {
+    return NextResponse.json(
+      { error: lastError?.message || "No se pudo generar el número de la nota. Intenta de nuevo." },
+      { status: 500 }
+    );
+  }
 
   // Insert items
   if (body.items && body.items.length > 0) {
