@@ -42,6 +42,8 @@ function formatFecha(d: string) {
 
 function estadoBadge(estado: string) {
   switch (estado) {
+    case "pendiente":
+      return "bg-amber-100 text-amber-700";
     case "abierta":
       return "bg-gray-100 text-gray-600";
     case "cerrada":
@@ -63,6 +65,8 @@ export default function NotaDetallePage() {
   const [showCerrarModal, setShowCerrarModal] = useState(false);
   const [scanFile, setScanFile] = useState<File | null>(null);
   const [closing, setClosing] = useState(false);
+  const [role, setRole] = useState("");
+  const [aprobando, setAprobando] = useState(false);
 
   // Editing state
   const [editing, setEditing] = useState(false);
@@ -92,6 +96,12 @@ export default function NotaDetallePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    setRole(localStorage.getItem("brandit_role") || "");
+  }, []);
+
+  const isAdmin = role === "admin";
 
   const startEdit = () => {
     if (!nota) return;
@@ -182,6 +192,31 @@ export default function NotaDetallePage() {
     generateNotaPDF(nota);
   };
 
+  const handleAprobar = async () => {
+    setAprobando(true);
+    try {
+      const res = await fetch(`/api/notas-entrega/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "aprobar",
+          aprobado_por: localStorage.getItem("brandit_nombre") || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Error al aprobar");
+      }
+      const updated = await res.json();
+      updated.items = (updated.items || []).sort((a: NotaItem, b: NotaItem) => a.sort_order - b.sort_order);
+      setNota(updated);
+      toast("Nota aprobada");
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+    setAprobando(false);
+  };
+
   const handleCerrar = async () => {
     if (!scanFile) {
       toast("Selecciona un archivo escaneado", "error");
@@ -260,6 +295,33 @@ export default function NotaDetallePage() {
           <p className="text-sm text-gray-400 mt-1">{formatFecha(nota.fecha)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {nota.estado === "pendiente" && (
+            <>
+              {!editing && (
+                <button
+                  onClick={startEdit}
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:border-brandit-orange hover:text-brandit-orange transition-colors min-h-[44px]"
+                >
+                  Editar
+                </button>
+              )}
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium border border-red-200 text-red-500 hover:bg-red-50 transition-colors min-h-[44px]"
+              >
+                Eliminar
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={handleAprobar}
+                  disabled={aprobando}
+                  className="bg-green-600 text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 min-h-[44px]"
+                >
+                  {aprobando ? "Aprobando..." : "Aprobar"}
+                </button>
+              )}
+            </>
+          )}
           {nota.estado === "abierta" && (
             <>
               {!editing && (
@@ -300,6 +362,21 @@ export default function NotaDetallePage() {
           )}
         </div>
       </div>
+
+      {/* Aviso pendiente de aprobación (solo muestras) */}
+      {nota.estado === "pendiente" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 flex items-start gap-3">
+          <span className="text-xl">⏳</span>
+          <div>
+            <p className="text-sm font-bold text-amber-800">Pendiente de aprobación</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {isAdmin
+                ? "Aprobá esta nota para poder imprimir el PDF y cerrarla."
+                : "Un administrador debe aprobar esta nota antes de imprimir o cerrarla."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Nota al cliente */}
       {nota.atencion && !editing && (

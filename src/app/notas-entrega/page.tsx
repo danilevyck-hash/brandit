@@ -21,12 +21,15 @@ const TIPO_TABS = [
 
 const TABS = [
   { key: "todas", label: "Todas" },
+  { key: "pendiente", label: "Pendientes" },
   { key: "abierta", label: "Abiertas" },
   { key: "cerrada", label: "Cerradas" },
 ];
 
 function estadoBadge(estado: string) {
   switch (estado) {
+    case "pendiente":
+      return "bg-amber-100 text-amber-700";
     case "abierta":
       return "bg-gray-100 text-gray-600";
     case "cerrada":
