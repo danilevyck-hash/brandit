@@ -23,7 +23,7 @@ type UserForm = {
 };
 
 const emptyForm: UserForm = {
-  email: "", role: "vendedora", nombre: "", password: "", empresa: "Confecciones Boston", activo: true,
+  email: "", role: "vendedora", nombre: "", password: "", empresa: "confecciones_boston", activo: true,
 };
 
 export default function UsuariosPage() {
@@ -65,7 +65,7 @@ export default function UsuariosPage() {
       role: u.role,
       nombre: u.nombre,
       password: u.password,
-      empresa: "Confecciones Boston",
+      empresa: u.empresa,
       activo: u.activo,
     });
     setShowModal(true);
@@ -191,8 +191,12 @@ export default function UsuariosPage() {
               </div>
               <div>
                 <label className="text-xs text-gray-400 block mb-1">Empresa</label>
-                <input value="Confecciones Boston" disabled readOnly
-                  className="w-full border-b border-gray-200 py-2 text-sm bg-transparent text-gray-500 cursor-not-allowed" />
+                <select value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })}
+                  className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
+                  <option value="confecciones_boston">Confecciones Boston</option>
+                  <option value="brand_it">Brand It</option>
+                  <option value="ambas">Ambas</option>
+                </select>
               </div>
               <div className="flex items-center gap-3">
                 <label className="text-xs text-gray-400">Activo</label>

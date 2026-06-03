@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       role: body.role,
       nombre: body.nombre,
       password: body.password,
-      empresa: "Confecciones Boston", // mono-empresa: nunca se guarda otra clave
+      empresa: body.empresa,
       activo: body.activo ?? true,
     }])
     .select()

@@ -61,6 +61,7 @@ type LeadForm = {
   vendedora: string;
   fecha_seguimiento: string;
   asignado_a: string;
+  empresa_vendedora: string;
 };
 
 type ViewMode = "lista" | "kanban";
@@ -73,6 +74,7 @@ export default function LeadsPage() {
   const [form, setForm] = useState<LeadForm>({
     nombre: "", empresa: "", telefono: "", email: "", estado: "prospecto",
     estado_venta: "activo", notas: "", vendedora: "", fecha_seguimiento: "", asignado_a: "",
+    empresa_vendedora: "confecciones_boston",
   });
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showPanel, setShowPanel] = useState(false);
@@ -98,12 +100,21 @@ export default function LeadsPage() {
   }, []);
 
   const isVendedora = role === "vendedora";
+  // Quién elige a qué negocio (empresa_vendedora) pertenece el lead: admin, secretaria,
+  // o vendedora con empresa 'ambas'. Una vendedora de una sola empresa NO elige (auto).
+  const canPickEmpresa = !isVendedora || userEmpresa === "ambas";
+  // El lead SIEMPRE pertenece a UN negocio concreto — nunca 'ambas'.
+  const empresaVendedoraToSave = () => {
+    const pick = canPickEmpresa ? form.empresa_vendedora : userEmpresa;
+    return pick === "brand_it" ? "brand_it" : "confecciones_boston";
+  };
 
   const load = useCallback(async () => {
     if (!role) return;
     setLoading(true);
     const params = new URLSearchParams();
-    if (isVendedora && userEmpresa) params.set("empresa", userEmpresa);
+    // Vendedora de una sola empresa → scope a su empresa. Si es "ambas", ve las dos (sin filtro).
+    if (isVendedora && userEmpresa && userEmpresa !== "ambas") params.set("empresa", userEmpresa);
     const res = await fetch(`/api/leads?${params}`);
     const data = await res.json();
     setLeads(Array.isArray(data) ? data : []);
@@ -175,6 +186,7 @@ export default function LeadsPage() {
       estado_venta: "activo", notas: "",
       vendedora: userName || "",
       fecha_seguimiento: "", asignado_a: "",
+      empresa_vendedora: "confecciones_boston",
     });
     setShowNewForm(true);
     setShowPanel(false);
@@ -195,6 +207,7 @@ export default function LeadsPage() {
       vendedora: lead.vendedora || "",
       fecha_seguimiento: lead.fecha_seguimiento || "",
       asignado_a: lead.asignado_a || "",
+      empresa_vendedora: lead.empresa_vendedora === "brand_it" ? "brand_it" : "confecciones_boston",
     });
     setShowPanel(true);
     setShowNewForm(false);
@@ -216,7 +229,7 @@ export default function LeadsPage() {
     await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, empresa_vendedora: userEmpresa }),
+      body: JSON.stringify({ ...form, empresa_vendedora: empresaVendedoraToSave() }),
     });
     setShowNewForm(false);
     setSaving(false);
@@ -230,7 +243,7 @@ export default function LeadsPage() {
     await fetch(`/api/leads/${selectedLead.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, empresa_vendedora: empresaVendedoraToSave() }),
     });
     setSaving(false);
     setEditMode(false);
@@ -578,6 +591,16 @@ export default function LeadsPage() {
                   <input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })} required
                     className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
                 </div>
+                {canPickEmpresa && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Negocio (empresa)</label>
+                    <select value={form.empresa_vendedora} onChange={(e) => setForm({ ...form, empresa_vendedora: e.target.value })}
+                      className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
+                      <option value="confecciones_boston">Confecciones Boston</option>
+                      <option value="brand_it">Brand It</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Teléfono *</label>
                   <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} required
@@ -713,6 +736,16 @@ export default function LeadsPage() {
                       <input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })}
                         className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent" />
                     </div>
+                    {canPickEmpresa && (
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Negocio (empresa)</label>
+                        <select value={form.empresa_vendedora} onChange={(e) => setForm({ ...form, empresa_vendedora: e.target.value })}
+                          className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-brandit-orange transition-colors bg-transparent">
+                          <option value="confecciones_boston">Confecciones Boston</option>
+                          <option value="brand_it">Brand It</option>
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">Teléfono</label>
                       <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })}

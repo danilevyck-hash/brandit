@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const { data, error } = await getSupabaseServer()
     .from("user_roles")
-    .update({ ...body, empresa: "Confecciones Boston" }) // mono-empresa: forzado
+    .update(body)
     .eq("id", params.id)
     .select()
     .single();
