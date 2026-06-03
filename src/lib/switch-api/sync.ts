@@ -241,19 +241,76 @@ export async function syncFacturas(opts: { desde: string; hasta: string }): Prom
   }
 }
 
-// ─── Estado de cuenta (CxC) — iterativo por cliente, como fashiongr ───────────
+// ─── Estado de cuenta (CxC) — SECUENCIAL con cursor reanudable ────────────────
 //
 // No hay endpoint global de antigüedad en Switch: /apicliente/estadocuenta es
-// PER-CLIENTE (requiere clienteId). Diseño:
-//   1) Listar TODOS los clientes vía /apicliente/lista (getPaginated corta por
-//      paginacion.total, no por page*size — Switch capa porPagina en silencio).
-//   2) Por cada cliente, GET /apicliente/estadocuenta?clienteId=<id>, en lotes
-//      de 10 en paralelo. El array está en data.estadocuenta.elements.
-//   3) Reconcile: REPLACE solo de los clientes consultados con éxito. Los que
-//      fallan (red/timeout/429) NO se reconcilian → conservan su saldo viejo
-//      (una falla transitoria no debe poner su CxC en $0 falsamente).
+// PER-CLIENTE (requiere clienteId). Diseño robusto para ~361 clientes sin timeout:
+//   1) Una "vuelta" = barrer todos los clientes UNA vez. Su lista + runStamp se
+//      guardan en switch_sync_cursor para poder reanudar entre corridas del cron.
+//   2) Se procesa de a UN cliente (SECUENCIAL) — Switch tiene SESIÓN ÚNICA: dos
+//      logins en paralelo se matan entre sí (codigo 0006) → re-logins que alargan
+//      el tiempo. Secuencial = un solo request a la vez = sin colisión de token.
+//   3) Se procesa mientras haya TIEMPO SEGURO (EC_TIME_BUDGET_MS). Al agotarse,
+//      se guarda el cursor y se devuelve "partial-cursor" (el cron encadena la
+//      siguiente corrida). NO se corre el reconcile global hasta terminar la vuelta.
+//   4) REPLACE per-cliente: por cada cliente consultado OK se borran sus filas de
+//      este runStamp (idempotencia ante re-proceso tras un corte), se insertan las
+//      nuevas, y se borran sus filas de vueltas anteriores (< runStamp). Así el
+//      cliente YA procesado nunca queda doble-contado, y los AÚN NO procesados
+//      conservan intacta su data vieja (nunca caen a $0 a mitad de vuelta).
+//   5) Falla transitoria (red/timeout/429): el cliente NO entra al reconcile →
+//      conserva su saldo viejo. Net-zero (pagó todo): se borran sus filas → $0.
+//   6) Al terminar la vuelta: reconcile global de respaldo (queriedCodigos) y se
+//      limpia el cursor.
 
-const EC_CONCURRENCY = 10;
+const EC_TIME_BUDGET_MS = 240_000;  // ~240s: parar antes del límite del plan (300 Pro)
+const EC_PERSIST_EVERY = 20;        // checkpoint del cursor cada N clientes procesados
+
+interface ClienteRef { id: number; nombre: string | null }
+
+interface CajaCursor {
+  runStamp: string;          // runStamp de la vuelta (lo usa el reconcile)
+  clientes: ClienteRef[];    // lista completa de la vuelta (estable entre corridas)
+  offsetIdx: number;         // próximo índice a procesar
+  queriedCodigos: string[];  // acumulado de clientes consultados OK (para el reconcile)
+}
+
+type DB = ReturnType<typeof getSupabaseServer>;
+
+async function loadEcCursor(db: DB): Promise<CajaCursor | null> {
+  const { data } = await db
+    .from("switch_sync_cursor")
+    .select("run_stamp, clientes, offset_idx, queried_codigos")
+    .eq("sync_type", "estadocuenta")
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    runStamp: String(data.run_stamp),
+    clientes: Array.isArray(data.clientes) ? (data.clientes as ClienteRef[]) : [],
+    offsetIdx: typeof data.offset_idx === "number" ? data.offset_idx : 0,
+    queriedCodigos: Array.isArray(data.queried_codigos) ? (data.queried_codigos as string[]) : [],
+  };
+}
+
+async function saveEcCursor(db: DB, c: CajaCursor): Promise<void> {
+  const { error } = await db.from("switch_sync_cursor").upsert(
+    {
+      sync_type: "estadocuenta",
+      run_stamp: c.runStamp,
+      clientes: c.clientes,
+      offset_idx: c.offsetIdx,
+      queried_codigos: c.queriedCodigos,
+      total: c.clientes.length,
+      updated_at: nowIso(),
+    },
+    { onConflict: "sync_type" },
+  );
+  if (error) throw new Error(`save switch_sync_cursor: ${error.message}`);
+}
+
+async function clearEcCursor(db: DB): Promise<void> {
+  await db.from("switch_sync_cursor").delete().eq("sync_type", "estadocuenta");
+}
 
 function mapEstadoCuentaRow(
   clienteCodigo: string,
@@ -295,7 +352,7 @@ function mapEstadoCuentaRow(
 
 export async function syncEstadocuenta(): Promise<SyncResult> {
   const startedAt = nowIso();
-  const runStamp = startedAt;
+  const startMs = Date.now();
   const skipDetails: SkipDetail[] = [];
   let rowsSynced = 0;
 
@@ -303,86 +360,140 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
     const client = createSwitchClient();
     const db = getSupabaseServer();
 
-    // 1) Todos los clientes (getPaginated corta por paginacion.total).
-    const clientesRaw = await client.getPaginated<RawRow>("/apicliente/lista", {}, 50);
+    // ── Arranque: RED DE SEGURIDAD del cursor ──
+    // Si YA existe un cursor (vuelta a medias) se RETOMA con su MISMO runStamp, sin
+    // importar su antigüedad — nunca se descarta. Así, aunque el auto-encadenado
+    // falle un día, el cron diario siguiente continúa la vuelta vieja desde donde
+    // quedó (offsetIdx) y siempre la termina, sin perder data y sin necesitar Pro.
+    // Solo se arranca una vuelta NUEVA cuando el cursor está LIMPIO (no hay fila =
+    // la vuelta anterior se completó y se borró el cursor). Un cursor incompleto
+    // SIEMPRE tiene prioridad sobre arrancar una vuelta nueva.
+    let cursor = await loadEcCursor(db);
+    // Un cursor "vacío" (sin clientes, p.ej. por un guardado a medias) no sirve para
+    // reanudar → se trata como limpio y se re-lista. No se queda trabado.
+    if (cursor && cursor.clientes.length === 0) {
+      await clearEcCursor(db);
+      cursor = null;
+    }
+    const resumed = cursor !== null;
+    if (cursor) {
+      const ageH = Math.round((Date.now() - new Date(cursor.runStamp).getTime()) / 3_600_000);
+      console.error(`[estadocuenta] RETOMA vuelta a medias: offset ${cursor.offsetIdx}/${cursor.clientes.length} (cursor de ~${ageH}h atrás)`);
+    } else {
+      // Vuelta NUEVA: listar todos los clientes (getPaginated corta por
+      // paginacion.total) y fijar el runStamp de la vuelta en el cursor.
+      const clientesRaw = await client.getPaginated<RawRow>("/apicliente/lista", {}, 50);
+      const clientes: ClienteRef[] = clientesRaw.map((c) => ({
+        id: typeof c["id"] === "number" ? (c["id"] as number) : NaN,
+        nombre: asStr(c["nombre"]),
+      }));
+      cursor = { runStamp: startedAt, clientes, offsetIdx: 0, queriedCodigos: [] };
+      await saveEcCursor(db, cursor);
+      console.error(`[estadocuenta] vuelta NUEVA: ${clientes.length} clientes`);
+    }
 
-    // 2) Estado de cuenta por cliente, en lotes de EC_CONCURRENCY en paralelo.
-    const queriedCodigos: string[] = [];   // clientes consultados OK → entran al reconcile
-    const buffer: RawRow[] = [];
-    let excludedNetZero = 0;                // clientes con saldo neto ~0 (pagados): no se insertan
+    const runStamp = cursor.runStamp;                          // runStamp de ESTA vuelta (reconcile usa este)
+    const queriedSet = new Set<string>(cursor.queriedCodigos); // acumulado entre corridas parciales
+    let excludedNetZero = 0;
 
-    const persist = async (batch: RawRow[]) => {
-      if (batch.length === 0) return;
-      const stamped = batch.map((r) => ({ ...r, synced_at: runStamp }));
-      const { error } = await db.from("switch_estadocuenta").insert(stamped);
-      if (error) throw new Error(`insert switch_estadocuenta: ${error.message}`);
-      rowsSynced += batch.length;
+    const persistCursor = async (offsetIdx: number) =>
+      saveEcCursor(db, { runStamp, clientes: cursor!.clientes, offsetIdx, queriedCodigos: Array.from(queriedSet) });
+
+    // REPLACE idempotente per-cliente: borra sus filas de ESTE runStamp (por si es
+    // re-proceso tras un corte), inserta las nuevas, y borra sus filas de vueltas
+    // ANTERIORES (< runStamp). Así el cliente ya procesado nunca queda doble-contado,
+    // y los AÚN NO procesados no se tocan (conservan su saldo viejo, nunca caen a $0).
+    const replaceCliente = async (codigo: string, rows: RawRow[]) => {
+      await db.from("switch_estadocuenta").delete().eq("cliente_codigo", codigo).eq("synced_at", runStamp);
+      if (rows.length > 0) {
+        const stamped = rows.map((r) => ({ ...r, synced_at: runStamp }));
+        const { error } = await db.from("switch_estadocuenta").insert(stamped);
+        if (error) throw new Error(`insert switch_estadocuenta: ${error.message}`);
+        rowsSynced += rows.length;
+      }
+      const { error: delErr } = await db.from("switch_estadocuenta").delete().eq("cliente_codigo", codigo).lt("synced_at", runStamp);
+      if (delErr) throw new Error(`reconcile per-cliente switch_estadocuenta: ${delErr.message}`);
     };
 
-    for (let i = 0; i < clientesRaw.length; i += EC_CONCURRENCY) {
-      const grupo = clientesRaw.slice(i, i + EC_CONCURRENCY);
-      const resultados = await Promise.all(
-        grupo.map(async (c) => {
-          const id = c["id"];
-          const codigo = id != null && id !== "" ? String(id) : null;
-          const nombre = asStr(c["nombre"]);
-          if (codigo == null || typeof id !== "number") {
-            return { codigo: null, nombre, elements: null as RawRow[] | null, error: "cliente sin id numérico" };
-          }
-          try {
-            const data = await client.get("/apicliente/estadocuenta", { clienteId: id });
-            return { codigo, nombre, elements: digEstadoCuentaElements(data), error: null as string | null };
-          } catch (err) {
-            return { codigo, nombre, elements: null as RawRow[] | null, error: err instanceof Error ? err.message : String(err) };
-          }
-        }),
-      );
+    // ── Procesar SECUENCIAL desde el offset, dentro del presupuesto de tiempo ──
+    let i = cursor.offsetIdx;
+    let processed = 0;
+    for (; i < cursor.clientes.length; i++) {
+      if (Date.now() - startMs > EC_TIME_BUDGET_MS) break;  // se acabó el tiempo seguro
 
-      for (const r of resultados) {
-        if (r.codigo == null) {
-          skipDetails.push({ entidad: "estadocuenta", identificador: "(sin id)", campo: "cliente_id", valorCrudo: String(r.nombre ?? ""), motivo: "cliente sin id numérico" });
-          continue;
-        }
-        if (r.error != null || r.elements == null) {
-          // Falla transitoria: NO entra al reconcile → conserva su data vieja.
-          skipDetails.push({ entidad: "estadocuenta", identificador: r.codigo, campo: "getEstadoCuenta", valorCrudo: r.error ?? "", motivo: "fallo al consultar (excluido del reconcile)" });
-          continue;
-        }
-        // Consulta exitosa → participa del reconcile (incluso si es net-zero).
-        queriedCodigos.push(r.codigo);
-
-        // Acumular las filas del cliente y su saldo NETO antes de decidir.
-        const clientRows: RawRow[] = [];
-        let netoCliente = 0;
-        for (const el of r.elements) {
-          const mapped = mapEstadoCuentaRow(r.codigo, r.nombre, el);
-          if (mapped.skip) { skipDetails.push(mapped.skip); continue; }
-          if (mapped.row) { clientRows.push(mapped.row); netoCliente += Number(mapped.row["saldo"]) || 0; }
-        }
-
-        // Net-zero (pagó todo): el reporte oficial NO lista no-deudores → no
-        // insertamos sus filas. NO es fallo ni skip: ya está en queriedCodigos,
-        // así que el reconcile borra sus filas viejas (queda sin saldo, correcto).
-        if (Math.abs(netoCliente) < 0.01) {
-          excludedNetZero++;
-          continue;
-        }
-
-        buffer.push(...clientRows);
-        while (buffer.length >= UPSERT_BATCH) {
-          await persist(buffer.splice(0, UPSERT_BATCH));
-        }
+      const cli = cursor.clientes[i];
+      if (!Number.isFinite(cli.id)) {
+        skipDetails.push({ entidad: "estadocuenta", identificador: "(sin id)", campo: "cliente_id", valorCrudo: String(cli.nombre ?? ""), motivo: "cliente sin id numérico" });
+        processed++;
+        if (processed % EC_PERSIST_EVERY === 0) await persistCursor(i + 1);
+        continue;
       }
-    }
-    await persist(buffer.splice(0, buffer.length));
-    console.error(`[estadocuenta] clientes net-zero excluidos: ${excludedNetZero}`);
+      const codigo = String(cli.id);
 
-    // 3) Reconcile: borrar las filas VIEJAS (synced_at < runStamp) SOLO de los
-    //    clientes consultados con éxito. Los recién insertados llevan
-    //    synced_at = runStamp y sobreviven. Los clientes que fallaron no están
-    //    en queriedCodigos → su data vieja queda intacta.
-    for (let i = 0; i < queriedCodigos.length; i += 200) {
-      const chunk = queriedCodigos.slice(i, i + 200);
+      let elements: RawRow[];
+      try {
+        const data = await client.get("/apicliente/estadocuenta", { clienteId: cli.id });
+        elements = digEstadoCuentaElements(data);
+      } catch (err) {
+        // Falla transitoria: NO entra al reconcile → conserva su data vieja.
+        skipDetails.push({ entidad: "estadocuenta", identificador: codigo, campo: "getEstadoCuenta", valorCrudo: err instanceof Error ? err.message : String(err), motivo: "fallo al consultar (excluido del reconcile)" });
+        processed++;
+        if (processed % EC_PERSIST_EVERY === 0) await persistCursor(i + 1);
+        continue;
+      }
+
+      // Consulta exitosa → participa del reconcile (incluso si es net-zero).
+      queriedSet.add(codigo);
+
+      // Acumular las filas del cliente y su saldo NETO antes de decidir.
+      const clientRows: RawRow[] = [];
+      let netoCliente = 0;
+      for (const el of elements) {
+        const mapped = mapEstadoCuentaRow(codigo, cli.nombre, el);
+        if (mapped.skip) { skipDetails.push(mapped.skip); continue; }
+        if (mapped.row) { clientRows.push(mapped.row); netoCliente += Number(mapped.row["saldo"]) || 0; }
+      }
+
+      // Net-zero (pagó todo): no insertamos filas, pero el replace borra sus filas
+      // viejas → queda en $0 (correcto). Igual entra a queriedSet.
+      if (Math.abs(netoCliente) < 0.01) {
+        excludedNetZero++;
+        await replaceCliente(codigo, []);
+      } else {
+        await replaceCliente(codigo, clientRows);
+      }
+
+      processed++;
+      if (processed % EC_PERSIST_EVERY === 0) await persistCursor(i + 1);
+    }
+
+    const completed = i >= cursor.clientes.length;
+
+    if (!completed) {
+      // ── Vuelta a medias: guardar el cursor y terminar parcial. SIN reconcile global. ──
+      await persistCursor(i);
+      const result: SyncResult = {
+        syncType: "estadocuenta",
+        status: "partial-cursor",
+        rowsSynced,
+        rowsSkipped: skipDetails.length,
+        skipDetails,
+        excludedNetZero,
+        remaining: cursor.clientes.length - i,
+        resumed,
+        startedAt,
+        finishedAt: nowIso(),
+      };
+      await logSync(result);
+      return result;
+    }
+
+    // ── Vuelta COMPLETA: reconcile global de respaldo (el replace per-cliente ya
+    //    dejó cada cliente consultado en su estado final; esto barre cualquier
+    //    remanente < runStamp de los queriedCodigos) y se limpia el cursor. ──
+    const queriedCodigos = Array.from(queriedSet);
+    for (let j = 0; j < queriedCodigos.length; j += 200) {
+      const chunk = queriedCodigos.slice(j, j + 200);
       const { error } = await db
         .from("switch_estadocuenta")
         .delete()
@@ -390,6 +501,8 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
         .lt("synced_at", runStamp);
       if (error) throw new Error(`reconcile switch_estadocuenta: ${error.message}`);
     }
+    await clearEcCursor(db);
+    console.error(`[estadocuenta] vuelta completa. net-zero excluidos: ${excludedNetZero}`);
 
     const result: SyncResult = {
       syncType: "estadocuenta",
@@ -398,6 +511,7 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
       rowsSkipped: skipDetails.length,
       skipDetails,
       excludedNetZero,
+      resumed,
       startedAt,
       finishedAt: nowIso(),
     };

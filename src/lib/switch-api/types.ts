@@ -59,12 +59,19 @@ export type SyncType = "facturas" | "estadocuenta" | "costo_diario";
 
 export interface SyncResult {
   syncType: SyncType;
-  status: "success" | "partial" | "error";
+  // "partial-cursor": la vuelta de estadocuenta quedó a medias (se acabó el
+  // presupuesto de tiempo); hay un cursor activo y falta reanudar. NO se corrió
+  // el reconcile final todavía.
+  status: "success" | "partial" | "error" | "partial-cursor";
   rowsSynced: number;
   rowsSkipped: number;
   skipDetails: SkipDetail[];
   /** Solo estadocuenta: clientes con saldo neto ~0 (pagados) no insertados. NO son skips ni fallos. */
   excludedNetZero?: number;
+  /** Solo estadocuenta: clientes que faltan procesar en la vuelta actual (cuando es partial-cursor). */
+  remaining?: number;
+  /** Solo estadocuenta: true si esta corrida RETOMÓ un cursor existente (vuelta a medias) en vez de iniciar una nueva. */
+  resumed?: boolean;
   errorMessage?: string;
   startedAt: string;        // ISO
   finishedAt: string;       // ISO
