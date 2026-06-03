@@ -30,8 +30,12 @@ function NuevaNotaInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const initialTipo = searchParams.get("tipo") === "muestras" ? "muestras" : "pedido";
-  const [tipo, setTipo] = useState<"muestras" | "pedido">(initialTipo);
+  // Tipo arranca SIN seleccionar (null) salvo que venga ?tipo= explícito desde el
+  // tab del listado — una elección consciente. Sin default silencioso a "pedido".
+  const urlTipo = searchParams.get("tipo");
+  const explicitTipo: "muestras" | "pedido" | null =
+    urlTipo === "muestras" || urlTipo === "pedido" ? urlTipo : null;
+  const [tipo, setTipo] = useState<"muestras" | "pedido" | null>(explicitTipo);
   const [cliente, setCliente] = useState("");
   const [contacto, setContacto] = useState("");
   const [numeroContacto, setNumeroContacto] = useState("");
@@ -47,7 +51,9 @@ function NuevaNotaInner() {
       const draft = localStorage.getItem(LS_KEY);
       if (draft) {
         const d = JSON.parse(draft);
-        if (d.tipo) setTipo(d.tipo);
+        // El draft solo impone su tipo si NO entraste con un ?tipo= explícito distinto.
+        // Si entraste con ?tipo=X, gana la URL (no un draft viejo que pisaba el tab).
+        if (d.tipo && (explicitTipo === null || d.tipo === explicitTipo)) setTipo(d.tipo);
         if (d.cliente) setCliente(d.cliente);
         if (d.contacto) setContacto(d.contacto);
         if (d.numeroContacto) setNumeroContacto(d.numeroContacto);
@@ -56,6 +62,8 @@ function NuevaNotaInner() {
         if (d.items?.length) setItems(d.items);
       }
     } catch { /* ignore */ }
+    // explicitTipo es estable (deriva de searchParams); el draft se carga solo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-save draft every 5s
@@ -93,7 +101,18 @@ function NuevaNotaInner() {
 
   const totalCantidad = items.reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
 
+  // Aviso de coherencia (suave, NO bloqueante): tipo Pedido pero el texto menciona
+  // "muestra(s)" en la nota al cliente o en alguna descripción de artículo.
+  const mencionaMuestra =
+    /\bmuestras?\b/i.test(atencion) ||
+    items.some((it) => /\bmuestras?\b/i.test(it.descripcion));
+  const avisoCoherencia = tipo === "pedido" && mencionaMuestra;
+
   const handleSave = async () => {
+    if (tipo === null) {
+      toast("Elegí si es Pedido o Muestras antes de guardar", "error");
+      return;
+    }
     if (!cliente.trim()) {
       toast("Ingresa el nombre del cliente", "error");
       return;
@@ -152,17 +171,22 @@ function NuevaNotaInner() {
 
       {/* Form */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 mb-6">
-        {/* Tipo toggle */}
-        <div className="mb-6">
-          <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Tipo de nota *</label>
+        {/* Tipo toggle — primer paso, requerido, sin default silencioso */}
+        <div className={`mb-6 -mx-2 px-2 py-3 rounded-2xl transition-colors ${tipo === null ? "bg-amber-50/60 ring-1 ring-amber-200" : ""}`}>
+          <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">
+            Tipo de nota <span className="text-brandit-orange">*</span>
+          </label>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setTipo("pedido")}
-              className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+              aria-pressed={tipo === "pedido"}
+              className={`flex-1 py-4 rounded-xl text-base font-semibold transition-colors min-h-[52px] ${
                 tipo === "pedido"
                   ? "bg-brandit-orange text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  : tipo === null
+                    ? "bg-white border-2 border-amber-300 text-gray-700 hover:border-amber-400"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
             >
               Pedido
@@ -170,15 +194,26 @@ function NuevaNotaInner() {
             <button
               type="button"
               onClick={() => setTipo("muestras")}
-              className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+              aria-pressed={tipo === "muestras"}
+              className={`flex-1 py-4 rounded-xl text-base font-semibold transition-colors min-h-[52px] ${
                 tipo === "muestras"
                   ? "bg-brandit-orange text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  : tipo === null
+                    ? "bg-white border-2 border-amber-300 text-gray-700 hover:border-amber-400"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
             >
               Muestras
             </button>
           </div>
+          {tipo === null && (
+            <p className="mt-2 text-xs font-medium text-amber-600 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+              </svg>
+              Elegí el tipo: ¿es un Pedido o son Muestras?
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
@@ -415,6 +450,18 @@ function NuevaNotaInner() {
             </div>
           ))}
         </div>
+
+        {/* Aviso de coherencia suave (no bloquea el guardado) */}
+        {avisoCoherencia && (
+          <div className="mt-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+            </svg>
+            <span>
+              El texto menciona <strong>&ldquo;muestras&rdquo;</strong> pero el tipo es <strong>Pedido</strong>. ¿Es correcto? Podés guardar igual.
+            </span>
+          </div>
+        )}
 
         {/* Total and actions */}
         <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
