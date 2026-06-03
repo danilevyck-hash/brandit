@@ -52,14 +52,14 @@ interface GuiasListProps {
   readOnly?: boolean;
 }
 
-const DESPACHO_ROLES = ["admin", "secretaria", "bodega", "director"];
-const CREATE_ROLES = ["admin", "secretaria", "bodega"];
+const DESPACHO_ROLES = ["admin", "secretaria"];
+const CREATE_ROLES = ["admin", "secretaria"];
 const DELETE_ROLES = ["admin", "secretaria"];
 const REJECT_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
   guias, loading, error, search, setSearch,
-  showPending, setShowPending, role,
+  showPending, role,
   onNewGuia,
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
   tipoDespacho, setTipoDespacho,
@@ -101,7 +101,7 @@ export default function GuiasList({
   const canCreate = !readOnly && role && CREATE_ROLES.includes(role);
   const canDespacho = !readOnly && role && DESPACHO_ROLES.includes(role);
   const canDelete = !readOnly && role && DELETE_ROLES.includes(role);
-  const canEdit = !readOnly && role && ["admin", "secretaria", "bodega"].includes(role);
+  const canEdit = !readOnly && role && ["admin", "secretaria"].includes(role);
   const canReject = !readOnly && role && REJECT_ROLES.includes(role);
 
   return (
@@ -168,25 +168,6 @@ export default function GuiasList({
             )}
           </div>
         </div>
-
-        {/* Bodega pending banner */}
-        {role === "bodega" && (() => {
-          const pendingCount = guias.filter((g) => g.estado === "Pendiente Bodega").length;
-          if (pendingCount === 0) return null;
-          return (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600 mb-6 flex items-center justify-between">
-              <span>
-                {pendingCount} guia{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
-              </span>
-              <button
-                onClick={() => setShowPending(!showPending)}
-                className="text-xs font-medium text-gray-500 hover:text-black underline transition"
-              >
-                {showPending ? "Ver todas" : "Ver pendientes"}
-              </button>
-            </div>
-          );
-        })()}
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
