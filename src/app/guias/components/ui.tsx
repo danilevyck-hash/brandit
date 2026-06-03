@@ -411,10 +411,101 @@ export function SwipeableRow({
 }
 
 export function PullToRefresh({
+  onRefresh,
   children,
 }: {
   onRefresh?: () => void | Promise<void>;
   children: ReactNode;
 }) {
-  return <>{children}</>;
+  const THRESHOLD = 70;   // px de pull (ya con resistencia) para disparar refresh
+  const MAX = 110;        // tope visual del pull
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  // Refs espejo para leer dentro de los listeners sin re-suscribir en cada frame.
+  const pullRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const startY = useRef<number | null>(null);
+  const active = useRef(false);
+
+  const applyPull = (v: number) => { pullRef.current = v; setPull(v); };
+  const setRefreshingBoth = (v: boolean) => { refreshingRef.current = v; setRefreshing(v); };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onStart = (e: TouchEvent) => {
+      if (refreshingRef.current) return;
+      // Solo arranca el gesto si el scroll está en el tope.
+      if (window.scrollY > 0) { startY.current = null; return; }
+      startY.current = e.touches[0].clientY;
+      active.current = false;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (refreshingRef.current || startY.current === null) return;
+      const dy = e.touches[0].clientY - startY.current;
+      if (dy <= 0 || window.scrollY > 0) {
+        if (active.current) { active.current = false; applyPull(0); }
+        return;
+      }
+      active.current = true;
+      applyPull(Math.min(MAX, dy * 0.5));   // resistencia: la mitad del arrastre
+      if (e.cancelable) e.preventDefault();  // frena el scroll/bounce nativo mientras se tira
+    };
+    const onEnd = () => {
+      if (refreshingRef.current || startY.current === null) return;
+      const shouldRefresh = active.current && pullRef.current >= THRESHOLD;
+      startY.current = null;
+      active.current = false;
+      if (shouldRefresh && onRefresh) {
+        setRefreshingBoth(true);
+        applyPull(46);  // deja espacio para el spinner mientras refresca
+        Promise.resolve(onRefresh()).finally(() => {
+          setRefreshingBoth(false);
+          applyPull(0);
+        });
+      } else {
+        applyPull(0);
+      }
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [onRefresh]);
+
+  const ready = pull >= THRESHOLD;
+
+  return (
+    <div ref={containerRef} style={{ overscrollBehaviorY: "contain" }}>
+      {/* Indicador: crece con el pull y empuja el contenido hacia abajo */}
+      <div
+        className="flex items-center justify-center overflow-hidden text-xs text-gray-400 select-none"
+        style={{ height: pull, transition: active.current ? "none" : "height 200ms ease" }}
+        aria-hidden
+      >
+        {refreshing ? (
+          <span className="flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Actualizando...
+          </span>
+        ) : pull > 0 ? (
+          <span>{ready ? "Soltá para refrescar" : "Tirá para refrescar"}</span>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
 }
