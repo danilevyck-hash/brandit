@@ -113,13 +113,16 @@ export function generateNotaPDF(nota: Nota) {
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
     let infoY = logoY + 13;
-    doc.text(`RUC  ${COMPANY.ruc}`, infoX, infoY);
-    infoY += 4;
-    doc.text(COMPANY.address, infoX, infoY);
-    infoY += 4;
     doc.text(`T.  ${COMPANY.phone}`, infoX, infoY);
     infoY += 4;
     doc.text(COMPANY.email, infoX, infoY);
+    infoY += 4;
+    doc.text(`IG  ${COMPANY.instagram}`, infoX, infoY);
+    infoY += 4;
+    doc.text(COMPANY.website, infoX, infoY);
+    infoY += 4;
+    // Ubicación al final, debajo del bloque de contacto.
+    doc.text(COMPANY.address, infoX, infoY);
 
     // ─────────── RIGHT-SIDE DOCUMENT BLOCK ───────────
     const rightX = pageWidth - margin;

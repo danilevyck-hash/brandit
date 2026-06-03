@@ -3,10 +3,11 @@
 export const COMPANY = {
   name: "Confecciones Boston",
   legal_name: "Confecciones Boston, S.A.",
-  ruc: "655-544-133465 DV13",
-  phone: "(+507) 6615-6110",
-  email: "levyd@gmail.com",
+  phone: "(+507) 6765-9785 / 6847-2069",
+  email: "ventas@cboston.net",
   address: "Vista Hermosa, Ciudad de Panamá",
+  instagram: "@Confeccionesboston",
+  website: "www.confeccionesboston.com",
 };
 
 // Formatea un número panameño a XXXX-XXXX
