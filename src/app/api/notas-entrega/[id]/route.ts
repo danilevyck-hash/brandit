@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRoles, getSessionPayload } from "@/lib/auth-brandit";
+import { requireRoles } from "@/lib/auth-brandit";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +47,6 @@ export async function PUT(request: NextRequest,
     tipo: nuevoTipo,
     fecha: body.fecha,
   };
-  // Una muestra "pendiente" reconvertida a pedido ya no requiere aprobación.
-  if (existing?.estado === "pendiente" && nuevoTipo === "pedido") {
-    updateFields.estado = "abierta";
-  }
 
   // Update nota
   const { error } = await getSupabaseServer()
@@ -95,63 +91,10 @@ export async function PATCH(request: NextRequest,
 
   const body = await request.json();
 
-  // ── Aprobación de muestras: solo admin ──
-  if (body.action === "aprobar") {
-    if (auth !== "admin") {
-      return NextResponse.json({ error: "Solo un administrador puede aprobar muestras" }, { status: 403 });
-    }
-
-    const { data: nota } = await getSupabaseServer()
-      .from("notas_entrega")
-      .select("tipo, estado")
-      .eq("id", params.id)
-      .single();
-
-    if (!nota) {
-      return NextResponse.json({ error: "Nota no encontrada" }, { status: 404 });
-    }
-    if (nota.tipo !== "muestras") {
-      return NextResponse.json({ error: "Solo las notas de muestras requieren aprobación" }, { status: 400 });
-    }
-    if (nota.estado !== "pendiente") {
-      return NextResponse.json({ error: "La nota ya fue aprobada" }, { status: 400 });
-    }
-
-    const payload = getSessionPayload(request);
-    const aprobador = body.aprobado_por || payload?.nombre || payload?.userId || "Administrador";
-
-    const { data, error } = await getSupabaseServer()
-      .from("notas_entrega")
-      .update({
-        estado: "abierta",
-        aprobado_por: aprobador,
-        aprobado_at: new Date().toISOString(),
-      })
-      .eq("id", params.id)
-      .select("*, items:notas_entrega_items(*)")
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
-  }
-
   const updateData: Record<string, unknown> = {};
 
-  // Cierre (sube scan firmado). Una muestra debe estar aprobada (no "pendiente") antes de cerrarse.
+  // Cierre (sube scan firmado).
   if (body.estado === "cerrada") {
-    const { data: actual } = await getSupabaseServer()
-      .from("notas_entrega")
-      .select("estado")
-      .eq("id", params.id)
-      .single();
-
-    if (actual?.estado === "pendiente") {
-      return NextResponse.json(
-        { error: "La nota de muestras debe ser aprobada antes de cerrarse" },
-        { status: 400 }
-      );
-    }
-
     updateData.estado = "cerrada";
     updateData.cerrada_at = new Date().toISOString();
     if (body.scan_url) updateData.scan_url = body.scan_url;

@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
           contacto: body.contacto || null,
           numero_contacto: body.numero_contacto || null,
           tipo: tipoValue,
-          // Muestras nacen "pendiente" (requieren aprobación admin); pedido nace "abierta".
-          estado: tipoValue === "muestras" ? "pendiente" : "abierta",
+          // Todas las notas (muestras y pedido) nacen "abierta". Sin paso de aprobación.
+          estado: "abierta",
           created_by: body.created_by || null,
         },
       ])
