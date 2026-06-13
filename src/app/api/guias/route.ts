@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const session = getSessionPayload(req);
   const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por } = body;
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por, tipo_despacho, receptor_nombre, cedula, nombre_chofer, numero_guia_transp, firma_base64, firma_entregador_base64 } = body;
 
   // Validate modo_entrega + transportista_id (Sprint 2 schema)
   if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") {
@@ -61,6 +61,14 @@ export async function POST(req: NextRequest) {
   if (totalBultos === 0) {
     return NextResponse.json({ error: "La guía debe tener al menos un item con bultos > 0" }, { status: 400 });
   }
+
+  // Brand It no tiene bodega: la guía se crea ya despachada ("Completada"),
+  // así que el POST exige las MISMAS validaciones que el PUT al despachar
+  // (ver [id]/route.ts líneas 59-71).
+  if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
+  if (!cedula) return NextResponse.json({ error: "Cédula del receptor requerida" }, { status: 400 });
+  if (tipo_despacho === "externo" && !placa) return NextResponse.json({ error: "Placa del vehículo requerida para transporte externo" }, { status: 400 });
+  if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
 
   // Auto-increment numero with retry for race conditions (UNIQUE constraint)
   let guia: Record<string, unknown> | null = null;
@@ -85,10 +93,17 @@ export async function POST(req: NextRequest) {
       placa: placa || null,
       observaciones: observaciones || null,
       monto_total: monto_total || 0,
-      estado: estado || "Pendiente Bodega",
+      estado: estado || "Completada",
       entregado_por: entregado_por || null,
+      tipo_despacho: tipo_despacho || null,
+      receptor_nombre: receptor_nombre || null,
+      cedula: cedula || null,
+      nombre_chofer: nombre_chofer || null,
+      numero_guia_transp: numero_guia_transp || null,
     };
     if (firma_transportista) insertData.firma_transportista = firma_transportista;
+    if (firma_base64) insertData.firma_base64 = firma_base64;
+    if (firma_entregador_base64) insertData.firma_entregador_base64 = firma_entregador_base64;
 
     const { data, error } = await getSupabaseServer()
       .from("guia_transporte")
