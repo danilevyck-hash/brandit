@@ -13,7 +13,6 @@ import { useState, useCallback } from "react";
 import type { Guia } from "./types";
 import { usePersistedState } from "../hooks/usePersistedState";
 import { useToast } from "@/components/Toast";
-import { fmtGuia } from "@/lib/format";
 
 export function useGuiasState() {
   const { toast } = useToast();
@@ -31,39 +30,8 @@ export function useGuiasState() {
   // Confirm delete state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Despacho state
-  const [bPlaca, setBPlaca] = useState("");
-  const [bReceptor, setBReceptor] = useState("");
-  const [bCedula, setBCedula] = useState("");
-  const [bChofer, setBChofer] = useState("");
-  const [bSaving, setBSaving] = useState(false);
+  // Filtro "pendientes" del listado
   const [showPending, setShowPending] = useState(false);
-  const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
-  const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
-  const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
-
-  function setPendingFirma1(v: string | null) {
-    _setPendingFirma1(v);
-    try {
-      if (expandedId) {
-        if (v) localStorage.setItem(`guia_firma_${expandedId}_transportista`, v);
-        else localStorage.removeItem(`guia_firma_${expandedId}_transportista`);
-      }
-    } catch {
-      /* */
-    }
-  }
-  function setPendingFirma2(v: string | null) {
-    _setPendingFirma2(v);
-    try {
-      if (expandedId) {
-        if (v) localStorage.setItem(`guia_firma_${expandedId}_entregador`, v);
-        else localStorage.removeItem(`guia_firma_${expandedId}_entregador`);
-      }
-    } catch {
-      /* */
-    }
-  }
 
   // showToast: misma firma que en FG, pero delega en el Toast de Brand It.
   const showToast = useCallback(
@@ -92,7 +60,6 @@ export function useGuiasState() {
     if (expandedId === id) {
       setExpandedId(null);
       setExpandedGuia(null);
-      resetDespachoFields();
       return;
     }
     setExpandedId(id);
@@ -102,34 +69,11 @@ export function useGuiasState() {
       if (res.ok) {
         const g = await res.json();
         setExpandedGuia(g);
-        setBPlaca(g.placa || "");
-        setBReceptor(g.receptor_nombre || "");
-        setBCedula(g.cedula || "");
-        setBChofer(g.nombre_chofer || "");
-        setTipoDespacho(g.tipo_despacho || "externo");
-        try {
-          const saved1 = localStorage.getItem(`guia_firma_${id}_transportista`);
-          const saved2 = localStorage.getItem(`guia_firma_${id}_entregador`);
-          if (saved1) _setPendingFirma1(saved1);
-          if (saved2) _setPendingFirma2(saved2);
-        } catch {
-          /* */
-        }
       }
     } catch {
       showToast("Error al cargar detalles", "error");
     }
     setExpandedLoading(false);
-  }
-
-  function resetDespachoFields() {
-    setBPlaca("");
-    setBReceptor("");
-    setBCedula("");
-    setBChofer("");
-    setTipoDespacho("externo");
-    setPendingFirma1(null);
-    setPendingFirma2(null);
   }
 
   function requestDeleteGuia(id: string) {
@@ -152,53 +96,6 @@ export function useGuiasState() {
     setExpandedId(null);
     setExpandedGuia(null);
     loadGuias();
-  }
-
-  async function confirmarDespacho(firma1: string, firma2: string) {
-    if (!expandedGuia) return;
-    setBSaving(true);
-
-    const payload: Record<string, unknown> = {
-      estado: "Completada",
-      tipo_despacho: tipoDespacho,
-      receptor_nombre: bReceptor,
-      cedula: bCedula,
-      firma_base64: firma1,
-      firma_entregador_base64: firma2,
-    };
-
-    if (tipoDespacho === "externo") {
-      payload.placa = bPlaca;
-    } else {
-      payload.nombre_chofer = bChofer;
-    }
-
-    const res = await fetch(`/api/guias/${expandedGuia.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.ok) {
-      showToast(`Guía ${fmtGuia(expandedGuia.numero)} despachada`);
-      try {
-        localStorage.removeItem(`guia_firma_${expandedGuia.id}_transportista`);
-        localStorage.removeItem(`guia_firma_${expandedGuia.id}_entregador`);
-      } catch {
-        /* */
-      }
-
-      const fullRes = await fetch(`/api/guias/${expandedGuia.id}`);
-      if (fullRes.ok) {
-        const updated = await fullRes.json();
-        setExpandedGuia(updated);
-      }
-      loadGuias();
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      showToast(errData.error || "Error al guardar", "error");
-    }
-    setBSaving(false);
   }
 
   async function rejectGuia(id: string, motivo: string) {
@@ -231,28 +128,12 @@ export function useGuiasState() {
     expandedGuia,
     expandedLoading,
     toggleExpand,
-    tipoDespacho,
-    setTipoDespacho,
-    bPlaca,
-    setBPlaca,
-    bReceptor,
-    setBReceptor,
-    bCedula,
-    setBCedula,
-    bChofer,
-    setBChofer,
-    bSaving,
-    pendingFirma1,
-    setPendingFirma1,
-    pendingFirma2,
-    setPendingFirma2,
     showToast,
     loadGuias,
     confirmDeleteId,
     setConfirmDeleteId,
     requestDeleteGuia,
     confirmDeleteGuia,
-    confirmarDespacho,
     rejectGuia,
   };
 }
