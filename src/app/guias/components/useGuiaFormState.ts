@@ -69,6 +69,15 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(editingId === null);
 
+  // Despacho en un paso (solo creación): la guía nace "Completada".
+  const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
+  const [placa, setPlaca] = useState("");
+  const [receptorNombre, setReceptorNombre] = useState("");
+  const [cedula, setCedula] = useState("");
+  const [nombreChofer, setNombreChofer] = useState("");
+  const [firma1, setFirma1] = useState<string | null>(null);
+  const [firma2, setFirma2] = useState<string | null>(null);
+
   const showToast = useCallback(
     (msg: string, type: "success" | "error" | "info" = "success") => {
       toast(msg, type);
@@ -195,11 +204,20 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setItems(items.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
   }
 
-  function validate(): boolean {
+  function validate(firma1Val = "", firma2Val = ""): boolean {
     const errors = new Set<string>();
     if (!fecha) errors.add("fecha");
     if (modoEntrega === "transportista" && !transportistaId) errors.add("transportista");
     if (!entregadoPor) errors.add("entregadoPor");
+    // Datos de despacho: requeridos solo al crear (la guía nace despachada).
+    if (!editingId) {
+      if (!receptorNombre.trim()) errors.add("receptor");
+      if (!cedula.trim()) errors.add("cedula");
+      if (tipoDespacho === "externo" && !placa.trim()) errors.add("placa");
+      if (tipoDespacho === "directo" && !nombreChofer.trim()) errors.add("chofer");
+      if (!firma1Val) errors.add("firma1");
+      if (!firma2Val) errors.add("firma2");
+    }
     const validItems = items.filter(
       (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
     );
@@ -231,9 +249,11 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     return true;
   }
 
-  async function saveGuia(opts?: { silent?: boolean }) {
+  async function saveGuia(opts?: { silent?: boolean; firma1?: string; firma2?: string }) {
     const silent = opts?.silent === true;
-    if (!validate()) return;
+    const f1 = opts?.firma1 ?? firma1 ?? "";
+    const f2 = opts?.firma2 ?? firma2 ?? "";
+    if (!validate(f1, f2)) return;
     try {
       localStorage.setItem("brandit_last_modo_entrega", modoEntrega);
       if (transportistaId) localStorage.setItem("brandit_last_transportista_id", transportistaId);
@@ -247,18 +267,33 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setSaving(true);
     const url = editingId ? `/api/guias/${editingId}` : "/api/guias";
     const method = editingId ? "PUT" : "POST";
+
+    const base: Record<string, unknown> = {
+      fecha,
+      modo_entrega: modoEntrega,
+      transportista_id: modoEntrega === "transportista" ? transportistaId : null,
+      entregado_por: entregadoPor,
+      observaciones,
+      items: validItems,
+    };
+    // Edición: PUT conserva el estado actual. Creación: POST omite estado
+    // (el backend la crea "Completada") y replica el payload de despacho.
+    const payload: Record<string, unknown> = editingId
+      ? { ...base, estado: editingEstado || "Pendiente Bodega" }
+      : {
+          ...base,
+          tipo_despacho: tipoDespacho,
+          receptor_nombre: receptorNombre,
+          cedula,
+          firma_base64: f1,
+          firma_entregador_base64: f2,
+          ...(tipoDespacho === "externo" ? { placa } : { nombre_chofer: nombreChofer }),
+        };
+
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fecha,
-        modo_entrega: modoEntrega,
-        transportista_id: modoEntrega === "transportista" ? transportistaId : null,
-        entregado_por: entregadoPor,
-        observaciones,
-        estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
-        items: validItems,
-      }),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
       setError(null);
@@ -274,8 +309,8 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            subject: `Nueva Guía ${fmtGuia(guia.numero)} — Pendiente Bodega`,
-            body: `<h2>Guía ${fmtGuia(guia.numero)}</h2><p><strong>Transportista:</strong> ${transpLabel}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
+            subject: `Nueva Guía ${fmtGuia(guia.numero)} — Despachada`,
+            body: `<h2>Guía ${fmtGuia(guia.numero)}</h2><p><strong>Transportista:</strong> ${transpLabel}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Guía creada y despachada.</p>`,
           }),
         }).catch(() => {});
       }
@@ -321,6 +356,21 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     addRow,
     removeRow,
     saveGuia,
+    // despacho (solo creación)
+    tipoDespacho,
+    setTipoDespacho,
+    placa,
+    setPlaca,
+    receptorNombre,
+    setReceptorNombre,
+    cedula,
+    setCedula,
+    nombreChofer,
+    setNombreChofer,
+    firma1,
+    setFirma1,
+    firma2,
+    setFirma2,
     // draft
     hasGuiaDraft,
     guiaDraftTimeAgo,

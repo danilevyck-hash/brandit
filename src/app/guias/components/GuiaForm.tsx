@@ -15,6 +15,8 @@ import { useEffect, useRef, useState } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import { ScrollableTable } from "./ui";
+import SignatureCanvas from "./SignatureCanvas";
+import { isCanvasClear } from "./canvasUtils";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -41,12 +43,27 @@ interface GuiaFormProps {
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
   onAddRow: () => void;
   onRemoveRow: (idx: number) => void;
-  onSave: (opts?: { silent?: boolean }) => void;
+  onSave: (opts?: { silent?: boolean; firma1?: string; firma2?: string }) => void;
   onCancel: () => void;
   hasDraft?: boolean;
   draftTimeAgo?: string;
   onRestoreDraft?: () => void;
   onDiscardDraft?: () => void;
+  // Despacho (solo creación)
+  tipoDespacho?: "externo" | "directo";
+  setTipoDespacho?: (v: "externo" | "directo") => void;
+  placa?: string;
+  setPlaca?: (v: string) => void;
+  receptorNombre?: string;
+  setReceptorNombre?: (v: string) => void;
+  cedula?: string;
+  setCedula?: (v: string) => void;
+  nombreChofer?: string;
+  setNombreChofer?: (v: string) => void;
+  firma1?: string | null;
+  setFirma1?: (v: string | null) => void;
+  firma2?: string | null;
+  setFirma2?: (v: string | null) => void;
 }
 
 export default function GuiaForm({
@@ -58,8 +75,17 @@ export default function GuiaForm({
   onAddCliente, onAddDireccion,
   onUpdateItem, onAddRow, onRemoveRow, onSave, onCancel,
   hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
+  tipoDespacho = "externo", setTipoDespacho = () => {},
+  placa = "", setPlaca = () => {},
+  receptorNombre = "", setReceptorNombre = () => {},
+  cedula = "", setCedula = () => {},
+  nombreChofer = "", setNombreChofer = () => {},
+  firma1 = null, setFirma1 = () => {},
+  firma2 = null, setFirma2 = () => {},
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
+  const canvas1Ref = useRef<HTMLCanvasElement>(null);
+  const canvas2Ref = useRef<HTMLCanvasElement>(null);
 
   // Real-time onBlur validation
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -153,7 +179,9 @@ export default function GuiaForm({
   }, [dirty, saving]);
 
   function handleSave(opts?: { silent?: boolean }) {
-    onSave(opts);
+    const f1 = !isCanvasClear(canvas1Ref.current) ? (canvas1Ref.current?.toDataURL() || "") : (firma1 || "");
+    const f2 = !isCanvasClear(canvas2Ref.current) ? (canvas2Ref.current?.toDataURL() || "") : (firma2 || "");
+    onSave({ silent: opts?.silent, firma1: f1, firma2: f2 });
     setDirty(false);
     setLastSaved(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
   }
@@ -292,6 +320,78 @@ export default function GuiaForm({
           </div>
         </div>
       </div>
+
+      {/* Datos de Despacho (solo creación — la guía nace "Completada") */}
+      {!editingId && (
+        <div className="mb-6">
+          <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Datos de Despacho</div>
+
+          {/* Toggle tipo despacho */}
+          <div className="flex rounded-lg bg-gray-100 p-0.5 mb-6 max-w-md">
+            <button type="button" onClick={() => setTipoDespacho("externo")}
+              className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "externo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+              Transportista externo
+            </button>
+            <button type="button" onClick={() => setTipoDespacho("directo")}
+              className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "directo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+              Entrega directa
+            </button>
+          </div>
+
+          {/* Campos */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-6 mb-6">
+            {tipoDespacho === "externo" ? (
+              <div>
+                <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">Placa del vehículo <span className="text-red-500">*</span></label>
+                <input type="text" value={placa} onChange={e => setPlaca(e.target.value)} onBlur={() => handleBlur("placa")}
+                  className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition ${(fieldError("placa", placa) || validationErrors.has("placa")) ? "border-red-400" : ""}`} />
+                {(fieldError("placa", placa) || validationErrors.has("placa")) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">Chofer <span className="text-red-500">*</span></label>
+                <input type="text" value={nombreChofer} onChange={e => setNombreChofer(e.target.value)} onBlur={() => handleBlur("chofer")} placeholder="Nombre del chofer"
+                  className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition ${(fieldError("chofer", nombreChofer) || validationErrors.has("chofer")) ? "border-red-400" : ""}`} />
+                {(fieldError("chofer", nombreChofer) || validationErrors.has("chofer")) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+              </div>
+            )}
+            <div>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">{tipoDespacho === "externo" ? "Nombre del receptor" : "Cliente receptor"} <span className="text-red-500">*</span></label>
+              <input type="text" value={receptorNombre} onChange={e => setReceptorNombre(e.target.value)} onBlur={() => handleBlur("receptor")}
+                className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition ${(fieldError("receptor", receptorNombre) || validationErrors.has("receptor")) ? "border-red-400" : ""}`} />
+              {(fieldError("receptor", receptorNombre) || validationErrors.has("receptor")) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">{tipoDespacho === "externo" ? "Cédula del receptor" : "Cédula del cliente"} <span className="text-red-500">*</span></label>
+              <input type="text" value={cedula} onChange={e => setCedula(e.target.value)} onBlur={() => handleBlur("cedula")}
+                className={`w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition ${(fieldError("cedula", cedula) || validationErrors.has("cedula")) ? "border-red-400" : ""}`} />
+              {(fieldError("cedula", cedula) || validationErrors.has("cedula")) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+            </div>
+          </div>
+
+          {/* Firmas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+              <SignatureCanvas
+                label={tipoDespacho === "externo" ? "Firma del transportista *" : "Firma del chofer *"}
+                canvasRef={canvas1Ref}
+                initialImage={firma1}
+                onChange={setFirma1}
+              />
+              {validationErrors.has("firma1") && <p className="text-red-500 text-xs mt-0.5">Se requiere la firma</p>}
+            </div>
+            <div>
+              <SignatureCanvas
+                label={tipoDespacho === "externo" ? "Firma del entregador *" : "Firma del cliente *"}
+                canvasRef={canvas2Ref}
+                initialImage={firma2}
+                onChange={setFirma2}
+              />
+              {validationErrors.has("firma2") && <p className="text-red-500 text-xs mt-0.5">Se requiere la firma</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Items table */}
       <div className="mb-6">
