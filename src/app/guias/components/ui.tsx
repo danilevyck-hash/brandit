@@ -179,7 +179,6 @@ const STATUS_COLORS: Record<string, string> = {
   "En revisión": "purple",
   Preparando: "orange",
   "En camino": "orange",
-  "Pendiente Bodega": "orange",
 };
 
 export function StatusBadge({ estado }: { estado: string }) {

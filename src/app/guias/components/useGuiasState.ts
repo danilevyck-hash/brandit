@@ -30,9 +30,6 @@ export function useGuiasState() {
   // Confirm delete state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Filtro "pendientes" del listado
-  const [showPending, setShowPending] = useState(false);
-
   // showToast: misma firma que en FG, pero delega en el Toast de Brand It.
   const showToast = useCallback(
     (msg: string, type: "success" | "error" | "info" = "success") => {
@@ -122,8 +119,6 @@ export function useGuiasState() {
     error,
     search,
     setSearch,
-    showPending,
-    setShowPending,
     expandedId,
     expandedGuia,
     expandedLoading,

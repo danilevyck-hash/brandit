@@ -74,8 +74,6 @@ export default function GuiasPage() {
   useEffect(() => {
     if (authChecked) {
       s.loadGuias();
-      const pendientesParam = new URLSearchParams(window.location.search).get("pendientes");
-      if (pendientesParam === "1") s.setShowPending(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
@@ -92,8 +90,6 @@ export default function GuiasPage() {
           error={s.error}
           search={s.search}
           setSearch={s.setSearch}
-          showPending={s.showPending}
-          setShowPending={s.setShowPending}
           role={role}
           onNewGuia={() => router.push("/guias/nueva")}
           expandedId={s.expandedId}

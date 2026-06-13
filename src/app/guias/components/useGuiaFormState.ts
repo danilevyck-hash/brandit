@@ -279,7 +279,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     // Edición: PUT conserva el estado actual. Creación: POST omite estado
     // (el backend la crea "Completada") y replica el payload de despacho.
     const payload: Record<string, unknown> = editingId
-      ? { ...base, estado: editingEstado || "Pendiente Bodega" }
+      ? { ...base, estado: editingEstado }
       : {
           ...base,
           tipo_despacho: tipoDespacho,

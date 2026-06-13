@@ -15,8 +15,6 @@ interface GuiasListProps {
   error: string | null;
   search: string;
   setSearch: (v: string) => void;
-  showPending: boolean;
-  setShowPending: (v: boolean) => void;
   role: string | null;
   onNewGuia: () => void;
   // Accordion
@@ -38,7 +36,7 @@ const REJECT_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
   guias, loading, error, search, setSearch,
-  showPending, role,
+  role,
   onNewGuia,
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
   onEdit, onPrint, onDelete, onReject,
@@ -115,13 +113,10 @@ export default function GuiasList({
                                   (item.cliente || "").toLowerCase().includes(q),
                               )
                             );
-                          })
-                          .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+                          });
                         const subtitle = search
                           ? `Filtrado: "${search}"`
-                          : showPending
-                            ? "Pendientes de bodega"
-                            : "Todas las guías";
+                          : "Todas las guías";
                         exportGuiasExcel(filtered, subtitle);
                       }}
                       className="text-sm border border-gray-200 text-gray-600 px-4 py-3 rounded-md font-medium hover:border-gray-400 hover:text-black transition"
@@ -159,7 +154,7 @@ export default function GuiasList({
             <div className="mb-4 flex items-center gap-4 flex-wrap">
               {selectionMode && (
                 <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0">
-                  <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
+                  <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
                   Todas
                 </label>
               )}
@@ -189,8 +184,7 @@ export default function GuiasList({
                           (item.cliente || "").toLowerCase().includes(q),
                       )
                     );
-                  })
-                  .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+                  });
 
                 if (filtered.length === 0) {
                   return <p className="text-sm text-gray-400 py-8 text-center">No hay guias</p>;
@@ -239,13 +233,8 @@ export default function GuiasList({
                                 {clientesSummary(g.guia_items || [])}
                               </span>
                               <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
-                              {!isDispatched && g.estado === "Pendiente Bodega" && (
-                                <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
-                                  Pendiente despacho
-                                </span>
-                              )}
                               <span className="w-24 shrink-0">
-                                <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
+                                <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : "despachada"} />
                               </span>
                               <svg
                                 className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
@@ -278,16 +267,9 @@ export default function GuiasList({
                                 <span className="text-gray-500 text-xs">{fmtDate(g.fecha)}</span>
                                 <span className="tabular-nums text-xs text-gray-500">{g.total_bultos} bultos</span>
                                 <span className="ml-auto">
-                                  <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
+                                  <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : "despachada"} />
                                 </span>
                               </div>
-                              {!isDispatched && g.estado === "Pendiente Bodega" && (
-                                <div className="mt-1.5">
-                                  <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap">
-                                    Pendiente despacho
-                                  </span>
-                                </div>
-                              )}
                             </div>
                           </button>
 
