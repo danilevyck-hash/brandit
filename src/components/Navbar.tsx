@@ -9,6 +9,7 @@ type NavLink = { href: string; label: string; match: (p: string) => boolean };
 
 const ALL_LINKS: NavLink[] = [
   { href: "/", label: "Inicio", match: (p) => p === "/" },
+  { href: "/recordatorios", label: "Recordatorios", match: (p) => p.startsWith("/recordatorios") },
   { href: "/stickers", label: "Stickers", match: (p) => p.startsWith("/stickers") },
   { href: "/ventas", label: "Ventas", match: (p) => p.startsWith("/ventas") },
   { href: "/admin/usuarios", label: "Usuarios", match: (p) => p === "/admin/usuarios" },
@@ -16,8 +17,8 @@ const ALL_LINKS: NavLink[] = [
 ];
 
 const ROLE_LINKS: Record<string, string[]> = {
-  admin: ["/", "/stickers", "/ventas", "/admin/usuarios", "/configuracion"],
-  secretaria: ["/", "/configuracion"],
+  admin: ["/", "/recordatorios", "/stickers", "/ventas", "/admin/usuarios", "/configuracion"],
+  secretaria: ["/", "/recordatorios", "/configuracion"],
   vendedora: ["/"],
 };
 
