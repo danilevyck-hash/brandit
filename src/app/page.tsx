@@ -41,7 +41,7 @@ type DashboardData = {
   };
 };
 
-type ModuleId = "cxc" | "guias" | "notas" | "caja" | "recordatorios" | "leads" | "cotizaciones" | "ventas" | "stickers" | "usuarios";
+type ModuleId = "cxc" | "guias" | "notas" | "caja" | "recordatorios" | "pedidos" | "leads" | "cotizaciones" | "ventas" | "stickers" | "usuarios";
 
 type Role = "admin" | "secretaria" | "vendedora";
 const ALL_ROLES: Role[] = ["admin", "secretaria", "vendedora"];
@@ -64,6 +64,7 @@ const MODULES: ModuleConfig[] = [
   { id: "notas", icon: "\uD83D\uDCE6", label: "Notas de Entrega", description: "Crear y rastrear entregas a clientes", href: "/notas-entrega", color: "text-teal-600", bgColor: "bg-teal-50", allowedRoles: ALL_ROLES },
   { id: "caja", icon: "\uD83D\uDCB5", label: "Caja Menuda", description: "Registrar gastos de caja chica", href: "/caja", color: "text-amber-600", bgColor: "bg-amber-50", allowedRoles: ["admin", "secretaria"] },
   { id: "recordatorios", icon: "\u23F0", label: "Recordatorios de Pago", description: "Promesas de pago de clientes", href: "/recordatorios", color: "text-cyan-600", bgColor: "bg-cyan-50", allowedRoles: ["admin", "secretaria"] },
+  { id: "pedidos", icon: "\uD83C\uDFED", label: "Pedidos en Producci\u00F3n", description: "Organiza la cola del taller", href: "/pedidos-produccion", color: "text-orange-600", bgColor: "bg-orange-50", allowedRoles: ALL_ROLES },
   { id: "leads", icon: "\uD83E\uDD1D", label: "Leads", description: "Seguimiento de clientes nuevos", href: "/leads", color: "text-purple-600", bgColor: "bg-purple-50", allowedRoles: ALL_ROLES },
   { id: "cotizaciones", icon: "\uD83D\uDCCB", label: "Cotizaciones", description: "Crear y ver presupuestos", href: "/cotizaciones", color: "text-rose-600", bgColor: "bg-rose-50", allowedRoles: ALL_ROLES },
   { id: "ventas", icon: "📈", label: "Ventas", description: "Cotizaciones, pedidos y facturas", href: "/ventas", color: "text-indigo-600", bgColor: "bg-indigo-50", allowedRoles: ["admin"] },
@@ -71,7 +72,7 @@ const MODULES: ModuleConfig[] = [
   { id: "usuarios", icon: "\uD83D\uDC65", label: "Usuarios", description: "Administrar personas y accesos", href: "/admin/usuarios", color: "text-gray-600", bgColor: "bg-gray-100", allowedRoles: ["admin"] },
 ];
 
-const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "notas", "caja", "recordatorios", "leads", "cotizaciones", "ventas", "stickers", "usuarios"];
+const DEFAULT_ORDER: ModuleId[] = ["cxc", "guias", "notas", "caja", "recordatorios", "pedidos", "leads", "cotizaciones", "ventas", "stickers", "usuarios"];
 const STORAGE_KEY = "brandit_home_module_order";
 
 function getStoredOrder(): ModuleId[] {
