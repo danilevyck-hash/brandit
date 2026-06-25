@@ -43,18 +43,6 @@ export default function GuiaNuevaPage() {
         onSave={s.saveGuia}
         tipoDespacho={s.tipoDespacho}
         setTipoDespacho={s.setTipoDespacho}
-        placa={s.placa}
-        setPlaca={s.setPlaca}
-        receptorNombre={s.receptorNombre}
-        setReceptorNombre={s.setReceptorNombre}
-        cedula={s.cedula}
-        setCedula={s.setCedula}
-        nombreChofer={s.nombreChofer}
-        setNombreChofer={s.setNombreChofer}
-        firma1={s.firma1}
-        setFirma1={s.setFirma1}
-        firma2={s.firma2}
-        setFirma2={s.setFirma2}
         onCancel={() => router.push("/guias")}
         hasDraft={s.hasGuiaDraft}
         draftTimeAgo={s.guiaDraftTimeAgo}

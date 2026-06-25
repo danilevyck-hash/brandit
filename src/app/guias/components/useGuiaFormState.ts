@@ -71,12 +71,6 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
 
   // Despacho en un paso (solo creación): la guía nace "Completada".
   const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
-  const [placa, setPlaca] = useState("");
-  const [receptorNombre, setReceptorNombre] = useState("");
-  const [cedula, setCedula] = useState("");
-  const [nombreChofer, setNombreChofer] = useState("");
-  const [firma1, setFirma1] = useState<string | null>(null);
-  const [firma2, setFirma2] = useState<string | null>(null);
 
   const showToast = useCallback(
     (msg: string, type: "success" | "error" | "info" = "success") => {
@@ -204,20 +198,13 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setItems(items.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
   }
 
-  function validate(firma1Val = "", firma2Val = ""): boolean {
+  function validate(): boolean {
     const errors = new Set<string>();
     if (!fecha) errors.add("fecha");
     if (modoEntrega === "transportista" && !transportistaId) errors.add("transportista");
     if (!entregadoPor) errors.add("entregadoPor");
-    // Datos de despacho: requeridos solo al crear (la guía nace despachada).
-    if (!editingId) {
-      if (!receptorNombre.trim()) errors.add("receptor");
-      if (!cedula.trim()) errors.add("cedula");
-      if (tipoDespacho === "externo" && !placa.trim()) errors.add("placa");
-      if (tipoDespacho === "directo" && !nombreChofer.trim()) errors.add("chofer");
-      if (!firma1Val) errors.add("firma1");
-      if (!firma2Val) errors.add("firma2");
-    }
+    // Datos de despacho (receptor, cédula, placa, firmas): los llena bodega a mano
+    // en la guía impresa, no se piden en el formulario.
     const validItems = items.filter(
       (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
     );
@@ -249,11 +236,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     return true;
   }
 
-  async function saveGuia(opts?: { silent?: boolean; firma1?: string; firma2?: string }) {
+  async function saveGuia(opts?: { silent?: boolean }) {
     const silent = opts?.silent === true;
-    const f1 = opts?.firma1 ?? firma1 ?? "";
-    const f2 = opts?.firma2 ?? firma2 ?? "";
-    if (!validate(f1, f2)) return;
+    if (!validate()) return;
     try {
       localStorage.setItem("brandit_last_modo_entrega", modoEntrega);
       if (transportistaId) localStorage.setItem("brandit_last_transportista_id", transportistaId);
@@ -277,18 +262,11 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
       items: validItems,
     };
     // Edición: PUT conserva el estado actual. Creación: POST omite estado
-    // (el backend la crea "Completada") y replica el payload de despacho.
+    // (el backend la crea "Completada"). Receptor/cédula/placa/firmas quedan
+    // vacíos en DB → el PDF imprime líneas en blanco para llenar a mano.
     const payload: Record<string, unknown> = editingId
       ? { ...base, estado: editingEstado }
-      : {
-          ...base,
-          tipo_despacho: tipoDespacho,
-          receptor_nombre: receptorNombre,
-          cedula,
-          firma_base64: f1,
-          firma_entregador_base64: f2,
-          ...(tipoDespacho === "externo" ? { placa } : { nombre_chofer: nombreChofer }),
-        };
+      : { ...base, tipo_despacho: tipoDespacho };
 
     const res = await fetch(url, {
       method,
@@ -356,21 +334,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     addRow,
     removeRow,
     saveGuia,
-    // despacho (solo creación)
+    // despacho (solo creación): solo el tipo; receptor/cédula/firmas se llenan a mano
     tipoDespacho,
     setTipoDespacho,
-    placa,
-    setPlaca,
-    receptorNombre,
-    setReceptorNombre,
-    cedula,
-    setCedula,
-    nombreChofer,
-    setNombreChofer,
-    firma1,
-    setFirma1,
-    firma2,
-    setFirma2,
     // draft
     hasGuiaDraft,
     guiaDraftTimeAgo,
