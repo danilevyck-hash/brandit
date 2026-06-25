@@ -70,6 +70,11 @@
   --caja-danger-onSoft: #B91C1C;
   --caja-danger-border: #FECACA;
 
+  --caja-info:        #2563EB;
+  --caja-info-soft:   #EFF6FF;
+  --caja-info-onSoft: #1D4ED8;
+  --caja-info-border: #BFDBFE;
+
   background: var(--caja-bg-page);
   color: var(--caja-fg-default);
   font-family: var(--caja-font-sans);

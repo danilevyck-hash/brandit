@@ -9,10 +9,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const auth = requireRoles(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
+  const tipoParam = new URL(req.url).searchParams.get("tipo");
+  const tipo = tipoParam === "yappy" ? "yappy" : "efectivo";
   const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
     .select("*, caja_gastos(total, deleted)")
     .eq("deleted", false)
+    .eq("tipo", tipo)
     .order("numero", { ascending: false });
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
@@ -34,16 +37,23 @@ export async function POST(req: NextRequest) {
   if (!session?.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
 
   let fondo = 200;
+  let tipo: "efectivo" | "yappy" = "efectivo";
   try {
     const body = await req.json();
     if (body.fondo_inicial && !isNaN(Number(body.fondo_inicial))) {
       fondo = Number(body.fondo_inicial);
     }
+    if (body.tipo === "yappy" || body.tipo === "efectivo") {
+      tipo = body.tipo;
+    }
   } catch { /* empty body = default fondo */ }
 
+  // Numeración independiente por tipo: cada caja (efectivo/yappy) lleva su propia
+  // secuencia 1, 2, 3...
   const { data: last } = await getSupabaseServer()
     .from("caja_periodos")
     .select("numero")
+    .eq("tipo", tipo)
     .order("numero", { ascending: false })
     .limit(1)
     .single();
@@ -53,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await getSupabaseServer()
     .from("caja_periodos")
-    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto", created_by: session?.nombre ?? session?.userId ?? null })
+    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto", tipo, created_by: session?.nombre ?? session?.userId ?? null })
     .select()
     .single();
 

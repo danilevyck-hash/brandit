@@ -13,6 +13,7 @@ export default function CajaPage() {
   const { authChecked, role } = useCajaAuth();
 
   const {
+    tipo, setTipo,
     periodos, loading, error,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
     confirmClosePeriodo, setConfirmClosePeriodo,
@@ -40,6 +41,8 @@ export default function CajaPage() {
           error={error}
           hasOpenPeriod={hasOpenPeriod}
           role={role}
+          tipo={tipo}
+          onTipoChange={setTipo}
           onCreatePeriodo={createPeriodo}
           onLoadDetail={(id) => router.push(`/caja/${id}`)}
           onPrintPeriodo={(id) => router.push(`/caja/${id}/imprimir`)}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { CajaPeriodo, CajaGasto, CajaResponsable } from "../components/types";
+import { CajaPeriodo, CajaGasto, CajaResponsable, CajaTipo } from "../components/types";
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -17,6 +17,7 @@ export function useCajaState(opts?: UseCajaOptions) {
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
   const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
 
+  const [tipo, setTipo] = useState<CajaTipo>("efectivo");
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
@@ -52,7 +53,7 @@ export function useCajaState(opts?: UseCajaOptions) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/caja/periodos");
+      const res = await fetch(`/api/caja/periodos?tipo=${tipo}`);
       if (!res.ok) throw new Error();
       setPeriodos(await res.json());
     } catch {
@@ -60,8 +61,9 @@ export function useCajaState(opts?: UseCajaOptions) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tipo]);
 
+  // Catálogos: solo al montar (no dependen del tipo de caja).
   useEffect(() => {
     fetch("/api/caja/categorias")
       .then((r) => (r.ok ? r.json() : []))
@@ -69,13 +71,17 @@ export function useCajaState(opts?: UseCajaOptions) {
         setCategorias(Array.isArray(data) ? data : []);
       })
       .catch(() => { console.error('Failed to load categorias'); });
-    loadPeriodos();
     fetch("/api/caja/responsables")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: CajaResponsable[]) => {
         setResponsablesCatalog(Array.isArray(data) ? data : []);
       })
       .catch(() => { console.error('Failed to load responsables'); });
+  }, []);
+
+  // Períodos: recarga cuando cambia el tipo de caja (efectivo/yappy).
+  useEffect(() => {
+    loadPeriodos();
   }, [loadPeriodos]);
 
   const loadDetail = useCallback(async (id: string) => {
@@ -102,7 +108,7 @@ export function useCajaState(opts?: UseCajaOptions) {
       const res = await fetch("/api/caja/periodos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fondo_inicial: fondo }),
+        body: JSON.stringify({ fondo_inicial: fondo, tipo }),
       });
       if (!res.ok) throw new Error();
       const p = await res.json();
@@ -277,6 +283,7 @@ export function useCajaState(opts?: UseCajaOptions) {
   }
 
   return {
+    tipo, setTipo,
     periodos, loading, current, setCurrent, error,
     allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,

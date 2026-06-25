@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const { data: periodo } = await getSupabaseServer()
     .from("caja_periodos")
-    .select("estado, deleted")
+    .select("estado, deleted, tipo")
     .eq("id", periodo_id)
     .maybeSingle();
   if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
       responsable_id: responsableId,
       categoria,
       subtotal, itbms: roundedItbms, total: roundedTotal,
+      // El tipo (efectivo/yappy) se hereda del período padre, no lo envía el cliente.
+      tipo: periodo.tipo,
       // Keep old fields populated for backwards compat
       nombre: descripcion || "",
       created_by: session?.nombre ?? session?.userId ?? null,

@@ -1,7 +1,8 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { fmt, fmtDate } from "@/lib/format";
-import { CajaPeriodo } from "./types";
+import { CajaPeriodo, CajaTipo } from "./types";
 import { SkeletonTable, EmptyState } from "./ui";
 import OverflowMenu, { OverflowMenuItem } from "./OverflowMenu";
 
@@ -11,6 +12,8 @@ interface Props {
   error: string | null;
   hasOpenPeriod: boolean;
   role: string | null;
+  tipo: CajaTipo;
+  onTipoChange: (tipo: CajaTipo) => void;
   onCreatePeriodo: () => void;
   onLoadDetail: (id: string) => void;
   onPrintPeriodo: (id: string) => void;
@@ -24,6 +27,65 @@ function PlusIcon({ size = 14 }: { size?: number }) {
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
+  );
+}
+
+function CashIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <line x1="6" y1="12" x2="6" y2="12" />
+      <line x1="18" y1="12" x2="18" y2="12" />
+    </svg>
+  );
+}
+
+function PhoneIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="6" y="2" width="12" height="20" rx="2.5" />
+      <line x1="11" y1="18" x2="13" y2="18" />
+    </svg>
+  );
+}
+
+function TipoToggle({ tipo, onTipoChange }: { tipo: CajaTipo; onTipoChange: (t: CajaTipo) => void }) {
+  const opciones: { value: CajaTipo; label: string; icon: ReactNode }[] = [
+    { value: "efectivo", label: "Efectivo", icon: <CashIcon /> },
+    { value: "yappy", label: "Yappy", icon: <PhoneIcon /> },
+  ];
+  return (
+    <div className="mt-4 flex gap-2" role="group" aria-label="Tipo de caja">
+      {opciones.map((o) => {
+        const active = tipo === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onTipoChange(o.value)}
+            aria-pressed={active}
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
+            style={
+              active
+                ? {
+                    background: "var(--caja-info-soft)",
+                    color: "var(--caja-info-onSoft)",
+                    border: "1.5px solid var(--caja-info-border)",
+                  }
+                : {
+                    background: "#fff",
+                    color: "var(--caja-fg-muted)",
+                    border: "1px solid var(--caja-stone-200)",
+                  }
+            }
+          >
+            {o.icon}
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -66,6 +128,8 @@ export default function PeriodoList({
   error,
   hasOpenPeriod,
   role,
+  tipo,
+  onTipoChange,
   onCreatePeriodo,
   onLoadDetail,
   onPrintPeriodo,
@@ -88,6 +152,7 @@ export default function PeriodoList({
           >
             Cada período representa un ciclo del fondo fijo de gastos. Crea uno nuevo cuando se reponga el fondo.
           </p>
+          <TipoToggle tipo={tipo} onTipoChange={onTipoChange} />
         </div>
         {!hasOpenPeriod && (
           <button

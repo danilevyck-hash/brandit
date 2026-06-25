@@ -1,3 +1,5 @@
+export type CajaTipo = "efectivo" | "yappy";
+
 export interface CajaPeriodo {
   id: string;
   numero: number;
@@ -5,6 +7,7 @@ export interface CajaPeriodo {
   fecha_cierre: string | null;
   fondo_inicial: number;
   estado: string;
+  tipo: CajaTipo;
   total_gastado: number;
   repuesto: boolean;
   repuesto_at: string | null;
