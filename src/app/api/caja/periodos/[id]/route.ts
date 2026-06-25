@@ -61,30 +61,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: true });
   }
 
-  // Default action: close the period. Block if saldo != 0 (tolerance 0.005).
+  // Default action: close the period. El cierre procede sin importar el saldo.
   const { data: periodo } = await getSupabaseServer()
     .from("caja_periodos")
-    .select("fondo_inicial, estado, deleted")
+    .select("estado, deleted")
     .eq("id", params.id)
     .maybeSingle();
   if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 404 });
   if (periodo.estado === "cerrado") return NextResponse.json({ error: "Este período ya está cerrado." }, { status: 400 });
-
-  const { data: gastos } = await getSupabaseServer()
-    .from("caja_gastos")
-    .select("total")
-    .eq("periodo_id", params.id)
-    .eq("deleted", false);
-  const totalGastos = (gastos || []).reduce((s: number, g: { total: number | null }) => s + (Number(g.total) || 0), 0);
-  const fondo = Number(periodo.fondo_inicial) || 0;
-  const saldo = Math.round((fondo - totalGastos) * 100) / 100;
-
-  if (Math.abs(saldo) > 0.005) {
-    const saldoStr = saldo >= 0 ? `$${saldo.toFixed(2)}` : `-$${Math.abs(saldo).toFixed(2)}`;
-    return NextResponse.json({
-      error: `No se puede cerrar con saldo ${saldoStr}. Reabastece o ajusta los gastos.`,
-    }, { status: 400 });
-  }
 
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await getSupabaseServer().from("caja_periodos").update({ estado: "cerrado", fecha_cierre: today }).eq("id", params.id).select().single();
