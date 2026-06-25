@@ -57,6 +57,10 @@ function NuevoGastoPage() {
   const itbmsNum = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
   const totalNum = Math.round((subtotalNum + itbmsNum) * 100) / 100;
 
+  // Caja Yappy: solo registra carreras de inDriver pagadas por Yappy → el form se
+  // reduce a fecha + monto; el resto se prellena oculto. Caja efectivo no cambia.
+  const isYappy = periodo?.tipo === "yappy";
+
   const loadPeriodo = useCallback(async () => {
     setLoading(true);
     try {
@@ -88,6 +92,21 @@ function NuevoGastoPage() {
       .then((d: CajaResponsable[]) => setResponsablesCatalog(Array.isArray(d) ? d : []))
       .catch(() => setResponsablesCatalog([]));
   }, [periodoId, loadPeriodo]);
+
+  // Prefill oculto para la caja Yappy (proveedor/categoría/descripción/responsable).
+  // Solo aplica cuando isYappy; la caja efectivo queda manual. Si no existe "Roxana"
+  // en el catálogo, se deja el responsable vacío (fallback: el guardado lo exigirá).
+  useEffect(() => {
+    if (!isYappy) return;
+    setGProveedor("inDriver");
+    setGDescripcion("Carrera inDriver");
+    setGCategoria("Transporte");
+    setGItbmsPct("0");
+    const roxana = responsablesCatalog.find(
+      (r) => r.nombre.trim().toLowerCase() === "roxana",
+    );
+    if (roxana) setGResponsableId(roxana.id);
+  }, [isYappy, responsablesCatalog, categorias]);
 
   function resetForm() {
     setGFecha(new Date().toISOString().slice(0, 10));
@@ -192,12 +211,15 @@ function NuevoGastoPage() {
   const saldo = periodo.fondo_inicial - totalGastado;
   const pctUsed = periodo.fondo_inicial > 0 ? (saldo / periodo.fondo_inicial) * 100 : 100;
 
-  const canSave =
-    !!gDescripcion.trim() &&
-    subtotalNum > 0 &&
-    !!gResponsableId &&
-    !!gProveedor.trim() &&
-    !addingGasto;
+  // Yappy: solo fecha (con default) + monto. El resto se prellena oculto (Paso 2);
+  // si "Roxana" falta, el POST devuelve un error claro de responsable obligatorio.
+  const canSave = isYappy
+    ? subtotalNum > 0 && !addingGasto
+    : !!gDescripcion.trim() &&
+      subtotalNum > 0 &&
+      !!gResponsableId &&
+      !!gProveedor.trim() &&
+      !addingGasto;
 
   const formValues = { gFecha, gDescripcion, gProveedor, gNroFactura, gSubtotal, gItbmsPct, gCategoria, gResponsableId };
   const formSetters = { setGFecha, setGDescripcion, setGProveedor, setGNroFactura, setGSubtotal, setGItbmsPct, setGCategoria, setGResponsableId };
@@ -253,7 +275,9 @@ function NuevoGastoPage() {
                 className="text-sm mt-1.5"
                 style={{ color: "var(--caja-fg-muted)" }}
               >
-                Registra un comprobante del fondo fijo. Los campos con * son obligatorios.
+                {isYappy
+                  ? "Registra una carrera de inDriver pagada por Yappy."
+                  : "Registra un comprobante del fondo fijo. Los campos con * son obligatorios."}
               </p>
             </div>
 
@@ -274,6 +298,7 @@ function NuevoGastoPage() {
               <GastoForm
                 values={formValues}
                 setters={formSetters}
+                isYappy={isYappy}
                 subtotalNum={subtotalNum}
                 totalNum={totalNum}
                 categorias={categorias}

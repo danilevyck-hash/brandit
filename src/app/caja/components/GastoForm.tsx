@@ -34,6 +34,8 @@ export function normalizeStr(s: string): string {
 interface Props {
   values: GastoFormValues;
   setters: GastoFormSetters;
+  // Caja Yappy: form reducido a fecha + monto (resto prellenado oculto).
+  isYappy?: boolean;
   subtotalNum: number;
   totalNum: number;
   categorias: string[];
@@ -292,6 +294,7 @@ function MoneyInputFlat({
 export default function GastoForm({
   values,
   setters,
+  isYappy = false,
   subtotalNum,
   totalNum,
   categorias,
@@ -386,18 +389,21 @@ export default function GastoForm({
           <Field label="Fecha" required>
             <TextInput type="date" value={gFecha} onChange={setGFecha} ariaLabel="Fecha" />
           </Field>
-          <Field label="Descripción" required>
-            <TextInput
-              value={gDescripcion}
-              onChange={setGDescripcion}
-              placeholder="¿En qué se gastó?"
-              ariaLabel="Descripción"
-            />
-          </Field>
+          {!isYappy && (
+            <Field label="Descripción" required>
+              <TextInput
+                value={gDescripcion}
+                onChange={setGDescripcion}
+                placeholder="¿En qué se gastó?"
+                ariaLabel="Descripción"
+              />
+            </Field>
+          )}
         </div>
       </Section>
 
       {/* Origen del gasto */}
+      {!isYappy && (
       <Section eyebrow="Origen del gasto">
         <div
           style={{
@@ -425,8 +431,10 @@ export default function GastoForm({
           </Field>
         </div>
       </Section>
+      )}
 
       {/* Clasificación */}
+      {!isYappy && (
       <Section eyebrow="Clasificación">
         <div
           style={{
@@ -638,6 +646,7 @@ export default function GastoForm({
           </div>
         )}
       </Section>
+      )}
 
       {/* Montos (USD) */}
       <Section eyebrow="Montos (USD)" last>
