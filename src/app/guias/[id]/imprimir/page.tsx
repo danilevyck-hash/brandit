@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useGuiaAuth } from "../../hooks/useGuiaAuth";
 import GuiaDetail from "../../components/GuiaDetail";
@@ -15,6 +15,7 @@ export default function GuiaImprimirPage() {
   const [guia, setGuia] = useState<Guia | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const printedRef = useRef(false);
 
   useEffect(() => {
     if (!authChecked || !id) return;
@@ -36,6 +37,15 @@ export default function GuiaImprimirPage() {
     })();
     return () => { cancelado = true; };
   }, [authChecked, id]);
+
+  // Auto-lanza el diálogo de impresión una sola vez, cuando la guía ya cargó
+  // y el PrintDocument está renderizado. El botón manual queda como respaldo.
+  useEffect(() => {
+    if (loading || !guia || printedRef.current) return;
+    printedRef.current = true;
+    const t = setTimeout(() => window.print(), 400);
+    return () => clearTimeout(t);
+  }, [loading, guia]);
 
   if (!authChecked) return null;
 

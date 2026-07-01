@@ -51,6 +51,7 @@ export default function GuiaEditarPage() {
         saving={s.saving}
         onAddCliente={s.addCliente}
         onAddDireccion={s.addDireccion}
+        onAddTransportista={s.addTransportista}
         onUpdateItem={s.updateItem}
         onAddRow={s.addRow}
         onRemoveRow={s.removeRow}

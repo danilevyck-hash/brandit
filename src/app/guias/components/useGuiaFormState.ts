@@ -185,6 +185,33 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setDirecciones(updated);
     saveList("brandit_direcciones", DEFAULT_DIRECCIONES, updated);
   }
+  // Alta de transportista al catálogo real (DB, no localStorage): hace POST,
+  // agrega el creado al select y lo deja seleccionado.
+  async function addTransportista(name: string) {
+    const n = name.trim();
+    if (!n) return;
+    try {
+      const res = await fetch("/api/transportistas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: n }),
+      });
+      if (!res.ok) {
+        showToast("No se pudo crear el transportista", "error");
+        return;
+      }
+      const t = (await res.json()) as Transportista;
+      setTransportistas((prev) =>
+        prev.some((x) => x.id === t.id)
+          ? prev
+          : [...prev, t].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      );
+      setModoEntrega("transportista");
+      setTransportistaId(t.id);
+    } catch {
+      showToast("No se pudo crear el transportista", "error");
+    }
+  }
 
   // Items
   function addRow() {
@@ -316,6 +343,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     direcciones,
     addCliente,
     addDireccion,
+    addTransportista,
     // form
     formNumero,
     fecha,

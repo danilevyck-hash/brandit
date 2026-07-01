@@ -12,6 +12,7 @@
 // cerrado contra el catálogo canónico (tabla `transportistas`).
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import { ScrollableTable } from "./ui";
@@ -38,6 +39,7 @@ interface GuiaFormProps {
   saving: boolean;
   onAddCliente: (v: string) => void;
   onAddDireccion: (v: string) => void;
+  onAddTransportista: (v: string) => void;
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
   onAddRow: () => void;
   onRemoveRow: (idx: number) => void;
@@ -58,11 +60,12 @@ export default function GuiaForm({
   entregadoPor, setEntregadoPor, observaciones, setObservaciones,
   items, transportistas, clientes, direcciones,
   validationErrors, error, saving,
-  onAddCliente, onAddDireccion,
+  onAddCliente, onAddDireccion, onAddTransportista,
   onUpdateItem, onAddRow, onRemoveRow, onSave, onCancel,
   hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
   tipoDespacho = "externo", setTipoDespacho = () => {},
 }: GuiaFormProps) {
+  const router = useRouter();
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
   // Real-time onBlur validation
@@ -203,7 +206,18 @@ export default function GuiaForm({
           <span className="text-sm text-gray-300 font-mono">GT-{String(formNumero).padStart(3, "0")}</span>
           <StatusBadge />
         </div>
-        <SaveButton size="small" />
+        <div className="flex items-center gap-2">
+          {editingId && (
+            <button
+              type="button"
+              onClick={() => router.push(`/guias/${editingId}/imprimir`)}
+              className="border border-gray-200 text-gray-600 px-4 rounded-xl text-xs font-medium min-h-[44px] hover:bg-gray-50 active:bg-gray-100 transition-all"
+            >
+              Imprimir
+            </button>
+          )}
+          <SaveButton size="small" />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-baseline gap-4 mb-6">
@@ -254,17 +268,20 @@ export default function GuiaForm({
             </div>
             {modoEntrega === "transportista" ? (
               <>
-                <select
-                  value={transportistaId || ""}
-                  onChange={e => setTransportistaId(e.target.value || null)}
-                  onBlur={() => handleBlur("transportista")}
-                  className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}
-                >
-                  <option value="">Seleccionar transportista...</option>
-                  {transportistas.map(t => (
-                    <option key={t.id} value={t.id}>{t.nombre}</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={transportistaId || ""}
+                    onChange={e => setTransportistaId(e.target.value || null)}
+                    onBlur={() => handleBlur("transportista")}
+                    className={inputClass("transportista", "flex-1 border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}
+                  >
+                    <option value="">Seleccionar transportista...</option>
+                    {transportistas.map(t => (
+                      <option key={t.id} value={t.id}>{t.nombre}</option>
+                    ))}
+                  </select>
+                  <AddNewInline placeholder="Transportista" onAdd={onAddTransportista} />
+                </div>
                 {transportistaError && (
                   <p className="text-red-500 text-xs mt-0.5">Selecciona un transportista</p>
                 )}

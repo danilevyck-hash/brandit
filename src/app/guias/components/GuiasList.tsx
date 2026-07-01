@@ -61,8 +61,8 @@ export default function GuiasList({
   function printSelected() {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    // Open each in a new tab for printing
-    ids.forEach(id => window.open(`/guias?id=${id}`, '_blank'));
+    // Cada una abre su vista dedicada de impresión (auto-lanza el diálogo).
+    ids.forEach(id => window.open(`/guias/${id}/imprimir`, '_blank'));
   }
 
   async function exportSelectedExcel() {
@@ -297,7 +297,7 @@ export default function GuiasList({
                                     )}
                                     <button
                                       type="button"
-                                      onClick={() => window.open(`/guias?id=${expandedGuia.id}`, '_blank')}
+                                      onClick={() => onPrint(expandedGuia.id)}
                                       className="inline-flex items-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-2 py-1.5 rounded hover:bg-gray-100 min-h-[36px]"
                                     >
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
