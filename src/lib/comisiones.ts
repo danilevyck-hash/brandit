@@ -33,6 +33,8 @@ export interface ReciboRow {
   cliente_nombre: string | null;
   vendedor_id: number | null;
   vendedor_nombre: string | null;
+  /** Dueño de cartera del cliente (Formato B). NULL en filas históricas sin re-sync. */
+  vendedor_cartera: string | null;
   total: number;
   es_retencion: boolean;
 }
@@ -62,4 +64,47 @@ export interface VendedorAgregado {
 /** Redondeo defensivo a 2 decimales (evita ruido de coma flotante en sumas). */
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// ─── Formato B (venta + cobro, estilo fashiongr) ─────────────────────────────
+
+/** Tasa fija del Formato B: 1% sobre venta y 1% sobre cobro. NO configurable. */
+export const FORMATO_B_TASA = 0.01;
+
+/**
+ * Normaliza un nombre de vendedor para comparar/agrupar: TRIM + espacios
+ * colapsados + MAYÚSCULAS. Switch tiene duplicados tipo "MELCHOR VEGA" /
+ * "Melchor Vega" (ids distintos, misma persona) — normalizar los fusiona.
+ */
+export function normalizeVendedor(nombre: string | null | undefined): string {
+  return (nombre ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+export type FormatoComision = "A" | "B";
+
+/** Abreviatura de tipo_comprobante para el detalle B (FA/NC/ND). */
+export function tipoDocCorto(tipo: string | null | undefined): string {
+  if (tipo === "Nota de Credito") return "NC";
+  if (tipo === "Nota de Debito") return "ND";
+  return "FA";
+}
+
+/** Cierre de UN mes de un vendedor Formato B (componentes redondeados). */
+export interface FormatoBMes {
+  mes: number;
+  ventas_base: number;
+  cobros_base: number;
+  comision_venta: number;   // ROUND(ventas_base × 1%, 2)
+  comision_cobro: number;   // ROUND(cobros_base × 1%, 2)
+}
+
+/** Resumen de un vendedor Formato B en el período (suma de meses ya redondeados). */
+export interface FormatoBVendedor {
+  vendedor: string;         // nombre normalizado
+  porMes: FormatoBMes[];
+  ventas_base: number;
+  cobros_base: number;
+  comision_venta: number;
+  comision_cobro: number;
+  comision_total: number;
 }
