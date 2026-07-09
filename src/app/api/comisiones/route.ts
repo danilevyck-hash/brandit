@@ -1,31 +1,37 @@
-// Comisiones por cobro (switch_recibos). Solo admin.
+// Comisiones (switch_recibos + switch_facturas). Solo admin.
 //   GET ?anio=&mes=  o  ?anio=&meses=1,2,3 [&vendedores=&clientes_excluidos=]
 //       Un solo mes → cálculo en vivo (o el snapshot congelado si ya existe).
 //       Varios meses → SIEMPRE cálculo en vivo combinado (los cierres son
 //       mensuales); mesesConCierre informa cuáles ya tienen snapshot.
-//   POST → genera snapshot del mes (cabecera + detalle), idempotente por (anio, mes).
+//   POST → genera snapshot del mes (cabecera + detalle A+B), idempotente por (anio, mes).
 //
-// Reglas: comisión por recibo, atribución por vendedor del recibo, EXCLUYE
-// es_retencion. Tramos fijos (lib/comisiones). Total = suma de comisiones/recibo.
+// DOS formatos, asignados por vendedor en comisiones_config_vendedor:
+//   A (por recibo): tramos fijos (<15000 → 0.5%, >=15000 → 1%), atribución por
+//     vendedor del recibo, excluye es_retencion. Los vendedores B NO aparecen acá.
+//   B (venta + cobro, estilo fashiongr): VENTA = switch_facturas del mes por
+//     vendedor de la factura (FA + subtotal_descuento, NC −ABS, ND +), SIN filtro
+//     de utilidad, × 1%. COBRO = recibos por CARTERA (dueño del cliente), excluye
+//     es_retencion, × 1%. Total = componentes ya redondeados. Nombres comparados
+//     normalizados (fusiona "MELCHOR VEGA"/"Melchor Vega").
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { requireRoles, getSessionPayload } from "@/lib/auth-brandit";
+import { loadCarteraMap } from "@/lib/switch-api/sync-clientes-cartera";
 import {
   comisionRecibo, tasaPara, vendedorToken, round2,
+  normalizeVendedor, tipoDocCorto, FORMATO_B_TASA,
   type ReciboRow, type ReciboCalculado, type VendedorAgregado,
+  type FormatoBVendedor,
 } from "@/lib/comisiones";
+import {
+  fetchRecibosMes, fetchFacturasMes, loadVendedoresB,
+  subtotalFirmado, carteraDeRecibo, calcularFormatoB,
+  type FacturaRow,
+} from "@/lib/comisiones-b";
 
 export const dynamic = "force-dynamic";
-
-function monthBounds(anio: number, mes: number) {
-  const inicio = `${anio}-${String(mes).padStart(2, "0")}-01`;
-  const ny = mes === 12 ? anio + 1 : anio;
-  const nm = mes === 12 ? 1 : mes + 1;
-  const finExcl = `${ny}-${String(nm).padStart(2, "0")}-01`;
-  return { inicio, finExcl };
-}
 
 function esMesEnCurso(anio: number, mes: number): boolean {
   const d = new Date();
@@ -48,29 +54,8 @@ function parseAnioMeses(sp: URLSearchParams): { anio: number; meses: number[] } 
   return { anio, meses };
 }
 
-/** Trae los recibos del mes (todos, incluye retenciones) de switch_recibos. */
-async function fetchRecibosMes(anio: number, mes: number): Promise<ReciboRow[]> {
-  const { inicio, finExcl } = monthBounds(anio, mes);
-  const { data, error } = await getSupabaseServer()
-    .from("switch_recibos")
-    .select("id,fecha,cliente_codigo,cliente_nombre,vendedor_id,vendedor_nombre,total,es_retencion")
-    .gte("fecha", inicio)
-    .lt("fecha", finExcl)
-    .order("fecha", { ascending: true })
-    .range(0, 99999);
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({
-    id: r.id as number,
-    mes,
-    fecha: r.fecha as string | null,
-    cliente_codigo: r.cliente_codigo as string | null,
-    cliente_nombre: r.cliente_nombre as string | null,
-    vendedor_id: (r.vendedor_id as number | null) ?? null,
-    vendedor_nombre: r.vendedor_nombre as string | null,
-    total: Number(r.total ?? 0),
-    es_retencion: Boolean(r.es_retencion),
-  }));
-}
+// (fetchRecibosMes / fetchFacturasMes / loadVendedoresB / calcularFormatoB y
+// helpers de Formato B viven en @/lib/comisiones-b, compartidos con detalle-b.)
 
 /** Núcleo: aplica filtros, calcula tasa/comisión por recibo y agrega por vendedor. */
 function calcular(recibos: ReciboRow[], vendedoresSel: Set<string> | null, clientesExcl: Set<string>) {
@@ -154,18 +139,21 @@ export async function GET(req: NextRequest) {
     if (snapshot) {
       const { data: det, error } = await getSupabaseServer()
         .from("comisiones_snapshot_recibos")
-        .select("fecha,cliente_codigo,cliente_nombre,vendedor_nombre,total,tasa,comision")
+        .select("fecha,cliente_codigo,cliente_nombre,vendedor_nombre,total,tasa,comision,formato,seccion")
         .eq("snapshot_id", snapshot.id)
         .order("fecha", { ascending: true })
         .range(0, 99999);
       if (error) throw new Error(error.message);
 
-      const recibos = (det ?? []).map((r, i) => ({
-        id: i, mes, fecha: r.fecha as string | null, cliente_codigo: r.cliente_codigo as string | null,
-        cliente_nombre: r.cliente_nombre as string | null, vendedor_id: null,
-        vendedor_nombre: r.vendedor_nombre as string | null,
-        total: Number(r.total ?? 0), tasa: Number(r.tasa ?? 0), comision: Number(r.comision ?? 0),
-      }));
+      const rows = det ?? [];
+      const recibos = rows
+        .filter((r) => (r.formato ?? "A") === "A")
+        .map((r, i) => ({
+          id: i, mes, fecha: r.fecha as string | null, cliente_codigo: r.cliente_codigo as string | null,
+          cliente_nombre: r.cliente_nombre as string | null, vendedor_id: null,
+          vendedor_nombre: r.vendedor_nombre as string | null,
+          total: Number(r.total ?? 0), tasa: Number(r.tasa ?? 0), comision: Number(r.comision ?? 0),
+        }));
 
       const agg = new Map<string, VendedorAgregado>();
       for (const r of recibos) {
@@ -177,8 +165,32 @@ export async function GET(req: NextRequest) {
         agg.set(tok, e);
       }
 
+      // Formato B congelado: reconstruir el resumen desde las filas B del detalle
+      // (bases = Σ montos por sección; comisión = base × 1%, igual que al generar).
+      const bAcc = new Map<string, { ventas: number; cobros: number }>();
+      for (const r of rows) {
+        if ((r.formato ?? "A") !== "B") continue;
+        const vend = normalizeVendedor(r.vendedor_nombre as string);
+        const e = bAcc.get(vend) ?? { ventas: 0, cobros: 0 };
+        if ((r.seccion ?? "cobro") === "venta") e.ventas += Number(r.total ?? 0);
+        else e.cobros += Number(r.total ?? 0);
+        bAcc.set(vend, e);
+      }
+      const formatoB: FormatoBVendedor[] = Array.from(bAcc.entries()).map(([vendedor, e]) => {
+        const ventas_base = round2(e.ventas);
+        const cobros_base = round2(e.cobros);
+        const comision_venta = round2(ventas_base * FORMATO_B_TASA);
+        const comision_cobro = round2(cobros_base * FORMATO_B_TASA);
+        return {
+          vendedor, porMes: [{ mes, ventas_base, cobros_base, comision_venta, comision_cobro }],
+          ventas_base, cobros_base, comision_venta, comision_cobro,
+          comision_total: round2(comision_venta + comision_cobro),
+        };
+      }).sort((a, b) => b.comision_total - a.comision_total || a.vendedor.localeCompare(b.vendedor));
+
       return NextResponse.json({
         anio, mes, meses, mesesConCierre: [mes], frozen: true, esMesEnCurso: esMesEnCurso(anio, mes),
+        formatoB,
         snapshot: {
           id: snapshot.id, generado_at: snapshot.generado_at, generado_por: snapshot.generado_por,
           total_cobrado: Number(snapshot.total_cobrado), total_comision: Number(snapshot.total_comision),
@@ -200,9 +212,22 @@ export async function GET(req: NextRequest) {
       : null;
     const clientesExcl = new Set((sp.get("clientes_excluidos") ?? "").split(",").map((s) => s.trim()).filter(Boolean));
 
-    const porMes = await Promise.all(meses.map((m) => fetchRecibosMes(anio, m)));
+    const vendedoresB = await loadVendedoresB();
+    const [porMes, facturasPorMes, carteraMap] = await Promise.all([
+      Promise.all(meses.map((m) => fetchRecibosMes(anio, m))),
+      vendedoresB.size > 0
+        ? Promise.all(meses.map((m) => fetchFacturasMes(anio, m)))
+        : Promise.resolve([] as FacturaRow[][]),
+      vendedoresB.size > 0 ? loadCarteraMap() : Promise.resolve(new Map<string, string>()),
+    ]);
     const recibos = porMes.flat();
-    const calc = calcular(recibos, vendedoresSel, clientesExcl);
+
+    // Formato A: SOLO recibos de vendedores que no son B (por vendedor del recibo).
+    const recibosA = recibos.filter((r) => !vendedoresB.has(normalizeVendedor(r.vendedor_nombre)));
+    const calc = calcular(recibosA, vendedoresSel, clientesExcl);
+
+    // Formato B: ventas por vendedor de factura + cobros por cartera.
+    const formatoB = calcularFormatoB(facturasPorMes.flat(), recibos, vendedoresB, carteraMap, meses);
 
     // Con varios meses: informar cuáles ya tienen cierre (la vista combinada no lo usa como fuente).
     let mesesConCierre: number[] = [];
@@ -219,7 +244,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       anio, mes, meses, mesesConCierre, frozen: false,
       esMesEnCurso: meses.some((m) => esMesEnCurso(anio, m)),
-      snapshot: null, ...calc,
+      snapshot: null, formatoB, ...calc,
     });
   } catch (e) {
     console.error("[comisiones GET]", e);
@@ -277,42 +302,98 @@ export async function POST(req: NextRequest) {
       : null;
     const clientesExcl = new Set((body.clientes_excluidos ?? []).map((s) => String(s).trim()).filter(Boolean));
 
-    const recibos = await fetchRecibosMes(anio, mes);
-    const calc = calcular(recibos, vendedoresSel, clientesExcl);
+    const vendedoresB = await loadVendedoresB();
+    const [recibos, facturas, carteraMap] = await Promise.all([
+      fetchRecibosMes(anio, mes),
+      vendedoresB.size > 0 ? fetchFacturasMes(anio, mes) : Promise.resolve([] as FacturaRow[]),
+      vendedoresB.size > 0 ? loadCarteraMap() : Promise.resolve(new Map<string, string>()),
+    ]);
 
-    // Cabecera.
+    // Formato A (sin los vendedores B) con los filtros de la vista.
+    const recibosA = recibos.filter((r) => !vendedoresB.has(normalizeVendedor(r.vendedor_nombre)));
+    const calc = calcular(recibosA, vendedoresSel, clientesExcl);
+
+    // Formato B (resumen + líneas del detalle congelado).
+    const formatoB = calcularFormatoB(facturas, recibos, vendedoresB, carteraMap, [mes]);
+    const bCobrosBase = round2(formatoB.reduce((a, v) => a + v.cobros_base, 0));
+    const bComisionTotal = round2(formatoB.reduce((a, v) => a + v.comision_total, 0));
+
+    const detalleB: Record<string, unknown>[] = [];
+    for (const f of facturas) {
+      const vend = normalizeVendedor(f.vendedor_nombre);
+      if (!vendedoresB.has(vend)) continue;
+      const firmado = round2(subtotalFirmado(f));
+      detalleB.push({
+        fecha: f.fecha, cliente_codigo: null, cliente_nombre: f.cliente_nombre,
+        vendedor_nombre: vend, total: firmado, tasa: FORMATO_B_TASA,
+        comision: round2(firmado * FORMATO_B_TASA), // informativa: el cierre se calcula sobre la BASE
+        formato: "B", seccion: "venta",
+        tipo_doc: tipoDocCorto(f.tipo_comprobante), numero_doc: f.numero,
+      });
+    }
+    for (const r of recibos) {
+      if (r.es_retencion) continue;
+      const vend = normalizeVendedor(carteraDeRecibo(r, carteraMap));
+      if (!vendedoresB.has(vend)) continue;
+      detalleB.push({
+        fecha: r.fecha, cliente_codigo: r.cliente_codigo, cliente_nombre: r.cliente_nombre,
+        vendedor_nombre: vend, total: round2(r.total), tasa: FORMATO_B_TASA,
+        comision: round2(round2(r.total) * FORMATO_B_TASA),
+        formato: "B", seccion: "cobro", tipo_doc: null, numero_doc: null,
+      });
+    }
+
+    // Cabecera: totales del mes = A + B (cobrado real; la base de venta B vive en el detalle).
     const { data: cab, error: cabErr } = await db
       .from("comisiones_snapshot")
       .insert({
         anio, mes,
-        vendedores_incluidos: calc.porVendedor.map((v) => ({ token: v.token, id: v.vendedor_id, nombre: v.vendedor_nombre })),
+        vendedores_incluidos: [
+          ...calc.porVendedor.map((v) => ({ token: v.token, id: v.vendedor_id, nombre: v.vendedor_nombre, formato: "A" })),
+          ...formatoB.map((v) => ({ nombre: v.vendedor, formato: "B" })),
+        ],
         clientes_excluidos: Array.from(clientesExcl),
-        total_cobrado: calc.totalCobrado,
-        total_comision: calc.totalComision,
+        total_cobrado: round2(calc.totalCobrado + bCobrosBase),
+        total_comision: round2(calc.totalComision + bComisionTotal),
         generado_por: role,
       })
       .select("id")
       .single();
     if (cabErr || !cab) throw new Error(cabErr?.message ?? "no se pudo crear la cabecera");
 
-    // Detalle congelado.
-    if (calc.recibos.length > 0) {
-      const detalle = calc.recibos.map((r) => ({
+    // Detalle congelado (A + B).
+    const detalle = [
+      ...calc.recibos.map((r) => ({
         snapshot_id: cab.id,
         fecha: r.fecha, cliente_codigo: r.cliente_codigo, cliente_nombre: r.cliente_nombre,
         vendedor_nombre: r.vendedor_nombre, total: r.total, tasa: r.tasa, comision: r.comision,
-      }));
-      const { error: detErr } = await db.from("comisiones_snapshot_recibos").insert(detalle);
-      if (detErr) {
-        // Compensación: borrar la cabecera si el detalle falla (evita snapshot huérfano).
-        await db.from("comisiones_snapshot").delete().eq("id", cab.id);
-        throw new Error(detErr.message);
+        formato: "A", seccion: "cobro", tipo_doc: null, numero_doc: null,
+      })),
+      ...detalleB.map((d) => ({ ...d, snapshot_id: cab.id })),
+    ];
+    if (detalle.length > 0) {
+      const INSERT_BATCH = 500;
+      for (let i = 0; i < detalle.length; i += INSERT_BATCH) {
+        const { error: detErr } = await db
+          .from("comisiones_snapshot_recibos")
+          .insert(detalle.slice(i, i + INSERT_BATCH));
+        if (detErr) {
+          // Compensación: borrar la cabecera si el detalle falla (evita snapshot
+          // huérfano; el detalle ya insertado cae por ON DELETE CASCADE).
+          await db.from("comisiones_snapshot").delete().eq("id", cab.id);
+          throw new Error(detErr.message);
+        }
       }
     }
 
-    await logActivity(session?.nombre || role, "comisiones_generar", `${anio}-${String(mes).padStart(2, "0")} · $${calc.totalComision}`);
+    const totalComisionMes = round2(calc.totalComision + bComisionTotal);
+    await logActivity(session?.nombre || role, "comisiones_generar", `${anio}-${String(mes).padStart(2, "0")} · $${totalComisionMes}`);
 
-    return NextResponse.json({ ok: true, id: cab.id, total_cobrado: calc.totalCobrado, total_comision: calc.totalComision });
+    return NextResponse.json({
+      ok: true, id: cab.id,
+      total_cobrado: round2(calc.totalCobrado + bCobrosBase),
+      total_comision: totalComisionMes,
+    });
   } catch (e) {
     console.error("[comisiones POST]", e);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

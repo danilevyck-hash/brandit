@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { formatCurrency, fmtDate } from "@/lib/format";
 import { vendedorToken, round2 } from "@/lib/comisiones";
 import { ConfirmModal, MultiSelect, type MultiOption } from "./ui";
+import { FormatoBSection, DetalleBModal, FormatosConfigModal, type FormatoBVendedor } from "./FormatoB";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -37,6 +38,7 @@ interface SnapshotCab {
 interface ApiResp {
   anio: number; mes: number; meses: number[]; mesesConCierre: number[];
   frozen: boolean; esMesEnCurso: boolean;
+  formatoB: FormatoBVendedor[];
   snapshot: SnapshotCab | null;
   recibos: Recibo[];
   porVendedor: unknown[];
@@ -88,6 +90,10 @@ export default function ComisionesClient() {
 
   const [hist, setHist] = useState<HistItem[]>([]);
   const [showHist, setShowHist] = useState(false);
+
+  // Formato B: drill-down por vendedor + modal de config de formatos.
+  const [detalleBVendedor, setDetalleBVendedor] = useState<string | null>(null);
+  const [showFormatos, setShowFormatos] = useState(false);
 
   const load = useCallback(async () => {
     if (meses.length === 0) {
@@ -144,8 +150,18 @@ export default function ComisionesClient() {
     });
   }, [data, frozen, vendSel, excluidos]);
 
-  const totalCobrado = frozen ? (data?.totalCobrado ?? 0) : round2(visibles.reduce((a, r) => a + r.total, 0));
-  const totalComision = frozen ? (data?.totalComision ?? 0) : round2(visibles.reduce((a, r) => a + r.comision, 0));
+  // Totales de la tabla A (siempre = suma de sus filas visibles).
+  const totalCobradoA = round2(visibles.reduce((a, r) => a + r.total, 0));
+  const totalComisionA = round2(visibles.reduce((a, r) => a + r.comision, 0));
+
+  const formatoB = data?.formatoB ?? [];
+  const bCobros = round2(formatoB.reduce((a, v) => a + v.cobros_base, 0));
+  const bComision = round2(formatoB.reduce((a, v) => a + v.comision_total, 0));
+
+  // KPIs del período = A + B. En congelado la cabecera del snapshot YA trae
+  // ambos formatos sumados; en vivo se suma acá.
+  const totalCobrado = frozen ? (data?.totalCobrado ?? 0) : round2(totalCobradoA + bCobros);
+  const totalComision = frozen ? (data?.totalComision ?? 0) : round2(totalComisionA + bComision);
 
   // Resumen POR VENDEDOR (para pagar), consistente con la vista filtrada.
   const resumenVendedor = useMemo(() => {
@@ -179,13 +195,24 @@ export default function ComisionesClient() {
     : meses.map((m) => MESES[m - 1]).join(", ") + ` ${anio}`;
 
   const exportExcel = async () => {
-    if (visibles.length === 0) return;
+    if (visibles.length === 0 && formatoB.length === 0) return;
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-    // Hoja 1: resumen por vendedor (todos los meses seleccionados).
+    // Hoja 1: resumen por vendedor Formato A (todos los meses seleccionados).
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
       resumenVendedor.map((v) => ({ Vendedor: v.nombre, Recibos: v.recibos, Cobrado: v.cobrado, Comisión: v.comision })),
-    ), "Por vendedor");
+    ), "Formato A");
+    // Hoja Formato B: venta + cobro (1%).
+    if (formatoB.length > 0) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+        formatoB.map((v) => ({
+          Vendedor: v.vendedor,
+          Ventas: v.ventas_base, "Com. venta": v.comision_venta,
+          Cobros: v.cobros_base, "Com. cobro": v.comision_cobro,
+          Total: v.comision_total,
+        })),
+      ), "Formato B");
+    }
     // Con varios meses: hoja adicional con el desglose vendedor × mes.
     if (multi) {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
@@ -196,14 +223,16 @@ export default function ComisionesClient() {
         })),
       ), "Por vendedor y mes");
     }
-    // Detalle recibo por recibo (con columna Mes si hay varios).
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
-      visibles.map((r) => ({
-        ...(multi ? { Mes: MESES[r.mes - 1] } : {}),
-        Fecha: r.fecha, Cliente: r.cliente_nombre ?? r.cliente_codigo ?? "",
-        Vendedor: r.vendedor_nombre ?? "", Total: r.total, Tasa: r.tasa, Comisión: r.comision,
-      })),
-    ), "Detalle");
+    // Detalle recibo por recibo del Formato A (con columna Mes si hay varios).
+    if (visibles.length > 0) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+        visibles.map((r) => ({
+          ...(multi ? { Mes: MESES[r.mes - 1] } : {}),
+          Fecha: r.fecha, Cliente: r.cliente_nombre ?? r.cliente_codigo ?? "",
+          Vendedor: r.vendedor_nombre ?? "", Total: r.total, Tasa: r.tasa, Comisión: r.comision,
+        })),
+      ), "Detalle A");
+    }
     const sufijo = meses.map((m) => String(m).padStart(2, "0")).join("_");
     XLSX.writeFile(wb, `Comisiones-${anio}-${sufijo}.xlsx`);
   };
@@ -310,6 +339,12 @@ export default function ComisionesClient() {
             >
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
+            <button
+              onClick={() => setShowFormatos(true)}
+              className="px-3 py-2 rounded-xl text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brandit-orange active:scale-[0.97] transition-all min-h-[44px]"
+            >
+              Formatos
+            </button>
           </div>
         </div>
 
@@ -369,7 +404,10 @@ export default function ComisionesClient() {
         {!loading && resumenVendedor.length > 0 && (
           <div className="mb-5 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Comisión por vendedor</p>
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Formato A — comisión por vendedor</p>
+                <p className="text-xs text-gray-400">Tramos por recibo: menos de $15,000 → 0.5% · desde $15,000 → 1%</p>
+              </div>
               <button
                 onClick={() => exportExcel()}
                 className="px-3 py-2 rounded-xl text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brandit-orange active:scale-[0.97] transition-all min-h-[44px]"
@@ -496,9 +534,9 @@ export default function ComisionesClient() {
                 <tfoot>
                   <tr className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 font-semibold text-gray-900 dark:text-white">
                     <td className="px-4 py-2.5" colSpan={multi ? 4 : 3}>Total ({visibles.length})</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(totalCobrado)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(totalCobradoA)}</td>
                     <td></td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(totalComision)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(totalComisionA)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -546,6 +584,11 @@ export default function ComisionesClient() {
           </div>
         )}
 
+        {/* Formato B — sección propia (venta + cobro por cartera, 1%) */}
+        {!loading && (
+          <FormatoBSection vendedores={formatoB} onVerDetalle={setDetalleBVendedor} />
+        )}
+
         {/* Generar — los cierres son mensuales: solo disponible con UN mes seleccionado */}
         {!frozen && meses.length > 0 && (
           <div className="mt-6 flex items-center justify-end gap-3 flex-wrap">
@@ -556,7 +599,7 @@ export default function ComisionesClient() {
             )}
             <button
               onClick={() => setConfirmGen(true)}
-              disabled={loading || multi || visibles.length === 0}
+              disabled={loading || multi || (visibles.length === 0 && formatoB.every((v) => v.ventas_base === 0 && v.cobros_base === 0))}
               className="px-5 py-2.5 rounded-xl text-sm font-medium bg-brandit-orange text-white hover:opacity-90 active:scale-[0.97] transition-all min-h-[44px] disabled:opacity-40"
             >
               Generar comisiones del mes
@@ -602,7 +645,7 @@ export default function ComisionesClient() {
         onClose={() => setConfirmGen(false)}
         onConfirm={() => void doGenerate(false)}
         title={`Generar comisiones de ${MESES[mes - 1]} ${anio}`}
-        message={`Se congelará el cierre con ${visibles.length} recibos · comisión ${formatCurrency(totalComision)}. Podrás eliminarlo para regenerar.`}
+        message={`Se congelará el cierre: Formato A ${visibles.length} recibos (${formatCurrency(totalComisionA)})${formatoB.length > 0 ? ` + Formato B ${formatoB.length} vendedor(es) (${formatCurrency(bComision)})` : ""} · comisión total ${formatCurrency(totalComision)}. Podrás eliminarlo para regenerar.`}
         confirmLabel="Generar"
         loading={generating}
       />
@@ -628,6 +671,24 @@ export default function ComisionesClient() {
         destructive
         loading={deleting}
       />
+
+      {/* Drill-down Formato B */}
+      {detalleBVendedor && (
+        <DetalleBModal
+          anio={anio}
+          meses={meses}
+          vendedor={detalleBVendedor}
+          onClose={() => setDetalleBVendedor(null)}
+        />
+      )}
+
+      {/* Config de formatos por vendedor */}
+      {showFormatos && (
+        <FormatosConfigModal
+          onClose={() => setShowFormatos(false)}
+          onSaved={() => { void load(); }}
+        />
+      )}
     </div>
   );
 }
