@@ -1,19 +1,29 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
-import { requireRoles } from "@/lib/auth-brandit";
+import { requireRoles, getSessionPayload, type Role } from "@/lib/auth-brandit";
 export const dynamic = "force-dynamic";
 
 const COMPANY_KEY = "confecciones_boston";
 
-async function buildContext(): Promise<string> {
+// SEC-3: la vendedora NO ve la cartera completa ni CxC. Su contexto se limita a
+// SUS propios leads (por vendedora/asignado_a); admin/secretaria ven todo.
+async function buildContext(role: Role, nombre: string): Promise<string> {
   const db = getSupabaseServer();
+  const esVendedora = role === "vendedora";
 
   // Leads summary
-  const { data: leads } = await db
+  const { data: allLeads } = await db
     .from("leads")
-    .select("nombre, empresa, estado, estado_venta, vendedora, fecha_seguimiento, telefono")
+    .select("nombre, empresa, estado, estado_venta, vendedora, fecha_seguimiento, telefono, asignado_a")
     .order("created_at", { ascending: false })
     .limit(200);
+
+  const nombreNorm = nombre.trim().toLowerCase();
+  const leads = esVendedora
+    ? (allLeads ?? []).filter((l) =>
+        (l.vendedora ?? "").trim().toLowerCase() === nombreNorm ||
+        (l.asignado_a ?? "").trim().toLowerCase() === nombreNorm)
+    : allLeads;
 
   let leadsContext = "";
   if (leads && leads.length > 0) {
@@ -34,16 +44,18 @@ async function buildContext(): Promise<string> {
 ${prospectos.slice(0, 50).map((l) => `- ${l.nombre} | ${l.empresa || "sin empresa"} | vendedora: ${l.vendedora || "N/A"} | tel: ${l.telefono || "N/A"} | seguimiento: ${l.fecha_seguimiento || "sin fecha"}`).join("\n")}`;
   }
 
-  // CxC summary
-  const { data: uploads } = await db
-    .from("cxc_uploads")
-    .select("id, uploaded_at")
-    .eq("company_key", COMPANY_KEY)
-    .order("uploaded_at", { ascending: false })
-    .limit(1);
-
+  // CxC summary — SEC-3: oculto para vendedora (dato financiero sensible).
   let cxcContext = "";
-  if (uploads && uploads.length > 0) {
+  const { data: uploads } = esVendedora
+    ? { data: null }
+    : await db
+        .from("cxc_uploads")
+        .select("id, uploaded_at")
+        .eq("company_key", COMPANY_KEY)
+        .order("uploaded_at", { ascending: false })
+        .limit(1);
+
+  if (!esVendedora && uploads && uploads.length > 0) {
     const { data: rows } = await db
       .from("cxc_rows")
       .select("nombre, total, d_0_30, d_31_60, d_61_90, d_91_120, d_121_180, d_181_270, d_271_365, d_mas_365")
@@ -84,6 +96,9 @@ ${validRows.slice(0, 30).map((r) => {
 export async function POST(req: NextRequest) {
   const auth = requireRoles(req, ["admin", "secretaria", "vendedora"]);
   if (auth instanceof NextResponse) return auth;
+  const session = getSessionPayload(req);
+  const role = (auth as Role);
+  const nombre = session?.nombre ?? "";
 
   try {
     const { messages } = await req.json();
@@ -93,7 +108,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
     }
 
-    const context = await buildContext();
+    const context = await buildContext(role, nombre);
 
     const systemPrompt = `Eres el asistente de Brand It Panama y Confecciones Boston. Ayudas con preguntas sobre leads, clientes, cuentas por cobrar, guías de transporte y caja menuda. Responde en español, de forma concisa y profesional.
 

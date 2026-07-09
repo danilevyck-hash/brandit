@@ -8,7 +8,10 @@ export async function GET(request: NextRequest) {
   const auth = requireRoles(request, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
-  const q = request.nextUrl.searchParams.get("q")?.trim();
+  const raw = request.nextUrl.searchParams.get("q")?.trim();
+  // SEC-6: quitar caracteres que rompen la sintaxis de filtro de PostgREST
+  // (.or usa , ( ) como separadores) y los wildcards de ilike (% \ *).
+  const q = raw?.replace(/[,()%\\*]/g, "").trim();
   if (!q || q.length < 2) return NextResponse.json({ leads: [], cxc: [] });
 
   const db = getSupabaseServer();
