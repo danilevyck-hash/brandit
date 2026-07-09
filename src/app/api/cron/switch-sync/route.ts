@@ -5,6 +5,10 @@
 // → costo diario. Para facturas usa una ventana de los últimos 7 días (catch-up
 // por si alguna corrida previa falló).
 //
+// SYNC-2: los RECIBOS (cobros) YA NO corren acá — tienen su propio cron
+// (/api/cron/sync-recibos, horario propio) para no sumar al muro de maxDuration
+// junto al estado de cuenta (~361 clientes secuenciales).
+//
 // Auth: Bearer ${CRON_SECRET} o ?secret=... (paridad con los otros crons).
 //
 // RED DE SEGURIDAD del estado de cuenta: el sync usa un cursor reanudable
@@ -19,40 +23,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { syncFacturas, syncEstadocuenta, syncCostoDiario } from "@/lib/switch-api/sync";
-import {
-  syncRecibos,
-  mesActual,
-  mesesCronDiario,
-  mesesDeAnio,
-  type Mes,
-} from "@/lib/switch-api/sync-recibos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // Pro — el sync de estado de cuenta itera ~361 clientes
 
 function fmtDate(d: Date): string {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
-}
-
-/**
- * Meses de recibos a sincronizar según params (paridad con backfill/mes de los
- * otros syncs):
- *   backfill=1[&year=YYYY] → todos los meses del año hasta el mes en curso.
- *   year=YYYY&mes=M        → ese único mes.
- *   (sin params)           → mes en curso; días 1-5 también el mes anterior.
- */
-function recibosMeses(sp: URLSearchParams): Mes[] {
-  const cur = mesActual();
-  const year = sp.get("year") ? parseInt(sp.get("year")!, 10) : cur.year;
-  if (sp.get("backfill") === "1") {
-    return mesesDeAnio(year, year === cur.year ? cur.month : 12);
-  }
-  const mesParam = sp.get("mes");
-  if (mesParam) {
-    const mes = parseInt(mesParam, 10);
-    return [{ year, month: mes }];
-  }
-  return mesesCronDiario();
 }
 
 export async function GET(req: NextRequest) {
@@ -75,28 +51,10 @@ export async function GET(req: NextRequest) {
   const desde = fmtDate(desdeDate);
   const mes = hasta.slice(0, 7); // YYYY-MM
 
-  // Validación de params manuales de recibos (mes 1..12).
-  const mesParam = req.nextUrl.searchParams.get("mes");
-  if (mesParam !== null) {
-    const m = parseInt(mesParam, 10);
-    if (!Number.isInteger(m) || m < 1 || m > 12) {
-      return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
-    }
-  }
-  const yearParam = req.nextUrl.searchParams.get("year");
-  if (yearParam !== null) {
-    const y = parseInt(yearParam, 10);
-    if (!Number.isInteger(y) || y < 2024 || y > mesActual().year + 1) {
-      return NextResponse.json({ error: "year inválido" }, { status: 400 });
-    }
-  }
-
   // En serie — Switch tiene SESIÓN ÚNICA; nada en paralelo (evita colisión de token).
   const facturas = onlyEstado ? null : await syncFacturas({ desde, hasta });
   const estadocuenta = await syncEstadocuenta();
   const costo = onlyEstado ? null : await syncCostoDiario(mes);
-  // Recibos (cobros) tras costo. Salta en el encadenado de solo-estadocuenta.
-  const recibos = onlyEstado ? null : await syncRecibos(recibosMeses(req.nextUrl.searchParams));
 
   // Auto-encadenado: si la vuelta de estado de cuenta quedó a medias, disparar la
   // siguiente corrida (solo estadocuenta) en otra instancia serverless. Fire-and-
@@ -114,7 +72,7 @@ export async function GET(req: NextRequest) {
     } catch { /* fire-and-forget */ }
   }
 
-  const anyError = [facturas, estadocuenta, costo, recibos].some((r) => r != null && r.status === "error");
+  const anyError = [facturas, estadocuenta, costo].some((r) => r != null && r.status === "error");
 
   return NextResponse.json(
     {
@@ -128,7 +86,6 @@ export async function GET(req: NextRequest) {
       facturas,
       estadocuenta,
       costo,
-      recibos,
     },
     { status: anyError ? 207 : 200 }
   );

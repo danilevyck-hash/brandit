@@ -52,9 +52,11 @@ export async function GET(req: NextRequest) {
     // Guías este mes
     db.from("guia_transporte").select("id", { count: "exact", head: true })
       .gte("created_at", monthStart),
-    // Caja: período abierto con sus gastos
-    db.from("caja_periodos").select("*, gastos:caja_gastos(total)")
-      .eq("estado", "abierto").limit(1),
+    // Caja: TODOS los períodos abiertos (efectivo + yappy) con sus gastos.
+    // BUG-3: sin limit(1) para no ignorar la segunda caja. BUG-2: traemos `deleted`
+    // para excluir gastos borrados al sumar (abajo).
+    db.from("caja_periodos").select("*, gastos:caja_gastos(total, deleted)")
+      .eq("estado", "abierto"),
     // Leads for charts (last 6 months, with vendedora and estado_venta)
     db.from("leads").select("created_at, vendedora, estado_venta")
       .gte("created_at", sixMonthsAgoStr),
@@ -86,13 +88,13 @@ export async function GET(req: NextRequest) {
     cxcTotalClientes = clientes.size;
   }
 
-  // Caja gastos del período activo
-  const periodoAbierto = cajaRes.data?.[0];
+  // Caja gastos de TODOS los períodos abiertos, excluyendo gastos borrados.
+  // BUG-2 (no sumar deleted) + BUG-3 (sumar ambas cajas).
   let cajaGastosMes = 0;
-  if (periodoAbierto) {
-    cajaGastosMes = (periodoAbierto.gastos || []).reduce(
-      (sum: number, g: { total: number }) => sum + Number(g.total), 0
-    );
+  for (const p of (cajaRes.data ?? []) as { gastos?: { total: number; deleted?: boolean }[] }[]) {
+    for (const g of p.gastos ?? []) {
+      if (!g.deleted) cajaGastosMes += Number(g.total);
+    }
   }
 
   // Build leadsPorMes — last 6 months
