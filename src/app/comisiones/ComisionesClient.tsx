@@ -95,6 +95,18 @@ export default function ComisionesClient() {
   const [detalleBVendedor, setDetalleBVendedor] = useState<string | null>(null);
   const [showFormatos, setShowFormatos] = useState(false);
 
+  // Tab Formato A | Formato B (patrón VentasShell). Se recuerda en localStorage;
+  // se lee en effect (no en el initializer) para no divergir en la hidratación.
+  const [tabFormato, setTabFormato] = useState<"A" | "B">("A");
+  useEffect(() => {
+    const saved = localStorage.getItem("brandit_comisiones_tab");
+    if (saved === "A" || saved === "B") setTabFormato(saved);
+  }, []);
+  const cambiarTab = (t: "A" | "B") => {
+    setTabFormato(t);
+    localStorage.setItem("brandit_comisiones_tab", t);
+  };
+
   const load = useCallback(async () => {
     if (meses.length === 0) {
       setData(null);
@@ -400,8 +412,28 @@ export default function ComisionesClient() {
           </div>
         </div>
 
+        {/* Tabs Formato A | Formato B (patrón VentasShell) */}
+        <div className="flex gap-1 mb-5 border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
+          {([
+            { key: "A" as const, label: "Formato A" },
+            { key: "B" as const, label: "Formato B" },
+          ]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => cambiarTab(t.key)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                tabFormato === t.key
+                  ? "border-brandit-orange text-gray-900 dark:text-white"
+                  : "border-transparent text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         {/* Resumen POR VENDEDOR + export Excel */}
-        {!loading && resumenVendedor.length > 0 && (
+        {tabFormato === "A" && !loading && resumenVendedor.length > 0 && (
           <div className="mb-5 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
               <div>
@@ -438,9 +470,15 @@ export default function ComisionesClient() {
           </div>
         )}
 
-        {/* Formato B — junto al resumen A, arriba (venta + cobro por cartera, 1%) */}
-        {!loading && (
-          <FormatoBSection vendedores={formatoB} onVerDetalle={setDetalleBVendedor} />
+        {/* Formato B — visible solo en su tab (venta + cobro por cartera, 1%) */}
+        {tabFormato === "B" && !loading && (
+          formatoB.length > 0 ? (
+            <FormatoBSection vendedores={formatoB} onVerDetalle={setDetalleBVendedor} />
+          ) : (
+            <p className="mb-5 py-8 text-center text-sm text-gray-400 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+              No hay vendedores con Formato B. Asígnalos desde el botón Formatos.
+            </p>
+          )
         )}
 
         {/* Desglose por vendedor Y por mes (solo con varios meses) */}
