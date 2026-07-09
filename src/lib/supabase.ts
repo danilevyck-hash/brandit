@@ -1,22 +1,7 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-
-let _client: SupabaseClient | null = null;
-
-function getClient(): SupabaseClient {
-  if (!_client) {
-    _client = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-  }
-  return _client;
-}
-
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_target, prop) {
-    return (getClient() as unknown as Record<string | symbol, unknown>)[prop];
-  },
-});
+// SEC-1: el cliente anon del browser fue ELIMINADO. Todo acceso a datos pasa por
+// rutas API server-side con service_role + requireRoles. Este archivo ahora solo
+// exporta TIPOS compartidos (no expone la anon key en el bundle). Ver migración
+// 20260709000000_sec1_drop_open_rls.sql.
 
 export type Client = {
   id: number;

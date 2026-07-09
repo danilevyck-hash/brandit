@@ -501,6 +501,26 @@ export async function syncEstadocuenta(): Promise<SyncResult> {
         .lt("synced_at", runStamp);
       if (error) throw new Error(`reconcile switch_estadocuenta: ${error.message}`);
     }
+
+    // SYNC-3: limpiar clientes FANTASMA — los que ya NO existen en el maestro de
+    // Switch (estaban en una vuelta previa pero fueron eliminados/desactivados).
+    // El maestro completo de ESTA vuelta es cursor.clientes; cualquier fila de
+    // switch_estadocuenta con un cliente_codigo fuera de ese conjunto es un
+    // fantasma con saldo viejo → se borra. Los que fallaron transitoriamente SIGUEN
+    // en cursor.clientes (vienen del maestro), así que se conservan. Solo en vuelta
+    // COMPLETA y solo si el maestro no vino vacío (guardia anti-borrado-total).
+    const validCodigos = cursor.clientes
+      .map((c) => String(c.id))
+      .filter((c) => c && c !== "NaN");
+    if (validCodigos.length > 0) {
+      const inList = `(${validCodigos.map((c) => `"${c}"`).join(",")})`;
+      const { error: ghostErr } = await db
+        .from("switch_estadocuenta")
+        .delete()
+        .not("cliente_codigo", "in", inList);
+      if (ghostErr) throw new Error(`reconcile fantasmas switch_estadocuenta: ${ghostErr.message}`);
+    }
+
     await clearEcCursor(db);
     console.error(`[estadocuenta] vuelta completa. net-zero excluidos: ${excludedNetZero}`);
 

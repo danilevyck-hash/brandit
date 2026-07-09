@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
+import { apiSend, errorMessage } from "@/lib/api-client";
 
 type Usuario = {
   id: string;
@@ -28,6 +30,7 @@ const emptyForm: UserForm = {
 
 export default function UsuariosPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -64,7 +67,8 @@ export default function UsuariosPage() {
       email: u.email,
       role: u.role,
       nombre: u.nombre,
-      password: u.password,
+      // SEC-2: el GET ya no trae password; se deja vacío. Vacío = no se cambia.
+      password: "",
       empresa: u.empresa,
       activo: u.activo,
     });
@@ -74,28 +78,32 @@ export default function UsuariosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    if (editing) {
-      await fetch(`/api/admin/usuarios/${editing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else {
-      await fetch("/api/admin/usuarios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+    // P1: si falla, NO cerramos el modal (no se pierde lo escrito) y avisamos.
+    try {
+      if (editing) {
+        await apiSend(`/api/admin/usuarios/${editing.id}`, { method: "PATCH", body: form });
+      } else {
+        await apiSend("/api/admin/usuarios", { method: "POST", body: form });
+      }
+      setShowModal(false);
+      toast(editing ? "Usuario actualizado" : "Usuario creado");
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setShowModal(false);
-    load();
   };
 
   const deleteUser = async (id: string) => {
     if (!confirm("¿Seguro que quieres eliminar este usuario?")) return;
-    await fetch(`/api/admin/usuarios/${id}`, { method: "DELETE" });
-    load();
+    try {
+      await apiSend(`/api/admin/usuarios/${id}`, { method: "DELETE" });
+      toast("Usuario eliminado");
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
   };
 
   if (role !== "admin") return null;

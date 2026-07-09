@@ -152,33 +152,14 @@ export function Badge({
 }
 
 // ── Status Badge (estado → color) ──
+// DEAD-5/INC-5: solo los estados REALES de la máquina de guías (ver CLAUDE.md).
+// Las ~26 keys muertas anteriores (borrador, Enviado, depositado, etc.) se
+// quitaron: nunca ocurren en este flujo.
 const STATUS_COLORS: Record<string, string> = {
-  pendiente: "yellow",
-  borrador: "yellow",
-  Borrador: "yellow",
-  pendiente_aprobacion: "yellow",
-  activo: "green",
-  abierto: "green",
-  Enviado: "blue",
-  depositado: "green",
-  aprobado: "green",
-  Aplicado: "green",
-  Pagado: "green",
-  cerrado: "gray",
-  Aplicada: "green",
-  Entregado: "green",
-  despachada: "green",
+  "Pendiente Bodega": "yellow",
+  Pendiente: "yellow",
   Completada: "green",
-  rechazado: "red",
-  Rechazado: "red",
   Rechazada: "red",
-  vencido: "red",
-  rebotado: "red",
-  archivado: "red",
-  Confirmado: "purple",
-  "En revisión": "purple",
-  Preparando: "orange",
-  "En camino": "orange",
 };
 
 export function StatusBadge({ estado }: { estado: string }) {

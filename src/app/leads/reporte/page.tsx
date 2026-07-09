@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
 type Lead = {
@@ -33,19 +33,20 @@ function normalizeEstadoVenta(ev: string): string {
 export default function ReporteVendedorasPage() {
   const [stats, setStats] = useState<VendedoraStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [role, setRole] = useState("");
 
   useEffect(() => {
     setRole(localStorage.getItem("brandit_role") || "");
   }, []);
 
-  useEffect(() => {
-    if (!role) return;
+  const load = useCallback(async () => {
     if (role !== "admin" && role !== "secretaria") return;
-
-    (async () => {
-      setLoading(true);
-      const res = await fetch("/api/leads");
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const res = await fetch("/api/leads", { cache: "no-store" });
+      if (!res.ok) throw new Error();
       const leads: Lead[] = await res.json();
 
       const map = new Map<string, { total: number; prospectos: number; convertidos: number; no_convertidos: number }>();
@@ -72,9 +73,14 @@ export default function ReporteVendedorasPage() {
 
       rows.sort((a, b) => b.conversion - a.conversion);
       setStats(rows);
+    } catch {
+      setLoadError(true); // P2/L-5: ya no queda en "Cargando…" infinito.
+    } finally {
       setLoading(false);
-    })();
+    }
   }, [role]);
+
+  useEffect(() => { load(); }, [load]);
 
   if (role && role !== "admin" && role !== "secretaria") {
     return (
@@ -111,6 +117,11 @@ export default function ReporteVendedorasPage() {
 
       {loading ? (
         <div className="text-center py-24 text-gray-300">Cargando...</div>
+      ) : loadError ? (
+        <div className="text-center py-24">
+          <p className="text-gray-500 mb-3">No se pudo cargar el reporte.</p>
+          <button onClick={() => load()} className="px-5 py-2.5 rounded-xl bg-brandit-orange text-white text-sm font-medium active:scale-[0.97] min-h-[44px]">Reintentar</button>
+        </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-50 overflow-x-auto">
           <table className="w-full text-sm">

@@ -132,6 +132,38 @@ export default function ComisionesClient() {
   const totalCobrado = frozen ? (data?.totalCobrado ?? 0) : round2(visibles.reduce((a, r) => a + r.total, 0));
   const totalComision = frozen ? (data?.totalComision ?? 0) : round2(visibles.reduce((a, r) => a + r.comision, 0));
 
+  // Resumen POR VENDEDOR (para pagar), consistente con la vista filtrada.
+  const resumenVendedor = useMemo(() => {
+    const agg = new Map<string, { nombre: string; recibos: number; cobrado: number; comision: number }>();
+    for (const r of visibles) {
+      const nombre = r.vendedor_nombre ?? "(sin vendedor)";
+      const e = agg.get(nombre) ?? { nombre, recibos: 0, cobrado: 0, comision: 0 };
+      e.recibos += 1;
+      e.cobrado = round2(e.cobrado + r.total);
+      e.comision = round2(e.comision + r.comision);
+      agg.set(nombre, e);
+    }
+    return Array.from(agg.values()).sort((a, b) => b.comision - a.comision);
+  }, [visibles]);
+
+  const exportExcel = async () => {
+    if (visibles.length === 0) return;
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    // Hoja 1: resumen por vendedor.
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      resumenVendedor.map((v) => ({ Vendedor: v.nombre, Recibos: v.recibos, Cobrado: v.cobrado, Comisión: v.comision })),
+    ), "Por vendedor");
+    // Hoja 2: detalle recibo por recibo.
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+      visibles.map((r) => ({
+        Fecha: r.fecha, Cliente: r.cliente_nombre ?? r.cliente_codigo ?? "",
+        Vendedor: r.vendedor_nombre ?? "", Total: r.total, Tasa: r.tasa, Comisión: r.comision,
+      })),
+    ), "Detalle");
+    XLSX.writeFile(wb, `Comisiones-${anio}-${String(mes).padStart(2, "0")}.xlsx`);
+  };
+
   const vendOptions: MultiOption[] = (data?.vendedoresDisponibles ?? []).map((v) => ({
     value: v.token, label: v.nombre ?? "(sin vendedor)",
   }));
@@ -245,10 +277,10 @@ export default function ComisionesClient() {
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        {/* KPIs — atenuados mientras carga el mes (no mostrar cifras viejas como si fueran nuevas). */}
+        <div className={`grid grid-cols-2 gap-3 mb-5 transition-opacity ${loading ? "opacity-40" : ""}`}>
           <div className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-            <p className="text-xs text-gray-400 mb-1">Total cobrado</p>
+            <p className="text-xs text-gray-400 mb-1">Total cobrado {loading && "· cargando…"}</p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">{formatCurrency(totalCobrado)}</p>
           </div>
           <div className="rounded-2xl border border-gray-200 dark:border-gray-800 p-4 bg-brandit-orange/5">
@@ -256,6 +288,41 @@ export default function ComisionesClient() {
             <p className="text-2xl font-semibold text-brandit-orange tabular-nums">{formatCurrency(totalComision)}</p>
           </div>
         </div>
+
+        {/* Resumen POR VENDEDOR + export Excel */}
+        {!loading && resumenVendedor.length > 0 && (
+          <div className="mb-5 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Comisión por vendedor</p>
+              <button
+                onClick={() => exportExcel()}
+                className="px-3 py-2 rounded-xl text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brandit-orange active:scale-[0.97] transition-all min-h-[44px]"
+              >
+                Descargar Excel
+              </button>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                  <th className="px-4 py-2 font-medium">Vendedor</th>
+                  <th className="px-4 py-2 text-right font-medium">Recibos</th>
+                  <th className="px-4 py-2 text-right font-medium">Cobrado</th>
+                  <th className="px-4 py-2 text-right font-medium">Comisión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumenVendedor.map((v) => (
+                  <tr key={v.nombre} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
+                    <td className="px-4 py-2.5 text-gray-800 dark:text-gray-200">{v.nombre}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{v.recibos}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300">{formatCurrency(v.cobrado)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brandit-orange">{formatCurrency(v.comision)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Filtros (solo en vivo) */}
         {!frozen && (

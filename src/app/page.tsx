@@ -154,6 +154,7 @@ function DragOverlayCard({ mod }: { mod: ModuleConfig }) {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [dashError, setDashError] = useState(false);
   const [nombre, setNombre] = useState("");
   const [role, setRole] = useState("");
   const [dark, setDark] = useState(false);
@@ -169,14 +170,19 @@ export default function DashboardPage() {
     setRole(localStorage.getItem("brandit_role") || "");
     setModuleOrder(getStoredOrder());
     setDark(document.documentElement.classList.contains("dark"));
-    fetch("/api/dashboard")
-      .then((r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then((d) => { if (d) setData(d); })
-      .catch(() => {});
+    loadDashboard();
   }, []);
+
+  const loadDashboard = async () => {
+    setDashError(false);
+    try {
+      const r = await fetch("/api/dashboard", { cache: "no-store" });
+      if (!r.ok) throw new Error();
+      setData(await r.json());
+    } catch {
+      setDashError(true); // P2: KPIs con error real, no solo "-".
+    }
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as ModuleId);
@@ -265,6 +271,12 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI row */}
+      {dashError && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 px-4 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <span>No se pudieron cargar los indicadores.</span>
+          <button onClick={() => loadDashboard()} className="font-medium underline underline-offset-2">Reintentar</button>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 shadow-sm">
           <p className="text-xs font-medium text-gray-400 mb-1">Gu&iacute;as del mes</p>

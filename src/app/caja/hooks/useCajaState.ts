@@ -21,6 +21,7 @@ export function useCajaState(opts?: UseCajaOptions) {
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
+  const [detailError, setDetailError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categorias, setCategorias] = useState<string[]>([]);
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
@@ -85,12 +86,20 @@ export function useCajaState(opts?: UseCajaOptions) {
   }, [loadPeriodos]);
 
   const loadDetail = useCallback(async (id: string) => {
-    const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`);
-    if (res.ok) {
+    setDetailError(false);
+    try {
+      const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`, { cache: "no-store" });
+      if (!res.ok) {
+        // Período inexistente/borrado o error → NO dejar el skeleton latiendo para siempre.
+        setDetailError(true);
+        return;
+      }
       const data = await res.json();
       const gastos = data.caja_gastos || [];
       data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
       setCurrent(data);
+    } catch {
+      setDetailError(true);
     }
   }, []);
 
@@ -266,12 +275,18 @@ export function useCajaState(opts?: UseCajaOptions) {
 
   async function exportExcel() {
     if (!current) return;
-    const res = await fetch("/api/caja/export-excel", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ periodo_id: current.id }),
-    });
-    if (res.ok) {
+    // P1: la descarga que falla ya NO es silenciosa — avisa por el banner de error.
+    try {
+      const res = await fetch("/api/caja/export-excel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periodo_id: current.id }),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setError("No se pudo generar el Excel. Intenta de nuevo.");
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -279,12 +294,15 @@ export function useCajaState(opts?: UseCajaOptions) {
       a.download = `CajaMenuda-Periodo${current.numero}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch {
+      setError("No se pudo conectar para descargar el Excel. Revisa tu internet.");
     }
   }
 
   return {
     tipo, setTipo,
     periodos, loading, current, setCurrent, error,
+    detailError,
     allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
     allResponsables,

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import FrescuraBadge from "@/components/FrescuraBadge";
+import { useToast } from "@/components/Toast";
 
 // cxc_aging VIEW del Supabase compartido (Fase 4 fashiongr). Schema actual:
 // buckets dX_Y sin underscore extra, total = SUM agregado. La server-side
@@ -66,7 +67,9 @@ const STATUS_COLORS = {
 };
 
 export default function CxcPage() {
+  const { toast } = useToast();
   const [rows, setRows] = useState<CxcRow[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [upload, setUpload] = useState<Upload | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -149,8 +152,10 @@ export default function CxcPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch("/api/cxc", { cache: "no-store" });
+      if (!res.ok) throw new Error();
       const data = await res.json();
       // cxc_aging ya filtra HAVING ABS(total) >= 0.01 — sólo defensa extra
       // contra filas vacías/junk si llegaran.
@@ -160,7 +165,8 @@ export default function CxcPage() {
       setRows(clean);
       setUpload(data.upload || null);
     } catch {
-      // silently fail
+      // P2: error de carga ≠ "no hay datos, sube un CSV".
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -206,16 +212,16 @@ export default function CxcPage() {
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        alert(data.error || `Error del servidor: ${res.status}`);
+        toast(data.error || `Error del servidor: ${res.status}`, "error");
       } else {
         const matchInfo = data.matched != null
           ? ` · match clientes ${data.matched}/${data.matched + (data.unmatched ?? 0)}`
           : "";
-        alert(`Cargado: ${data.count} facturas${matchInfo}`);
+        toast(`Cargado: ${data.count} facturas${matchInfo}`);
         loadData();
       }
     } catch (err) {
-      alert(`Error al subir el archivo: ${err instanceof Error ? err.message : "desconocido"}`);
+      toast(`Error al subir el archivo: ${err instanceof Error ? err.message : "desconocido"}`, "error");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -340,6 +346,11 @@ export default function CxcPage() {
 
       {loading ? (
         <div className="text-center py-24 text-gray-300 text-lg">Cargando...</div>
+      ) : loadError ? (
+        <div className="text-center py-24">
+          <p className="text-gray-500 text-lg mb-3">No se pudieron cargar los datos de CxC.</p>
+          <button onClick={() => loadData()} className="px-5 py-2.5 rounded-xl bg-brandit-orange text-white text-sm font-medium active:scale-[0.97] min-h-[44px]">Reintentar</button>
+        </div>
       ) : rows.length === 0 ? (
         <div className="text-center py-24">
           <p className="text-gray-400 text-lg mb-3">No hay datos de CxC cargados</p>

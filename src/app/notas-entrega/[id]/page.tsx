@@ -280,7 +280,7 @@ export default function NotaDetallePage() {
                 onClick={handlePDF}
                 className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:border-brandit-orange hover:text-brandit-orange transition-colors min-h-[44px]"
               >
-                Imprimir PDF
+                Descargar PDF
               </button>
               <button
                 onClick={() => setShowCerrarModal(true)}
@@ -295,7 +295,7 @@ export default function NotaDetallePage() {
               onClick={handlePDF}
               className="px-5 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:border-brandit-orange hover:text-brandit-orange transition-colors min-h-[44px]"
             >
-              Imprimir PDF
+              Descargar PDF
             </button>
           )}
         </div>

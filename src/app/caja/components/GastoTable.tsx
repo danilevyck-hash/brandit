@@ -408,13 +408,29 @@ export default function GastoTable({
                             </td>
                           </>
                         )}
-                        <td className="py-2 px-4 text-right caja-money caja-money-strong text-xs">
-                          $
-                          {fmt(
-                            (parseFloat(String(editGasto.subtotal)) || 0) +
-                              (parseFloat(String(editGasto.itbms)) || 0),
-                          )}
-                        </td>
+                        {showFiscal ? (
+                          <td className="py-2 px-4 text-right caja-money caja-money-strong text-xs">
+                            $
+                            {fmt(
+                              (parseFloat(String(editGasto.subtotal)) || 0) +
+                                (parseFloat(String(editGasto.itbms)) || 0),
+                            )}
+                          </td>
+                        ) : (
+                          // Sin el desglose fiscal, el MONTO total es editable directo
+                          // (subtotal = monto, ITBMS = 0). Antes no se podía corregir
+                          // el monto sin activar el toggle fiscal.
+                          <td className="py-2 px-4 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editGasto.subtotal ?? ""}
+                              onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0, itbms: 0 })}
+                              className="w-24 caja-mono py-1 text-xs outline-none bg-transparent text-right caja-money-strong"
+                              style={{ borderBottom: "1px solid var(--caja-border-default)" }}
+                            />
+                          </td>
+                        )}
                         {isOpen && (
                           <td className="py-2 px-2 text-right text-xs whitespace-nowrap">
                             <button

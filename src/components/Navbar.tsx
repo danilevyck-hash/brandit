@@ -9,8 +9,14 @@ type NavLink = { href: string; label: string; match: (p: string) => boolean };
 
 const ALL_LINKS: NavLink[] = [
   { href: "/", label: "Inicio", match: (p) => p === "/" },
+  { href: "/cxc", label: "CxC", match: (p) => p.startsWith("/cxc") },
+  { href: "/guias", label: "Guías", match: (p) => p.startsWith("/guias") },
+  { href: "/notas-entrega", label: "Notas", match: (p) => p.startsWith("/notas-entrega") },
+  { href: "/caja", label: "Caja", match: (p) => p.startsWith("/caja") },
   { href: "/recordatorios", label: "Recordatorios", match: (p) => p.startsWith("/recordatorios") },
   { href: "/pedidos-produccion", label: "Producción", match: (p) => p.startsWith("/pedidos-produccion") },
+  { href: "/cotizaciones", label: "Cotizaciones", match: (p) => p.startsWith("/cotizacion") },
+  { href: "/leads", label: "Leads", match: (p) => p.startsWith("/leads") },
   { href: "/stickers", label: "Stickers", match: (p) => p.startsWith("/stickers") },
   { href: "/ventas", label: "Ventas", match: (p) => p.startsWith("/ventas") },
   { href: "/comisiones", label: "Comisiones", match: (p) => p.startsWith("/comisiones") },
@@ -18,10 +24,12 @@ const ALL_LINKS: NavLink[] = [
   { href: "/configuracion", label: "Configuración", match: (p) => p.startsWith("/configuracion") },
 ];
 
+// Mismos accesos que las cards del home (allowedRoles en page.tsx). El gate real
+// vive en requireRoles de cada API; esto es solo qué se muestra en la navbar.
 const ROLE_LINKS: Record<string, string[]> = {
-  admin: ["/", "/recordatorios", "/pedidos-produccion", "/stickers", "/ventas", "/comisiones", "/admin/usuarios", "/configuracion"],
-  secretaria: ["/", "/recordatorios", "/pedidos-produccion", "/configuracion"],
-  vendedora: ["/", "/pedidos-produccion"],
+  admin: ["/", "/cxc", "/guias", "/notas-entrega", "/caja", "/recordatorios", "/pedidos-produccion", "/cotizaciones", "/leads", "/stickers", "/ventas", "/comisiones", "/admin/usuarios", "/configuracion"],
+  secretaria: ["/", "/cxc", "/guias", "/notas-entrega", "/caja", "/recordatorios", "/pedidos-produccion", "/cotizaciones", "/leads", "/configuracion"],
+  vendedora: ["/", "/notas-entrega", "/pedidos-produccion", "/cotizaciones", "/leads"],
 };
 
 type SearchResultLead = { id: string; nombre: string; empresa: string; estado: string; estado_venta: string };
@@ -32,7 +40,6 @@ export default function Navbar() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLeads, setSearchLeads] = useState<SearchResultLead[]>([]);
@@ -61,23 +68,6 @@ export default function Navbar() {
   }, [pathname]);
 
   const canSeeBadge = role === "admin" || role === "secretaria";
-
-  // Fetch pending leads count
-  const fetchPending = useCallback(async () => {
-    if (!canSeeBadge) return;
-    try {
-      const res = await fetch("/api/leads/pendientes");
-      const data = await res.json();
-      setPendingCount(data.count || 0);
-    } catch { /* ignore */ }
-  }, [canSeeBadge]);
-
-  useEffect(() => {
-    fetchPending();
-    if (!canSeeBadge) return;
-    const interval = setInterval(fetchPending, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchPending, canSeeBadge]);
 
   // Search
   const doSearch = useCallback(async (q: string) => {
@@ -149,7 +139,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="bg-brandit-black relative z-50">
+      <nav className="bg-brandit-black relative z-50" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
             {/* Logo */}
@@ -170,11 +160,6 @@ export default function Navbar() {
                   }`}
                 >
                   {link.label}
-                  {link.href === "/leads" && canSeeBadge && pendingCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                      {pendingCount}
-                    </span>
-                  )}
                 </Link>
               ))}
               {canSeeBadge && (
@@ -234,11 +219,6 @@ export default function Navbar() {
                 }`}
               >
                 {link.label}
-                {link.href === "/leads" && canSeeBadge && pendingCount > 0 && (
-                  <span className="absolute top-3 right-6 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {pendingCount}
-                  </span>
-                )}
               </Link>
             ))}
             <button

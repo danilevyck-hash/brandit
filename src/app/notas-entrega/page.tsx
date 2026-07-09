@@ -46,6 +46,7 @@ export default function NotasEntregaPage() {
   const [notas, setNotas] = useState<Nota[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tab, setTab] = useState("todas");
   const [tipoTab, setTipoTab] = useState<"pedido" | "muestras">(() => {
     if (typeof window !== "undefined") {
@@ -54,44 +55,54 @@ export default function NotasEntregaPage() {
     }
     return "pedido";
   });
+  // KPIs sobre el TOTAL real del tipo (no la lista filtrada por tab/búsqueda).
+  const [kpiCounts, setKpiCounts] = useState({ total: 0, abiertas: 0, cerradas: 0 });
 
   useEffect(() => {
     localStorage.setItem("brandit_ne_tipo_tab", tipoTab);
   }, [tipoTab]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (tab !== "todas") params.set("estado", tab);
-    params.set("tipo", tipoTab);
-    const res = await fetch(`/api/notas-entrega?${params}`);
-    const data = await res.json();
-    setNotas(Array.isArray(data) ? data : []);
-    setLoading(false);
-  }, [search, tab, tipoTab]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Debounce search
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Debounce de la búsqueda (un solo fetch, no uno por tecla).
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // load usa debouncedSearch → un único efecto, sin doble fetch.
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (tab !== "todas") params.set("estado", tab);
+    params.set("tipo", tipoTab);
+    try {
+      const res = await fetch(`/api/notas-entrega?${params}`, { cache: "no-store" });
+      const data = await res.json();
+      setNotas(Array.isArray(data) ? data : []);
+    } catch {
+      setNotas([]);
+    } finally {
+      setLoading(false);
+    }
   }, [debouncedSearch, tab, tipoTab]);
 
-  const kpiCounts = {
-    total: notas.length,
-    abiertas: notas.filter((n) => n.estado === "abierta").length,
-    cerradas: notas.filter((n) => n.estado === "cerrada").length,
-  };
+  useEffect(() => { load(); }, [load]);
+
+  // Conteos globales del tipo actual (sin filtrar por estado ni búsqueda).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/notas-entrega?tipo=${tipoTab}`, { cache: "no-store" });
+        const data = await res.json();
+        const all: Nota[] = Array.isArray(data) ? data : [];
+        setKpiCounts({
+          total: all.length,
+          abiertas: all.filter((n) => n.estado === "abierta").length,
+          cerradas: all.filter((n) => n.estado === "cerrada").length,
+        });
+      } catch { /* KPIs quedan en su último valor */ }
+    })();
+  }, [tipoTab, notas]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">

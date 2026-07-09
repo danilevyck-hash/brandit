@@ -98,12 +98,6 @@ export function verifySession(cookie: string | undefined | null): SessionPayload
 
 // ─── Request helpers ─────────────────────────────────────────────────────────
 
-/** Devuelve el role del cookie firmado, o null si no autenticado / inválido. */
-export function getSessionRole(req: NextRequest): Role | null {
-  const cookie = req.cookies.get("brandit_session")?.value;
-  return verifySession(cookie)?.role ?? null;
-}
-
 /** Devuelve el payload completo, o null si no autenticado / inválido. */
 export function getSessionPayload(req: NextRequest): SessionPayload | null {
   const cookie = req.cookies.get("brandit_session")?.value;
@@ -137,17 +131,4 @@ export function requireRoles(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
   return payload.role;
-}
-
-/** Cualquier usuario logueado, sin restringir por role. */
-export function requireAnyAuth(req: NextRequest): SessionPayload | NextResponse {
-  const cookie = req.cookies.get("brandit_session")?.value;
-  if (!cookie) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
-  const payload = verifySession(cookie);
-  if (!payload) {
-    return NextResponse.json({ error: "Sesión inválida o expirada" }, { status: 401 });
-  }
-  return payload;
 }

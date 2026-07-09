@@ -46,8 +46,16 @@ export async function GET(req: NextRequest) {
       data[table] = [];
       counts[table] = 0;
     } else {
-      data[table] = rows || [];
-      counts[table] = rows?.length || 0;
+      let out = rows || [];
+      // SEC-2: nunca exportar contraseñas al backup en R2.
+      if (table === "user_roles") {
+        out = out.map((r) => {
+          const { password: _pw, ...rest } = r as Record<string, unknown>;
+          return rest;
+        });
+      }
+      data[table] = out;
+      counts[table] = out.length;
     }
   }
 

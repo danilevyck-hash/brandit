@@ -118,7 +118,8 @@ export async function PATCH(request: NextRequest,
 
 export async function DELETE(request: NextRequest,
   { params }: { params: { id: string } }) {
-  const auth = requireRoles(request, ["admin", "secretaria", "vendedora"]);
+  // SEC-5: borrado destructivo solo admin/secretaria (no vendedora).
+  const auth = requireRoles(request, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   // Only delete if abierta

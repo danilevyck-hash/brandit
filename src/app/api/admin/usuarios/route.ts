@@ -8,9 +8,10 @@ export async function GET(req: NextRequest) {
   const auth = requireRoles(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
+  // SEC-2: NO devolver el campo password al cliente (select explícito).
   const { data, error } = await getSupabaseServer()
     .from("user_roles")
-    .select("*")
+    .select("id, email, role, nombre, empresa, activo")
     .order("nombre");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

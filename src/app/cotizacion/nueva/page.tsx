@@ -9,6 +9,7 @@ import PrintSection, { emptyPrint, calcPrintTotal } from "@/components/PrintSect
 import type { PrintDraft } from "@/components/PrintSection";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/components/Toast";
+import { apiSend, errorMessage } from "@/lib/api-client";
 
 type ItemDraft = ReturnType<typeof emptyItem>;
 
@@ -31,54 +32,32 @@ export default function NuevaQuotation() {
       toast("Selecciona un cliente", "error");
       return;
     }
-    if (items.length === 0 && prints.length === 0) {
-      toast("Agrega al menos un item o impresión", "error");
+
+    // Validación real: solo cuentan los ítems/impresiones CON descripción.
+    const itemsToSave = items
+      .filter(i => i.description.trim())
+      .map(({ _key, ...rest }) => rest);
+    const printsToSave = prints
+      .filter(p => p.description.trim())
+      .map(({ _key, ...rest }) => rest);
+
+    if (itemsToSave.length === 0 && printsToSave.length === 0) {
+      toast("Agrega al menos un ítem o impresión con descripción", "error");
       return;
     }
 
     setSaving(true);
     try {
-      const qRes = await fetch("/api/quotations", {
+      // Guardado atómico en el server (rollback si algo falla → sin huérfanas).
+      // P1: apiSend verifica res.ok y da mensaje humano; el form NO se cierra si falla.
+      const quotation = await apiSend<{ id: number }>("/api/quotations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: client.id, date, notes }),
+        body: { client_id: client.id, date, notes, items: itemsToSave, prints: printsToSave },
       });
-      if (!qRes.ok) throw new Error("Error creando cotización");
-      const quotation = await qRes.json();
-      if (quotation.error) throw new Error(quotation.error);
-
-      if (items.length > 0) {
-        const itemsToSave = items
-          .filter(i => i.description.trim())
-          .map(({ _key, ...rest }) => ({ ...rest, quotation_id: quotation.id }));
-        if (itemsToSave.length > 0) {
-          const res = await fetch("/api/quotation-items", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(itemsToSave),
-          });
-          if (!res.ok) throw new Error("Error guardando items");
-        }
-      }
-
-      if (prints.length > 0) {
-        const printsToSave = prints
-          .filter(p => p.description.trim())
-          .map(({ _key, ...rest }) => ({ ...rest, quotation_id: quotation.id }));
-        if (printsToSave.length > 0) {
-          const res = await fetch("/api/print-jobs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(printsToSave),
-          });
-          if (!res.ok) throw new Error("Error guardando impresiones");
-        }
-      }
-
       toast("Cotización guardada");
       router.push(`/cotizacion/${quotation.id}`);
-    } catch (err: unknown) {
-      toast((err as Error).message || "Error al guardar", "error");
+    } catch (err) {
+      toast(errorMessage(err), "error");
     } finally {
       setSaving(false);
     }

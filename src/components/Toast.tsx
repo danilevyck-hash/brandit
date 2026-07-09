@@ -20,25 +20,36 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
+const MAX_TOASTS = 3; // tope de pila: no tapar la pantalla con toasts apilados.
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const dismiss = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const toast = useCallback((message: string, type: ToastType = "success") => {
     const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    // Los errores necesitan tiempo para leerse/actuar; los éxitos son efímeros.
+    const ms = type === "error" ? 7000 : 3000;
+    setToasts((prev) => [...prev, { id, message, type }].slice(-MAX_TOASTS));
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
+    }, ms);
   }, []);
 
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90vw] max-w-sm pointer-events-none">
+      <div
+        className="fixed left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90vw] max-w-sm pointer-events-none"
+        style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`px-5 py-3 rounded-2xl shadow-lg text-sm font-medium text-white animate-fade-in-up pointer-events-auto ${
+            className={`flex items-start gap-3 px-5 py-3 rounded-2xl shadow-lg text-sm font-medium text-white animate-fade-in-up pointer-events-auto ${
               t.type === "success"
                 ? "bg-green-600"
                 : t.type === "error"
@@ -46,7 +57,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 : "bg-brandit-black"
             }`}
           >
-            {t.message}
+            <span className="flex-1">{t.message}</span>
+            <button
+              onClick={() => dismiss(t.id)}
+              aria-label="Cerrar"
+              className="-mr-1.5 -my-0.5 shrink-0 rounded-lg px-1.5 text-white/70 hover:text-white text-lg leading-none"
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>

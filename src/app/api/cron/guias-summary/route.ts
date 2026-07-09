@@ -153,17 +153,16 @@ export async function GET(req: NextRequest) {
     if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 24-hour window: 6pm Panama yesterday to 6pm Panama today
-  // Panama is UTC-5 year-round, so 6pm Panama = 23:00 UTC
+  // BUG-1: ventana de 24h que TERMINA en el corte más reciente de las 6pm Panamá
+  // (= 23:00 UTC, Panamá es UTC-5 todo el año). El cron corre a las 23:00 UTC, así
+  // que el corte es "hoy 23:00 UTC" y la ventana cubre [ayer 6pm, hoy 6pm] = el día
+  // que acaba de pasar. Si por algún motivo corre ANTES de las 23:00 (o manual a
+  // mediodía), el corte de hoy aún no ocurrió → retrocedemos un día.
+  // (El bug anterior AVANZABA a mañana, dejando la ventana en el FUTURO → email vacío.)
   const now = new Date();
   const endUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 0, 0));
-  // If cron runs at 23:00 UTC, endUtc is "today at 23:00 UTC"
-  // If somehow it runs after midnight UTC, adjust
   if (endUtc > now) {
-    // endUtc is in the future or current — that's fine
-  } else {
-    // We already passed 23:00 UTC today, use tomorrow (shouldn't happen with cron at 23:00)
-    endUtc.setUTCDate(endUtc.getUTCDate() + 1);
+    endUtc.setUTCDate(endUtc.getUTCDate() - 1);
   }
   const startUtc = new Date(endUtc.getTime() - 24 * 60 * 60 * 1000);
 

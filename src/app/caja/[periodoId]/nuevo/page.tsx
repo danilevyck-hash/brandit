@@ -168,7 +168,7 @@ function NuevoGastoPage() {
         // Scroll to top so user sees the updated header + empty form
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        router.push(`/caja?view=detail&id=${periodo.id}`);
+        router.push(`/caja/${periodo.id}`);
       }
     } catch {
       setError("Error al agregar gasto. Intenta de nuevo.");
@@ -224,7 +224,7 @@ function NuevoGastoPage() {
   const formValues = { gFecha, gDescripcion, gProveedor, gNroFactura, gSubtotal, gItbmsPct, gCategoria, gResponsableId };
   const formSetters = { setGFecha, setGDescripcion, setGProveedor, setGNroFactura, setGSubtotal, setGItbmsPct, setGCategoria, setGResponsableId };
 
-  const backToDetail = () => router.push(`/caja?view=detail&id=${periodo.id}`);
+  const backToDetail = () => router.push(`/caja/${periodo.id}`);
 
   return (
     <div>

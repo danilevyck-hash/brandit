@@ -87,7 +87,7 @@ type ImpuestoMap = Map<string, { fecha: string; imp: number }[]>;
  * Join key = cliente_codigo (que en switch_facturas = String(clienteId), numérico),
  * igual que el cliente_switch_id que persistimos en switch_recibos.
  */
-async function loadImpuestoMap(from: string, to: string): Promise<ImpuestoMap> {
+async function loadImpuestoMap(from: string, to: string): Promise<{ map: ImpuestoMap; ok: boolean }> {
   const map: ImpuestoMap = new Map();
   const db = getSupabaseServer();
   const { data, error } = await db
@@ -98,8 +98,9 @@ async function loadImpuestoMap(from: string, to: string): Promise<ImpuestoMap> {
     .lte("fecha", to)
     .range(0, 99999);
   if (error) {
+    // SYNC-4: no tragar el fallo — el llamador marca el sync 'partial'.
     console.error(`[sync-recibos] loadImpuestoMap: ${error.message}`);
-    return map;
+    return { map, ok: false };
   }
   for (const f of (data ?? []) as { cliente_codigo: string | null; fecha: string; itbms: unknown }[]) {
     const k = f.cliente_codigo;
@@ -107,7 +108,7 @@ async function loadImpuestoMap(from: string, to: string): Promise<ImpuestoMap> {
     if (!map.has(k)) map.set(k, []);
     map.get(k)!.push({ fecha: String(f.fecha).slice(0, 10), imp: parseMonto(f.itbms as string) });
   }
-  return map;
+  return { map, ok: true };
 }
 
 /** Retención = total ≈ impuesto/2 de una factura del mismo cliente, dentro de ±35d. */
@@ -130,7 +131,7 @@ function idToInt(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapRow(r: RawRow, impuestoMap: ImpuestoMap): RawRow {
+function mapRow(r: RawRow, impuestoMap: ImpuestoMap, runStamp: string): RawRow {
   const fc = String(r.fechaCreacion ?? "");
   const fecha = fc.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null; // "YYYY-MM-DD HH:mm:ss" → día
   const cliId = idToInt(r.clienteId);
@@ -148,25 +149,45 @@ function mapRow(r: RawRow, impuestoMap: ImpuestoMap): RawRow {
     sucursal_codigo: (r.codigoSucursal as string) ?? null,
     total,
     es_retencion: esRetencion(cliId != null ? String(cliId) : null, fecha, total, impuestoMap),
-    synced_at: nowIso(),
+    // SYNC-1: mismo stamp para todo el run → permite insertar antes de borrar y
+    // limpiar solo las filas de runs anteriores (< runStamp).
+    synced_at: runStamp,
     raw_data: r,
   };
 }
 
-// ─── Log de auditoría ───────────────────────────────────────────────────────────
+// ─── Log de auditoría (garantizado: fila 'running' al inicio, update al final) ──
 
-async function logSync(r: SyncResult): Promise<void> {
+/** Crea la fila de log en estado 'running' y devuelve su id (null si falla). */
+async function createLog(startedAt: string): Promise<number | null> {
   try {
-    await getSupabaseServer().from("switch_sync_log").insert({
-      sync_type: r.syncType,
-      started_at: r.startedAt,
-      finished_at: r.finishedAt,
-      status: r.status,
-      rows_synced: r.rowsSynced,
-      rows_skipped: r.rowsSkipped,
-      skip_details: r.skipDetails,
-      error_message: r.errorMessage ?? null,
-    });
+    const { data, error } = await getSupabaseServer()
+      .from("switch_sync_log")
+      .insert({ sync_type: "recibos", started_at: startedAt, status: "running", rows_synced: 0, rows_skipped: 0 })
+      .select("id")
+      .single();
+    if (error || !data) return null;
+    return (data as { id: number }).id;
+  } catch {
+    return null;
+  }
+}
+
+async function finishLog(logId: number | null, r: SyncResult): Promise<void> {
+  const payload = {
+    sync_type: r.syncType,
+    started_at: r.startedAt,
+    finished_at: r.finishedAt,
+    status: r.status,
+    rows_synced: r.rowsSynced,
+    rows_skipped: r.rowsSkipped,
+    skip_details: r.skipDetails,
+    error_message: r.errorMessage ?? null,
+  };
+  try {
+    const db = getSupabaseServer();
+    if (logId != null) await db.from("switch_sync_log").update(payload).eq("id", logId);
+    else await db.from("switch_sync_log").insert(payload);
   } catch (e) {
     console.error("[sync-recibos] no se pudo escribir switch_sync_log:", e);
   }
@@ -186,10 +207,16 @@ async function fetchRecibosMes(year: number, month: number): Promise<RawRow[]> {
  * Sincroniza los meses dados. delete+insert por mes calendario. Devuelve un
  * SyncResult agregado y escribe una fila en switch_sync_log.
  */
+const INSERT_BATCH = 500;
+
 export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
   const startedAt = nowIso();
+  const runStamp = nowIso();
   const skipDetails: SkipDetail[] = [];
   let rowsSynced = 0;
+  // Log garantizado: fila 'running' desde el arranque; si la función muere por
+  // timeout de Vercel queda visible como 'running' (no desaparece sin rastro).
+  const logId = await createLog(startedAt);
 
   try {
     if (meses.length === 0) {
@@ -197,7 +224,7 @@ export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
         syncType: "recibos", status: "success", rowsSynced: 0, rowsSkipped: 0,
         skipDetails: [], startedAt, finishedAt: nowIso(),
       };
-      await logSync(empty);
+      await finishLog(logId, empty);
       return empty;
     }
 
@@ -210,13 +237,20 @@ export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
     const lN = sorted[sorted.length - 1];
     const winFrom = new Date(Date.UTC(f0.year, f0.month - 1, 1) - RET_WINDOW_MS).toISOString().slice(0, 10);
     const winTo = monthBounds(lN.year, lN.month).finExcl;
-    const impuestoMap = await loadImpuestoMap(winFrom, winTo);
+    const { map: impuestoMap, ok: retencionOk } = await loadImpuestoMap(winFrom, winTo);
+    if (!retencionOk) {
+      // SYNC-4: no marcar success si no pudimos clasificar retenciones.
+      skipDetails.push({
+        entidad: "recibos", identificador: "(cruce retención)", campo: "switch_facturas",
+        valorCrudo: `${winFrom}..${winTo}`, motivo: "no se pudo cargar impuesto de facturas; es_retencion puede ser incorrecto",
+      });
+    }
 
     for (const { year, month } of meses) {
       const raw = await fetchRecibosMes(year, month);
       const rows: RawRow[] = [];
       for (const r of raw) {
-        const mapped = mapRow(r, impuestoMap);
+        const mapped = mapRow(r, impuestoMap, runStamp);
         // fecha es NOT NULL en la tabla: si no parsea, se salta (nunca en silencio).
         if (mapped.fecha == null) {
           skipDetails.push({
@@ -232,19 +266,27 @@ export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
       }
 
       const { inicio, finExcl } = monthBounds(year, month);
-      // delete+insert por mes (el endpoint no da id de recibo → reemplazo limpio).
-      const { error: delErr } = await db
-        .from("switch_recibos")
-        .delete()
-        .gte("fecha", inicio)
-        .lt("fecha", finExcl);
-      if (delErr) throw new Error(`delete switch_recibos: ${delErr.message}`);
 
-      if (rows.length > 0) {
-        const { error: insErr } = await db.from("switch_recibos").insert(rows);
+      // SYNC-1: INSERT-antes-de-DELETE con runStamp. Si el insert falla o la
+      // función muere, el mes conserva sus filas viejas (< runStamp) → nunca queda
+      // vacío. Idempotencia: primero limpiamos cualquier remanente de ESTE run.
+      const { error: delSelfErr } = await db
+        .from("switch_recibos").delete()
+        .gte("fecha", inicio).lt("fecha", finExcl).eq("synced_at", runStamp);
+      if (delSelfErr) throw new Error(`delete(self) switch_recibos: ${delSelfErr.message}`);
+
+      for (let i = 0; i < rows.length; i += INSERT_BATCH) {
+        const chunk = rows.slice(i, i + INSERT_BATCH);
+        const { error: insErr } = await db.from("switch_recibos").insert(chunk);
         if (insErr) throw new Error(`insert switch_recibos: ${insErr.message}`);
-        rowsSynced += rows.length;
+        rowsSynced += chunk.length;
       }
+
+      // Solo tras insertar TODO el mes OK: borrar las filas de runs anteriores.
+      const { error: delOldErr } = await db
+        .from("switch_recibos").delete()
+        .gte("fecha", inicio).lt("fecha", finExcl).lt("synced_at", runStamp);
+      if (delOldErr) throw new Error(`delete(old) switch_recibos: ${delOldErr.message}`);
     }
 
     const result: SyncResult = {
@@ -256,7 +298,7 @@ export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
       startedAt,
       finishedAt: nowIso(),
     };
-    await logSync(result);
+    await finishLog(logId, result);
     return result;
   } catch (err) {
     const result: SyncResult = {
@@ -269,7 +311,7 @@ export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
       startedAt,
       finishedAt: nowIso(),
     };
-    await logSync(result);
+    await finishLog(logId, result);
     return result;
   }
 }

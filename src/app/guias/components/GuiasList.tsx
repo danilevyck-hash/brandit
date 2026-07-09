@@ -203,17 +203,15 @@ export default function GuiasList({
                       const isExpanded = expandedId === g.id;
                       const isDispatched = g.estado === "Completada" || g.estado === "Rechazada";
 
-                      // Status-based left border color
+                      // Color del borde izquierdo por estado real (sin ramas muertas).
                       const statusBorderClass = g.estado === "Completada"
                         ? "border-l-4 border-l-emerald-400"
                         : g.estado === "Rechazada"
                           ? "border-l-4 border-l-red-400"
-                          : (g.estado === "Confirmada" || g.estado === "Despachada")
-                            ? "border-l-4 border-l-blue-400"
-                            : "border-l-4 border-l-amber-400";
+                          : "border-l-4 border-l-amber-400"; // Pendiente Bodega
 
                       const cardContent = (
-                        <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
+                        <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-300"}`}>
                           {/* Row header — desktop: inline row, mobile: stacked card */}
                           <button
                             onClick={() => selectionMode ? toggleSelect(g.id) : onToggleExpand(g.id)}
@@ -234,7 +232,7 @@ export default function GuiasList({
                               </span>
                               <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
                               <span className="w-24 shrink-0">
-                                <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : "despachada"} />
+                                <StatusBadge estado={g.estado} />
                               </span>
                               <svg
                                 className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
@@ -267,7 +265,7 @@ export default function GuiasList({
                                 <span className="text-gray-500 text-xs">{fmtDate(g.fecha)}</span>
                                 <span className="tabular-nums text-xs text-gray-500">{g.total_bultos} bultos</span>
                                 <span className="ml-auto">
-                                  <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : "despachada"} />
+                                  <StatusBadge estado={g.estado} />
                                 </span>
                               </div>
                             </div>

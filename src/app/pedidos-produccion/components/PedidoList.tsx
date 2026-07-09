@@ -88,7 +88,7 @@ function ColaGeneral({
                 type="button"
                 onClick={() => onMover(p.id, -1)}
                 disabled={idx === 0}
-                className="text-gray-400 disabled:opacity-25 hover:text-gray-700 dark:hover:text-gray-200 transition p-0.5"
+                className="text-gray-400 disabled:opacity-25 hover:text-gray-700 dark:hover:text-gray-200 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Subir"
               >
                 <ChevronUp />
@@ -98,7 +98,7 @@ function ColaGeneral({
                 type="button"
                 onClick={() => onMover(p.id, 1)}
                 disabled={idx === total - 1}
-                className="text-gray-400 disabled:opacity-25 hover:text-gray-700 dark:hover:text-gray-200 transition p-0.5"
+                className="text-gray-400 disabled:opacity-25 hover:text-gray-700 dark:hover:text-gray-200 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Bajar"
               >
                 <ChevronDown />
@@ -133,7 +133,7 @@ function ColaGeneral({
                 <button
                   type="button"
                   onClick={() => onEdit(p)}
-                  className="text-gray-300 hover:text-gray-600 dark:hover:text-gray-200 transition p-1"
+                  className="text-gray-300 hover:text-gray-600 dark:hover:text-gray-200 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                   aria-label="Editar"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -144,7 +144,7 @@ function ColaGeneral({
                 <button
                   type="button"
                   onClick={() => onDelete(p)}
-                  className="text-gray-300 hover:text-red-500 transition p-1"
+                  className="text-gray-300 hover:text-red-500 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
                   aria-label="Borrar"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
