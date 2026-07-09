@@ -106,6 +106,24 @@ export function carteraDeRecibo(r: ReciboRow, carteraMap: Map<string, string>): 
 }
 
 /**
+ * ¿El recibo pertenece al mundo Formato B? Un recibo comisiona UNA sola vez:
+ * si el cliente es de cartera B, comisiona SOLO en B (1%) y se excluye del A.
+ * También se excluyen del A los recibos registrados POR un vendedor B (ese
+ * vendedor no participa del formato A).
+ */
+export function perteneceAFormatoB(
+  r: ReciboRow,
+  vendedoresB: Set<string>,
+  carteraMap: Map<string, string>,
+): boolean {
+  if (vendedoresB.size === 0) return false;
+  return (
+    vendedoresB.has(normalizeVendedor(carteraDeRecibo(r, carteraMap))) ||
+    vendedoresB.has(normalizeVendedor(r.vendedor_nombre))
+  );
+}
+
+/**
  * Cálculo Formato B: por vendedor B, bases de venta/cobro POR MES y comisiones
  * (1% fijo, componentes redondeados por mes; el total suma componentes ya
  * redondeados). Devuelve una fila por vendedor B activo aunque esté en cero.

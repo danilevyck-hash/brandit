@@ -438,6 +438,11 @@ export default function ComisionesClient() {
           </div>
         )}
 
+        {/* Formato B — junto al resumen A, arriba (venta + cobro por cartera, 1%) */}
+        {!loading && (
+          <FormatoBSection vendedores={formatoB} onVerDetalle={setDetalleBVendedor} />
+        )}
+
         {/* Desglose por vendedor Y por mes (solo con varios meses) */}
         {!loading && multi && resumenVendedorMes.length > 0 && (
           <div className="mb-5 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -582,11 +587,6 @@ export default function ComisionesClient() {
               </div>
             )}
           </div>
-        )}
-
-        {/* Formato B — sección propia (venta + cobro por cartera, 1%) */}
-        {!loading && (
-          <FormatoBSection vendedores={formatoB} onVerDetalle={setDetalleBVendedor} />
         )}
 
         {/* Generar — los cierres son mensuales: solo disponible con UN mes seleccionado */}

@@ -7,7 +7,9 @@
 //
 // DOS formatos, asignados por vendedor en comisiones_config_vendedor:
 //   A (por recibo): tramos fijos (<15000 → 0.5%, >=15000 → 1%), atribución por
-//     vendedor del recibo, excluye es_retencion. Los vendedores B NO aparecen acá.
+//     vendedor del recibo, excluye es_retencion. EXCLUYE el mundo B: recibos de
+//     clientes con cartera B o registrados por un vendedor B (un recibo comisiona
+//     UNA sola vez; cliente de cartera B → solo B al 1%).
 //   B (venta + cobro, estilo fashiongr): VENTA = switch_facturas del mes por
 //     vendedor de la factura (FA + subtotal_descuento, NC −ABS, ND +), SIN filtro
 //     de utilidad, × 1%. COBRO = recibos por CARTERA (dueño del cliente), excluye
@@ -27,7 +29,7 @@ import {
 } from "@/lib/comisiones";
 import {
   fetchRecibosMes, fetchFacturasMes, loadVendedoresB,
-  subtotalFirmado, carteraDeRecibo, calcularFormatoB,
+  subtotalFirmado, carteraDeRecibo, calcularFormatoB, perteneceAFormatoB,
   type FacturaRow,
 } from "@/lib/comisiones-b";
 
@@ -222,8 +224,9 @@ export async function GET(req: NextRequest) {
     ]);
     const recibos = porMes.flat();
 
-    // Formato A: SOLO recibos de vendedores que no son B (por vendedor del recibo).
-    const recibosA = recibos.filter((r) => !vendedoresB.has(normalizeVendedor(r.vendedor_nombre)));
+    // Formato A: excluye todo recibo del mundo B (cartera B o registrado por un
+    // vendedor B) — un recibo comisiona UNA sola vez.
+    const recibosA = recibos.filter((r) => !perteneceAFormatoB(r, vendedoresB, carteraMap));
     const calc = calcular(recibosA, vendedoresSel, clientesExcl);
 
     // Formato B: ventas por vendedor de factura + cobros por cartera.
@@ -309,8 +312,9 @@ export async function POST(req: NextRequest) {
       vendedoresB.size > 0 ? loadCarteraMap() : Promise.resolve(new Map<string, string>()),
     ]);
 
-    // Formato A (sin los vendedores B) con los filtros de la vista.
-    const recibosA = recibos.filter((r) => !vendedoresB.has(normalizeVendedor(r.vendedor_nombre)));
+    // Formato A: excluye todo recibo del mundo B (cartera B o registrado por un
+    // vendedor B), con los filtros de la vista — un recibo comisiona UNA sola vez.
+    const recibosA = recibos.filter((r) => !perteneceAFormatoB(r, vendedoresB, carteraMap));
     const calc = calcular(recibosA, vendedoresSel, clientesExcl);
 
     // Formato B (resumen + líneas del detalle congelado).
