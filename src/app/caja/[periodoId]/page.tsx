@@ -22,7 +22,7 @@ export default function PeriodoDetailPage() {
   const [showDeletedModal, setShowDeletedModal] = useState(false);
 
   const {
-    current, error,
+    current, error, detailError,
     allCategorias,
     allResponsables,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
@@ -42,6 +42,17 @@ export default function PeriodoDetailPage() {
   }, [authChecked, periodoId, loadDetail]);
 
   if (!authChecked) return null;
+
+  if (detailError) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <p className="text-gray-500 mb-4">No se encontró este período (puede haber sido eliminado).</p>
+        <button onClick={() => router.push("/caja")} className="px-5 py-2.5 rounded-xl bg-brandit-black text-white text-sm font-medium active:scale-[0.97] min-h-[44px]">
+          Volver a Caja
+        </button>
+      </div>
+    );
+  }
 
   if (!current) {
     return (

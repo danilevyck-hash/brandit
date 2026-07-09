@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import FrescuraBadge from "@/components/FrescuraBadge";
+import { useToast } from "@/components/Toast";
 
 // cxc_aging VIEW del Supabase compartido (Fase 4 fashiongr). Schema actual:
 // buckets dX_Y sin underscore extra, total = SUM agregado. La server-side
@@ -66,6 +67,7 @@ const STATUS_COLORS = {
 };
 
 export default function CxcPage() {
+  const { toast } = useToast();
   const [rows, setRows] = useState<CxcRow[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [upload, setUpload] = useState<Upload | null>(null);
@@ -210,16 +212,16 @@ export default function CxcPage() {
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        alert(data.error || `Error del servidor: ${res.status}`);
+        toast(data.error || `Error del servidor: ${res.status}`, "error");
       } else {
         const matchInfo = data.matched != null
           ? ` · match clientes ${data.matched}/${data.matched + (data.unmatched ?? 0)}`
           : "";
-        alert(`Cargado: ${data.count} facturas${matchInfo}`);
+        toast(`Cargado: ${data.count} facturas${matchInfo}`);
         loadData();
       }
     } catch (err) {
-      alert(`Error al subir el archivo: ${err instanceof Error ? err.message : "desconocido"}`);
+      toast(`Error al subir el archivo: ${err instanceof Error ? err.message : "desconocido"}`, "error");
     } finally {
       setUploading(false);
       e.target.value = "";

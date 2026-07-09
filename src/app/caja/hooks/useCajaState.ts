@@ -21,6 +21,7 @@ export function useCajaState(opts?: UseCajaOptions) {
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
+  const [detailError, setDetailError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categorias, setCategorias] = useState<string[]>([]);
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
@@ -85,12 +86,20 @@ export function useCajaState(opts?: UseCajaOptions) {
   }, [loadPeriodos]);
 
   const loadDetail = useCallback(async (id: string) => {
-    const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`);
-    if (res.ok) {
+    setDetailError(false);
+    try {
+      const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`, { cache: "no-store" });
+      if (!res.ok) {
+        // Período inexistente/borrado o error → NO dejar el skeleton latiendo para siempre.
+        setDetailError(true);
+        return;
+      }
       const data = await res.json();
       const gastos = data.caja_gastos || [];
       data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
       setCurrent(data);
+    } catch {
+      setDetailError(true);
     }
   }, []);
 
@@ -293,6 +302,7 @@ export function useCajaState(opts?: UseCajaOptions) {
   return {
     tipo, setTipo,
     periodos, loading, current, setCurrent, error,
+    detailError,
     allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
     allResponsables,

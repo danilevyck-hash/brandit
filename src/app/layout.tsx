@@ -22,7 +22,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // viewportFit cover → habilita env(safe-area-inset-*) bajo el notch/Dynamic Island.
+  viewportFit: "cover",
+  // maximumScale eliminado: bloquear el pinch-zoom es un problema de accesibilidad.
   themeColor: "#F15A29",
 };
 
