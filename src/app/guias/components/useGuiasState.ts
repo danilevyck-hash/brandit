@@ -99,7 +99,9 @@ export function useGuiasState() {
     const res = await fetch(`/api/guias/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado: "Rechazada", observaciones: motivo }),
+      // El motivo de rechazo va a su propia columna (motivo_rechazo), NO pisa
+      // las observaciones de despacho.
+      body: JSON.stringify({ estado: "Rechazada", motivo_rechazo: motivo }),
     });
     if (res.ok) {
       showToast("Guía rechazada");

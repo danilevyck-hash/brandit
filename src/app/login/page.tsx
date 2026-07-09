@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { apiSend, errorMessage } from "@/lib/api-client";
+
+interface LoginResp { role: string; email: string; nombre: string; empresa?: string }
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");
@@ -12,26 +15,18 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || "Contraseña incorrecta");
+    // P1: try/catch — un fallo de red ya no deja el botón atascado "Ingresando…".
+    try {
+      const data = await apiSend<LoginResp>("/api/auth", { method: "POST", body: { password } });
+      localStorage.setItem("brandit_role", data.role);
+      localStorage.setItem("brandit_email", data.email);
+      localStorage.setItem("brandit_nombre", data.nombre);
+      localStorage.setItem("brandit_empresa", data.empresa || "");
+      window.location.href = "/";
+    } catch (err) {
+      setError(errorMessage(err));
       setLoading(false);
-      return;
     }
-
-    localStorage.setItem("brandit_role", data.role);
-    localStorage.setItem("brandit_email", data.email);
-    localStorage.setItem("brandit_nombre", data.nombre);
-    localStorage.setItem("brandit_empresa", data.empresa || "");
-
-    window.location.href = "/";
   };
 
   return (

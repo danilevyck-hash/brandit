@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -20,6 +20,7 @@ export default function StickersListPage() {
   const [role, setRole] = useState("");
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -30,17 +31,24 @@ export default function StickersListPage() {
     }
   }, [router]);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (role !== "admin" && role !== "secretaria") return;
     setLoading(true);
-    fetch("/api/stickers")
-      .then((r) => r.json())
-      .then((data) => {
-        setStickers(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    setLoadError(false);
+    try {
+      const res = await fetch("/api/stickers", { cache: "no-store" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setStickers(Array.isArray(data) ? data : []);
+    } catch {
+      // P2: error de carga ≠ lista vacía.
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [role]);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -84,6 +92,13 @@ export default function StickersListPage() {
         {/* Grid */}
         {loading ? (
           <p className="text-center text-gray-300 py-24">Cargando...</p>
+        ) : loadError ? (
+          <div className="text-center py-24 bg-white rounded-2xl border border-[#eeebe6]">
+            <p className="text-gray-500 text-lg mb-3">No se pudieron cargar los stickers.</p>
+            <button onClick={() => load()} className="px-5 py-2.5 rounded-xl bg-brandit-orange text-white text-sm font-medium active:scale-[0.97] min-h-[44px]">
+              Reintentar
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-2xl border border-[#eeebe6]" style={{ borderRadius: "14px" }}>
             <p className="text-gray-400 text-lg mb-1">

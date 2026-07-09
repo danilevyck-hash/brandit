@@ -266,12 +266,18 @@ export function useCajaState(opts?: UseCajaOptions) {
 
   async function exportExcel() {
     if (!current) return;
-    const res = await fetch("/api/caja/export-excel", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ periodo_id: current.id }),
-    });
-    if (res.ok) {
+    // P1: la descarga que falla ya NO es silenciosa — avisa por el banner de error.
+    try {
+      const res = await fetch("/api/caja/export-excel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periodo_id: current.id }),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setError("No se pudo generar el Excel. Intenta de nuevo.");
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -279,6 +285,8 @@ export function useCajaState(opts?: UseCajaOptions) {
       a.download = `CajaMenuda-Periodo${current.numero}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch {
+      setError("No se pudo conectar para descargar el Excel. Revisa tu internet.");
     }
   }
 

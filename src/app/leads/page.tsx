@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
+import { useToast } from "@/components/Toast";
+import { apiSend, errorMessage } from "@/lib/api-client";
 
 type Lead = {
   id: string;
@@ -67,6 +69,7 @@ type LeadForm = {
 type ViewMode = "lista" | "kanban";
 
 export default function LeadsPage() {
+  const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("");
@@ -132,14 +135,18 @@ export default function LeadsPage() {
   const addComentario = async () => {
     if (!newComment.trim() || !selectedLead) return;
     setAddingComment(true);
-    await fetch(`/api/leads/${selectedLead.id}/comentarios`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ comentario: newComment.trim(), autor: userName || userEmail }),
-    });
-    setNewComment("");
-    setAddingComment(false);
-    loadComentarios(selectedLead.id);
+    try {
+      await apiSend(`/api/leads/${selectedLead.id}/comentarios`, {
+        method: "POST",
+        body: { comentario: newComment.trim(), autor: userName || userEmail },
+      });
+      setNewComment("");
+      loadComentarios(selectedLead.id);
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setAddingComment(false);
+    }
   };
 
   const prospectoInfo = (estado: string) => {
@@ -226,48 +233,63 @@ export default function LeadsPage() {
   const handleSubmitNew = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, empresa_vendedora: empresaVendedoraToSave() }),
-    });
-    setShowNewForm(false);
-    setSaving(false);
-    load();
+    // P1: si falla, NO cerramos el form (no se pierde lo escrito) y avisamos.
+    try {
+      await apiSend("/api/leads", {
+        method: "POST",
+        body: { ...form, empresa_vendedora: empresaVendedoraToSave() },
+      });
+      setShowNewForm(false);
+      toast("Lead creado");
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLead) return;
     setSaving(true);
-    await fetch(`/api/leads/${selectedLead.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, empresa_vendedora: empresaVendedoraToSave() }),
-    });
-    setSaving(false);
-    setEditMode(false);
-    closePanel();
-    load();
+    try {
+      await apiSend(`/api/leads/${selectedLead.id}`, {
+        method: "PATCH",
+        body: { ...form, empresa_vendedora: empresaVendedoraToSave() },
+      });
+      setEditMode(false);
+      closePanel();
+      toast("Cambios guardados");
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateEstadoVenta = async (lead: Lead, estado_venta: string) => {
-    await fetch(`/api/leads/${lead.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado_venta }),
-    });
-    load();
-    if (selectedLead?.id === lead.id) {
-      setSelectedLead({ ...lead, estado_venta });
+    try {
+      await apiSend(`/api/leads/${lead.id}`, { method: "PATCH", body: { estado_venta } });
+      if (selectedLead?.id === lead.id) setSelectedLead({ ...lead, estado_venta });
+      toast(estado_venta === "convertido" ? "Lead marcado como convertido" : "Estado actualizado");
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
     }
   };
 
   const deleteLead = async (id: string) => {
     if (!confirm("¿Seguro que quieres eliminar este lead?")) return;
-    await fetch(`/api/leads/${id}`, { method: "DELETE" });
-    if (selectedLead?.id === id) closePanel();
-    load();
+    try {
+      await apiSend(`/api/leads/${id}`, { method: "DELETE" });
+      if (selectedLead?.id === id) closePanel();
+      toast("Lead eliminado");
+      load();
+    } catch (err) {
+      toast(errorMessage(err), "error");
+    }
   };
 
   const canDelete = !isVendedora;

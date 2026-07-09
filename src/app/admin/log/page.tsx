@@ -23,6 +23,7 @@ export default function LogPage() {
   const router = useRouter();
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [role, setRole] = useState("");
   const [filterUser, setFilterUser] = useState("");
 
@@ -34,10 +35,17 @@ export default function LogPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/admin/log");
-    const data = await res.json();
-    setEntries(Array.isArray(data) ? data : []);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const res = await fetch("/api/admin/log", { cache: "no-store" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setEntries(Array.isArray(data) ? data : []);
+    } catch {
+      setLoadError(true); // P2: error de carga ≠ "no hay actividad".
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { if (role === "admin") load(); }, [role, load]);
@@ -83,7 +91,12 @@ export default function LogPage() {
       {loading ? (
         <div className="text-center py-24 text-gray-300">Cargando...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-24 text-gray-300">No hay actividad registrada</div>
+        loadError ? (
+          <div className="text-center py-24">
+            <p className="text-gray-500 mb-3">No se pudo cargar el registro de actividad.</p>
+            <button onClick={() => load()} className="px-5 py-2.5 rounded-xl bg-brandit-orange text-white text-sm font-medium active:scale-[0.97] min-h-[44px]">Reintentar</button>
+          </div>
+        ) : (<div className="text-center py-24 text-gray-300">No hay actividad registrada</div>)
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <table className="w-full text-sm">

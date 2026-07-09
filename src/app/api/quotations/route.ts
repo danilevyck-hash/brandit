@@ -63,7 +63,15 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await request.json();
-  const { data, error } = await getSupabaseServer()
+  const db = getSupabaseServer();
+
+  // Guardado ATÓMICO opcional: si vienen items/prints, se insertan junto con la
+  // cotización y, si algo falla, se hace rollback (compensación) para NO dejar
+  // cotizaciones huérfanas/vacías. Sin items/prints se comporta como antes.
+  const items = Array.isArray(body.items) ? body.items : [];
+  const prints = Array.isArray(body.prints) ? body.prints : [];
+
+  const { data: quotation, error } = await db
     .from("quotations")
     .insert([{
       client_id: body.client_id,
@@ -74,8 +82,28 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  if (error || !quotation) return NextResponse.json({ error: error?.message ?? "No se pudo crear la cotización" }, { status: 500 });
+
+  if (items.length > 0) {
+    const rows = items.map((i: Record<string, unknown>) => ({ ...i, quotation_id: quotation.id }));
+    const { error: itemsErr } = await db.from("quotation_items").insert(rows);
+    if (itemsErr) {
+      await db.from("quotations").delete().eq("id", quotation.id); // rollback
+      return NextResponse.json({ error: `No se pudieron guardar los ítems: ${itemsErr.message}` }, { status: 500 });
+    }
+  }
+
+  if (prints.length > 0) {
+    const rows = prints.map((p: Record<string, unknown>) => ({ ...p, quotation_id: quotation.id }));
+    const { error: printsErr } = await db.from("print_jobs").insert(rows);
+    if (printsErr) {
+      await db.from("quotation_items").delete().eq("quotation_id", quotation.id);
+      await db.from("quotations").delete().eq("id", quotation.id); // rollback
+      return NextResponse.json({ error: `No se pudieron guardar las impresiones: ${printsErr.message}` }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json(quotation);
 }
 
 export async function PUT(request: NextRequest) {

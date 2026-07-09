@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import StickerCard from "@/components/StickerCard";
+import { apiSend, errorMessage } from "@/lib/api-client";
 
 type Sticker = {
   id: string;
@@ -53,14 +54,14 @@ export default function StickerDetailPage() {
   const handleDelete = async () => {
     if (!confirm("¿Eliminar este sticker? Esta acción no se puede deshacer.")) return;
     setDeleting(true);
-    const res = await fetch(`/api/stickers/${id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (data.error) {
-      alert(data.error);
+    // P1: un fallo de red ya no deja el botón atascado en "Eliminando…".
+    try {
+      await apiSend(`/api/stickers/${id}`, { method: "DELETE" });
+      router.push("/stickers");
+    } catch (err) {
+      setError(errorMessage(err));
       setDeleting(false);
-      return;
     }
-    router.push("/stickers");
   };
 
   const handlePrint = () => {
