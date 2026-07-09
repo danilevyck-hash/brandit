@@ -55,7 +55,7 @@ export interface SkipDetail {
   motivo: string;
 }
 
-export type SyncType = "facturas" | "estadocuenta" | "costo_diario" | "recibos";
+export type SyncType = "facturas" | "estadocuenta" | "costo_diario" | "recibos" | "clientes_cartera";
 
 export interface SyncResult {
   syncType: SyncType;

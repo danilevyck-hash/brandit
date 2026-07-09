@@ -16,6 +16,7 @@ import {
   mesesDeAnio,
   type Mes,
 } from "@/lib/switch-api/sync-recibos";
+import { syncClientesCartera } from "@/lib/switch-api/sync-clientes-cartera";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -61,8 +62,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Cartera PRIMERO: los recibos del mismo run se atribuyen con la lista fresca.
+  // Si la cartera falla, recibos corre igual (fallback al vendedor del recibo).
+  const cartera = await syncClientesCartera();
   const recibos = await syncRecibos(recibosMeses(sp));
-  const anyError = recibos.status === "error";
+  const anyError = recibos.status === "error" || cartera.status === "error";
 
-  return NextResponse.json({ ok: !anyError, recibos }, { status: anyError ? 207 : 200 });
+  return NextResponse.json({ ok: !anyError, cartera, recibos }, { status: anyError ? 207 : 200 });
 }

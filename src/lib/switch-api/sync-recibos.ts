@@ -19,6 +19,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient, parseMonto } from "./client";
+import { loadCarteraMap } from "./sync-clientes-cartera";
 import type { SkipDetail, SyncResult } from "./types";
 
 type RawRow = Record<string, unknown>;
@@ -131,11 +132,12 @@ function idToInt(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapRow(r: RawRow, impuestoMap: ImpuestoMap, runStamp: string): RawRow {
+function mapRow(r: RawRow, impuestoMap: ImpuestoMap, carteraMap: Map<string, string>, runStamp: string): RawRow {
   const fc = String(r.fechaCreacion ?? "");
   const fecha = fc.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null; // "YYYY-MM-DD HH:mm:ss" → día
   const cliId = idToInt(r.clienteId);
   const total = parseMonto(r.total as string); // defensivo (coma de miles / número)
+  const cliCodigo = ((r.clienteCodigo as string) ?? "").trim();
   return {
     fecha,
     fecha_creacion: fc ? fc.replace(" ", "T") : null,
@@ -145,6 +147,9 @@ function mapRow(r: RawRow, impuestoMap: ImpuestoMap, runStamp: string): RawRow {
     vendedor_id: idToInt(r.vendedorId),
     vendedor_nombre: (r.vendedor as string) ?? null,
     vendedor_codigo: (r.codigoVendedor as string) ?? null,
+    // Dueño de cartera del cliente (Formato B); fallback al vendedor del recibo
+    // si el cliente no está en la lista del maestro.
+    vendedor_cartera: (cliCodigo && carteraMap.get(cliCodigo)) || ((r.vendedor as string) ?? null),
     sucursal_id: idToInt(r.sucursalId),
     sucursal_codigo: (r.codigoSucursal as string) ?? null,
     total,
@@ -246,11 +251,23 @@ export async function syncRecibos(meses: Mes[]): Promise<SyncResult> {
       });
     }
 
+    // Cartera para vendedor_cartera. Si falla, no abortamos el sync de recibos:
+    // el mapRow cae al fallback (vendedor del recibo) y queda registrado el skip.
+    let carteraMap = new Map<string, string>();
+    try {
+      carteraMap = await loadCarteraMap();
+    } catch (e) {
+      skipDetails.push({
+        entidad: "recibos", identificador: "(cruce cartera)", campo: "switch_clientes_cartera",
+        valorCrudo: "", motivo: `no se pudo cargar la cartera (${e instanceof Error ? e.message : e}); vendedor_cartera usa el vendedor del recibo`,
+      });
+    }
+
     for (const { year, month } of meses) {
       const raw = await fetchRecibosMes(year, month);
       const rows: RawRow[] = [];
       for (const r of raw) {
-        const mapped = mapRow(r, impuestoMap, runStamp);
+        const mapped = mapRow(r, impuestoMap, carteraMap, runStamp);
         // fecha es NOT NULL en la tabla: si no parsea, se salta (nunca en silencio).
         if (mapped.fecha == null) {
           skipDetails.push({
