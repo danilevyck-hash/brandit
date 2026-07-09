@@ -27,6 +27,7 @@ export function vendedorToken(vendedorId: number | null, vendedorNombre: string 
 
 export interface ReciboRow {
   id: number;
+  mes: number;
   fecha: string | null;
   cliente_codigo: string | null;
   cliente_nombre: string | null;
@@ -38,6 +39,7 @@ export interface ReciboRow {
 
 export interface ReciboCalculado {
   id: number;
+  mes: number;
   fecha: string | null;
   cliente_codigo: string | null;
   cliente_nombre: string | null;

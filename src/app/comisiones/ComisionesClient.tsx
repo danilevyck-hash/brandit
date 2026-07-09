@@ -17,6 +17,7 @@ const MESES = [
 
 interface Recibo {
   id: number;
+  mes: number;
   fecha: string | null;
   cliente_codigo: string | null;
   cliente_nombre: string | null;
@@ -34,7 +35,8 @@ interface SnapshotCab {
   total_cobrado: number; total_comision: number;
 }
 interface ApiResp {
-  anio: number; mes: number; frozen: boolean; esMesEnCurso: boolean;
+  anio: number; mes: number; meses: number[]; mesesConCierre: number[];
+  frozen: boolean; esMesEnCurso: boolean;
   snapshot: SnapshotCab | null;
   recibos: Recibo[];
   porVendedor: unknown[];
@@ -58,7 +60,15 @@ export default function ComisionesClient() {
     return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
   });
   const [anio, setAnio] = useState(cur.y);
-  const [mes, setMes] = useState(cur.m);
+  // Meses seleccionados (multi-select). Un solo mes = comportamiento clásico
+  // (snapshot congelado, generar cierre); varios = vista combinada en vivo.
+  const [mesesSel, setMesesSel] = useState<Set<string>>(new Set([String(cur.m)]));
+  const meses = useMemo(
+    () => Array.from(mesesSel).map(Number).sort((a, b) => a - b),
+    [mesesSel],
+  );
+  const multi = meses.length > 1;
+  const mes = meses[0] ?? cur.m; // mes único (solo válido cuando !multi)
 
   const [data, setData] = useState<ApiResp | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,14 +90,19 @@ export default function ComisionesClient() {
   const [showHist, setShowHist] = useState(false);
 
   const load = useCallback(async () => {
+    if (meses.length === 0) {
+      setData(null);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/comisiones?anio=${anio}&mes=${mes}`, { cache: "no-store" });
+      const res = await fetch(`/api/comisiones?anio=${anio}&meses=${meses.join(",")}`, { cache: "no-store" });
       const body = (await res.json()) as ApiResp & { error?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setData(body);
-      const key = `${anio}-${mes}`;
+      const key = `${anio}-${meses.join(",")}`;
       if (!body.frozen && initFor !== key) {
         setVendSel(new Set(body.vendedoresDisponibles.map((v) => v.token)));
         setCliSel(new Set(body.clientesDisponibles.map((c) => c.codigo)));
@@ -99,7 +114,7 @@ export default function ComisionesClient() {
     } finally {
       setLoading(false);
     }
-  }, [anio, mes, initFor]);
+  }, [anio, meses, initFor]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -146,22 +161,51 @@ export default function ComisionesClient() {
     return Array.from(agg.values()).sort((a, b) => b.comision - a.comision);
   }, [visibles]);
 
+  // Desglose por vendedor Y por mes (solo con varios meses): matriz de comisión.
+  const resumenVendedorMes = useMemo(() => {
+    const agg = new Map<string, { nombre: string; porMes: Map<number, number>; total: number }>();
+    for (const r of visibles) {
+      const nombre = r.vendedor_nombre ?? "(sin vendedor)";
+      const e = agg.get(nombre) ?? { nombre, porMes: new Map<number, number>(), total: 0 };
+      e.porMes.set(r.mes, round2((e.porMes.get(r.mes) ?? 0) + r.comision));
+      e.total = round2(e.total + r.comision);
+      agg.set(nombre, e);
+    }
+    return Array.from(agg.values()).sort((a, b) => b.total - a.total);
+  }, [visibles]);
+
+  const periodoLabel = meses.length === 0
+    ? "—"
+    : meses.map((m) => MESES[m - 1]).join(", ") + ` ${anio}`;
+
   const exportExcel = async () => {
     if (visibles.length === 0) return;
     const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
-    // Hoja 1: resumen por vendedor.
+    // Hoja 1: resumen por vendedor (todos los meses seleccionados).
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
       resumenVendedor.map((v) => ({ Vendedor: v.nombre, Recibos: v.recibos, Cobrado: v.cobrado, Comisión: v.comision })),
     ), "Por vendedor");
-    // Hoja 2: detalle recibo por recibo.
+    // Con varios meses: hoja adicional con el desglose vendedor × mes.
+    if (multi) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+        resumenVendedorMes.map((v) => ({
+          Vendedor: v.nombre,
+          ...Object.fromEntries(meses.map((m) => [MESES[m - 1], v.porMes.get(m) ?? 0])),
+          Total: v.total,
+        })),
+      ), "Por vendedor y mes");
+    }
+    // Detalle recibo por recibo (con columna Mes si hay varios).
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
       visibles.map((r) => ({
+        ...(multi ? { Mes: MESES[r.mes - 1] } : {}),
         Fecha: r.fecha, Cliente: r.cliente_nombre ?? r.cliente_codigo ?? "",
         Vendedor: r.vendedor_nombre ?? "", Total: r.total, Tasa: r.tasa, Comisión: r.comision,
       })),
     ), "Detalle");
-    XLSX.writeFile(wb, `Comisiones-${anio}-${String(mes).padStart(2, "0")}.xlsx`);
+    const sufijo = meses.map((m) => String(m).padStart(2, "0")).join("_");
+    XLSX.writeFile(wb, `Comisiones-${anio}-${sufijo}.xlsx`);
   };
 
   const vendOptions: MultiOption[] = (data?.vendedoresDisponibles ?? []).map((v) => ({
@@ -223,7 +267,23 @@ export default function ComisionesClient() {
 
   const years = useMemo(() => [cur.y, cur.y - 1, cur.y - 2], [cur.y]);
 
-  const mesFuturo = (m: number) => anio === cur.y && m > cur.m;
+  // Opciones de mes del año elegido (sin meses futuros del año en curso).
+  const mesOptions: MultiOption[] = useMemo(
+    () => MESES.map((m, i) => ({ value: String(i + 1), label: m }))
+      .filter((o) => !(anio === cur.y && Number(o.value) > cur.m)),
+    [anio, cur.y, cur.m],
+  );
+
+  const onAnioChange = (y: number) => {
+    setAnio(y);
+    if (y === cur.y) {
+      // Al volver al año en curso, quitar meses futuros de la selección.
+      setMesesSel((prev) => {
+        const next = new Set(Array.from(prev).filter((v) => Number(v) <= cur.m));
+        return next.size > 0 ? next : new Set([String(cur.m)]);
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
@@ -235,18 +295,17 @@ export default function ComisionesClient() {
             <p className="text-sm text-gray-400">Comisión sobre cobros del mes</p>
           </div>
           <div className="flex items-center gap-2">
-            <select
-              value={mes}
-              onChange={(e) => setMes(parseInt(e.target.value, 10))}
-              className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-200 min-h-[44px]"
-            >
-              {MESES.map((m, i) => (
-                <option key={i} value={i + 1} disabled={mesFuturo(i + 1)}>{m}</option>
-              ))}
-            </select>
+            <div className="w-48">
+              <MultiSelect
+                label="Meses"
+                options={mesOptions}
+                selected={mesesSel}
+                onChange={setMesesSel}
+              />
+            </div>
             <select
               value={anio}
-              onChange={(e) => setAnio(parseInt(e.target.value, 10))}
+              onChange={(e) => onAnioChange(parseInt(e.target.value, 10))}
               className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-200 min-h-[44px]"
             >
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -274,6 +333,23 @@ export default function ComisionesClient() {
             >
               Eliminar y regenerar
             </button>
+          </div>
+        )}
+
+        {/* Aviso: sin meses seleccionados */}
+        {meses.length === 0 && (
+          <div className="mb-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            Selecciona al menos un mes para ver comisiones.
+          </div>
+        )}
+
+        {/* Aviso multi-mes: vista combinada en vivo + meses que ya tienen cierre */}
+        {multi && data && (
+          <div className="mb-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
+            Vista combinada de {meses.length} meses ({periodoLabel}), calculada en vivo.
+            {data.mesesConCierre.length > 0 && (
+              <> Los meses {data.mesesConCierre.map((m) => MESES[m - 1]).join(", ")} ya tienen cierre generado; sus cierres no cambian con esta vista.</>
+            )}
           </div>
         )}
 
@@ -324,6 +400,41 @@ export default function ComisionesClient() {
           </div>
         )}
 
+        {/* Desglose por vendedor Y por mes (solo con varios meses) */}
+        {!loading && multi && resumenVendedorMes.length > 0 && (
+          <div className="mb-5 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Comisión por vendedor y mes</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                    <th className="px-4 py-2 font-medium">Vendedor</th>
+                    {meses.map((m) => (
+                      <th key={m} className="px-4 py-2 text-right font-medium whitespace-nowrap">{MESES[m - 1].slice(0, 3)}</th>
+                    ))}
+                    <th className="px-4 py-2 text-right font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumenVendedorMes.map((v) => (
+                    <tr key={v.nombre} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
+                      <td className="px-4 py-2.5 text-gray-800 dark:text-gray-200 whitespace-nowrap">{v.nombre}</td>
+                      {meses.map((m) => (
+                        <td key={m} className="px-4 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                          {v.porMes.has(m) ? formatCurrency(v.porMes.get(m)!) : "—"}
+                        </td>
+                      ))}
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-brandit-orange">{formatCurrency(v.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Filtros (solo en vivo) */}
         {!frozen && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
@@ -348,9 +459,11 @@ export default function ComisionesClient() {
         {loading ? (
           <div className="py-20 text-center text-sm text-gray-400">Cargando…</div>
         ) : visibles.length === 0 ? (
-          <div className="py-16 text-center text-sm text-gray-400 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
-            Sin recibos {MESES[mes - 1]} {anio}.
-          </div>
+          meses.length === 0 ? null : (
+            <div className="py-16 text-center text-sm text-gray-400 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+              Sin recibos {periodoLabel}.
+            </div>
+          )
         ) : (
           <>
             {/* Desktop */}
@@ -358,6 +471,7 @@ export default function ComisionesClient() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-900 text-left text-xs uppercase tracking-wide text-gray-400">
+                    {multi && <th className="px-4 py-2.5 font-medium">Mes</th>}
                     <th className="px-4 py-2.5 font-medium">Fecha</th>
                     <th className="px-4 py-2.5 font-medium">Cliente</th>
                     <th className="px-4 py-2.5 font-medium">Vendedor</th>
@@ -368,7 +482,8 @@ export default function ComisionesClient() {
                 </thead>
                 <tbody>
                   {visibles.map((r) => (
-                    <tr key={r.id} className="border-t border-gray-100 dark:border-gray-800">
+                    <tr key={`${r.mes}-${r.id}`} className="border-t border-gray-100 dark:border-gray-800">
+                      {multi && <td className="px-4 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400">{MESES[r.mes - 1].slice(0, 3)}</td>}
                       <td className="px-4 py-2.5 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtDate(r.fecha ?? "")}</td>
                       <td className="px-4 py-2.5 text-gray-800 dark:text-gray-200">{r.cliente_nombre ?? r.cliente_codigo ?? "-"}</td>
                       <td className="px-4 py-2.5 text-gray-600 dark:text-gray-300">{r.vendedor_nombre ?? "-"}</td>
@@ -380,7 +495,7 @@ export default function ComisionesClient() {
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 font-semibold text-gray-900 dark:text-white">
-                    <td className="px-4 py-2.5" colSpan={3}>Total ({visibles.length})</td>
+                    <td className="px-4 py-2.5" colSpan={multi ? 4 : 3}>Total ({visibles.length})</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(totalCobrado)}</td>
                     <td></td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(totalComision)}</td>
@@ -392,10 +507,10 @@ export default function ComisionesClient() {
             {/* Mobile cards */}
             <div className="sm:hidden space-y-2">
               {visibles.map((r) => (
-                <div key={r.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 p-3">
+                <div key={`${r.mes}-${r.id}`} className="rounded-2xl border border-gray-200 dark:border-gray-800 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{r.cliente_nombre ?? r.cliente_codigo ?? "-"}</p>
-                    <span className="text-xs text-gray-400 shrink-0">{fmtDate(r.fecha ?? "")}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{multi ? `${MESES[r.mes - 1].slice(0, 3)} · ` : ""}{fmtDate(r.fecha ?? "")}</span>
                   </div>
                   <p className="text-xs text-gray-400 mb-2">{r.vendedor_nombre ?? "-"}</p>
                   <div className="flex items-center justify-between text-sm">
@@ -431,12 +546,17 @@ export default function ComisionesClient() {
           </div>
         )}
 
-        {/* Generar */}
-        {!frozen && (
-          <div className="mt-6 flex justify-end">
+        {/* Generar — los cierres son mensuales: solo disponible con UN mes seleccionado */}
+        {!frozen && meses.length > 0 && (
+          <div className="mt-6 flex items-center justify-end gap-3 flex-wrap">
+            {multi && (
+              <p className="text-xs text-gray-400 text-right">
+                Los cierres se generan por mes. Selecciona un solo mes para generar.
+              </p>
+            )}
             <button
               onClick={() => setConfirmGen(true)}
-              disabled={loading || visibles.length === 0}
+              disabled={loading || multi || visibles.length === 0}
               className="px-5 py-2.5 rounded-xl text-sm font-medium bg-brandit-orange text-white hover:opacity-90 active:scale-[0.97] transition-all min-h-[44px] disabled:opacity-40"
             >
               Generar comisiones del mes
@@ -458,7 +578,7 @@ export default function ComisionesClient() {
               {hist.map((h) => (
                 <button
                   key={h.id}
-                  onClick={() => { setAnio(h.anio); setMes(h.mes); setInitFor(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  onClick={() => { setAnio(h.anio); setMesesSel(new Set([String(h.mes)])); setInitFor(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                 >
                   <div>

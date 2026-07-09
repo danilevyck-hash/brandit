@@ -1,6 +1,8 @@
 // Comisiones por cobro (switch_recibos). Solo admin.
-//   GET ?anio=&mes=[&vendedores=&clientes_excluidos=] → cálculo en vivo del mes
-//       (o el snapshot congelado si ya existe para ese mes).
+//   GET ?anio=&mes=  o  ?anio=&meses=1,2,3 [&vendedores=&clientes_excluidos=]
+//       Un solo mes → cálculo en vivo (o el snapshot congelado si ya existe).
+//       Varios meses → SIEMPRE cálculo en vivo combinado (los cierres son
+//       mensuales); mesesConCierre informa cuáles ya tienen snapshot.
 //   POST → genera snapshot del mes (cabecera + detalle), idempotente por (anio, mes).
 //
 // Reglas: comisión por recibo, atribución por vendedor del recibo, EXCLUYE
@@ -30,16 +32,20 @@ function esMesEnCurso(anio: number, mes: number): boolean {
   return anio === d.getUTCFullYear() && mes === d.getUTCMonth() + 1;
 }
 
-function parseAnioMes(sp: URLSearchParams): { anio: number; mes: number } | NextResponse {
+function parseAnioMeses(sp: URLSearchParams): { anio: number; meses: number[] } | NextResponse {
   const anio = parseInt(sp.get("anio") ?? "", 10);
-  const mes = parseInt(sp.get("mes") ?? "", 10);
   if (!Number.isInteger(anio) || anio < 2024 || anio > 2100) {
     return NextResponse.json({ error: "anio inválido" }, { status: 400 });
   }
-  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+  // `meses=1,2,3` (lista) tiene prioridad; `mes=` se mantiene por compatibilidad.
+  const raw = sp.get("meses") ?? sp.get("mes") ?? "";
+  const meses = Array.from(new Set(
+    raw.split(",").map((s) => parseInt(s.trim(), 10)),
+  )).sort((a, b) => a - b);
+  if (meses.length === 0 || meses.some((m) => !Number.isInteger(m) || m < 1 || m > 12)) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
-  return { anio, mes };
+  return { anio, meses };
 }
 
 /** Trae los recibos del mes (todos, incluye retenciones) de switch_recibos. */
@@ -55,6 +61,7 @@ async function fetchRecibosMes(anio: number, mes: number): Promise<ReciboRow[]> 
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => ({
     id: r.id as number,
+    mes,
     fecha: r.fecha as string | null,
     cliente_codigo: r.cliente_codigo as string | null,
     cliente_nombre: r.cliente_nombre as string | null,
@@ -86,7 +93,7 @@ function calcular(recibos: ReciboRow[], vendedoresSel: Set<string> | null, clien
   });
 
   const calculados: ReciboCalculado[] = seleccionados.map((r) => ({
-    id: r.id, fecha: r.fecha, cliente_codigo: r.cliente_codigo, cliente_nombre: r.cliente_nombre,
+    id: r.id, mes: r.mes, fecha: r.fecha, cliente_codigo: r.cliente_codigo, cliente_nombre: r.cliente_nombre,
     vendedor_id: r.vendedor_id, vendedor_nombre: r.vendedor_nombre,
     total: round2(r.total), tasa: tasaPara(r.total), comision: comisionRecibo(r.total),
   }));
@@ -133,12 +140,15 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;
-  const parsed = parseAnioMes(sp);
+  const parsed = parseAnioMeses(sp);
   if (parsed instanceof NextResponse) return parsed;
-  const { anio, mes } = parsed;
+  const { anio, meses } = parsed;
+  const mes = meses[0];
 
   try {
-    const snapshot = await loadSnapshotCabecera(anio, mes);
+    // Solo el modo de UN mes puede devolver un snapshot congelado; con varios
+    // meses el cálculo es siempre en vivo (los cierres son mensuales).
+    const snapshot = meses.length === 1 ? await loadSnapshotCabecera(anio, mes) : null;
 
     // Ya generado → devolver el detalle CONGELADO (no el cálculo en vivo).
     if (snapshot) {
@@ -151,7 +161,7 @@ export async function GET(req: NextRequest) {
       if (error) throw new Error(error.message);
 
       const recibos = (det ?? []).map((r, i) => ({
-        id: i, fecha: r.fecha as string | null, cliente_codigo: r.cliente_codigo as string | null,
+        id: i, mes, fecha: r.fecha as string | null, cliente_codigo: r.cliente_codigo as string | null,
         cliente_nombre: r.cliente_nombre as string | null, vendedor_id: null,
         vendedor_nombre: r.vendedor_nombre as string | null,
         total: Number(r.total ?? 0), tasa: Number(r.tasa ?? 0), comision: Number(r.comision ?? 0),
@@ -168,7 +178,7 @@ export async function GET(req: NextRequest) {
       }
 
       return NextResponse.json({
-        anio, mes, frozen: true, esMesEnCurso: esMesEnCurso(anio, mes),
+        anio, mes, meses, mesesConCierre: [mes], frozen: true, esMesEnCurso: esMesEnCurso(anio, mes),
         snapshot: {
           id: snapshot.id, generado_at: snapshot.generado_at, generado_por: snapshot.generado_por,
           total_cobrado: Number(snapshot.total_cobrado), total_comision: Number(snapshot.total_comision),
@@ -184,16 +194,33 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Cálculo en vivo con filtros.
+    // Cálculo en vivo con filtros (uno o varios meses combinados).
     const vendedoresSel = sp.get("vendedores") !== null
       ? new Set(sp.get("vendedores")!.split(",").map((s) => s.trim()).filter(Boolean))
       : null;
     const clientesExcl = new Set((sp.get("clientes_excluidos") ?? "").split(",").map((s) => s.trim()).filter(Boolean));
 
-    const recibos = await fetchRecibosMes(anio, mes);
+    const porMes = await Promise.all(meses.map((m) => fetchRecibosMes(anio, m)));
+    const recibos = porMes.flat();
     const calc = calcular(recibos, vendedoresSel, clientesExcl);
 
-    return NextResponse.json({ anio, mes, frozen: false, esMesEnCurso: esMesEnCurso(anio, mes), snapshot: null, ...calc });
+    // Con varios meses: informar cuáles ya tienen cierre (la vista combinada no lo usa como fuente).
+    let mesesConCierre: number[] = [];
+    if (meses.length > 1) {
+      const { data: snaps, error: snapsErr } = await getSupabaseServer()
+        .from("comisiones_snapshot")
+        .select("mes")
+        .eq("anio", anio)
+        .in("mes", meses);
+      if (snapsErr) throw new Error(snapsErr.message);
+      mesesConCierre = (snaps ?? []).map((s) => s.mes as number).sort((a, b) => a - b);
+    }
+
+    return NextResponse.json({
+      anio, mes, meses, mesesConCierre, frozen: false,
+      esMesEnCurso: meses.some((m) => esMesEnCurso(anio, m)),
+      snapshot: null, ...calc,
+    });
   } catch (e) {
     console.error("[comisiones GET]", e);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
